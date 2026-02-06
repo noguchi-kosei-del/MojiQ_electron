@@ -1,0 +1,110 @@
+/* ========================================= */
+/* sidebar.css - サイドバー */
+/* ========================================= */
+
+/* --- サイドバー --- */
+.sidebar {
+    width: 180px;
+    background-color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    z-index: 10;
+    position: relative;
+    transition: width 0.3s ease;
+}
+
+.sidebar.left {
+    border-right: 1px solid #ccc;
+}
+
+.sidebar.right {
+    border-left: 1px solid #ccc;
+    width: 228px;
+    overflow: visible;
+}
+
+.sidebar.right .sidebar-content {
+    overflow: visible;
+}
+
+/* サイドバーヘッダー（折り畳みボタン用） */
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    height: 24px;
+    min-height: 24px;
+    background: #eceff1;
+    border-bottom: 1px solid #cfd8dc;
+    flex-shrink: 0;
+}
+
+.sidebar.left .sidebar-header {
+    justify-content: flex-start;
+    padding-left: 4px;
+}
+
+.sidebar.right .sidebar-header {
+    justify-content: flex-end;
+    padding-right: 4px;
+}
+
+/* サイドバーコンテンツ */
+.sidebar-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1;
+    opacity: 1;
+    transition: opacity 0.2s ease;
+}
+
+/* 折り畳みボタン */
+.sidebar-toggle-btn {
+    width: 18px;
+    height: 18px;
+    background: transparent;
+    color: #78909c;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    padding: 0;
+    line-height: 1;
+}
+
+.sidebar-toggle-btn:hover {
+    background: #cfd8dc;
+    color: #37474f;
+}
+
+/* 折り畳み状態 */
+.sidebar.collapsed {
+    width: 24px !important;
+    min-width: 24px;
+}
+
+.sidebar.collapsed .sidebar-header {
+    justify-content: center;
+    padding: 0;
+}
+
+.sidebar.collapsed .sidebar-content {
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+/* UIグループの表示制御 */
+.ui-group {
+    display: block;
+}

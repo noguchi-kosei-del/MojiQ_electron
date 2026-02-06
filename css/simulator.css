@@ -1,0 +1,306 @@
+/* ========================================= */
+/* MojiQ Simulator Specific Styles           */
+/* ========================================= */
+
+/* --- キャリブレーションモード時のスタイル調整 --- */
+
+/* キャリブレーション時は背景色を変えてクロスヘアカーソルに */
+.shared-canvas-area.calibration-mode { 
+    background-color: #263238 !important; 
+    cursor: crosshair !important; 
+}
+.shared-canvas-area.calibration-mode #canvas-wrapper {
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); /* 周囲を暗くする擬似表現 */
+    z-index: 5000;
+}
+
+/* キャリブレーションガイドダイアログ */
+#calibrationGuide {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%) scale(0.9);
+    width: auto;
+    max-width: 90%;
+    padding: 16px 28px;
+    background: linear-gradient(135deg, #ff9800, #ef6c00);
+    color: white;
+    text-align: center;
+    z-index: 5000;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(255, 152, 0, 0.4);
+    font-weight: bold;
+    font-size: 14px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    border-radius: 16px;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+#calibrationGuide.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) scale(1);
+}
+.calib-icon { background: rgba(255,255,255,0.25); padding: 4px 10px; border-radius: 4px; font-size: 12px; }
+
+/* 縮尺合わせボタンのアニメーション */
+#calibrateBtn { position: relative; transition: all 0.3s; }
+#calibrateBtn.active { 
+    background-color: #fff3e0; border-color: #ff9800; color: #e65100;
+    box-shadow: 0 2px 10px rgba(255, 152, 0, 0.2);
+    animation: pulse-border 2s infinite;
+}
+@keyframes pulse-border {
+    0% { box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.4); }
+    70% { box-shadow: 0 0 0 6px rgba(255, 152, 0, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 152, 0, 0); }
+}
+
+/* --- サイドバーツールボタン (縮尺合わせ・写植グリッド) --- */
+.sidebar-tool-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 10px 8px;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-height: 60px;
+}
+.sidebar-tool-btn:hover:not(:disabled) {
+    border-color: #90caf9;
+    background: #e3f2fd;
+}
+.sidebar-tool-btn:active:not(:disabled) {
+    transform: scale(0.96);
+}
+.sidebar-tool-btn.active {
+    border-color: #4caf50;
+    background: #e8f5e9;
+    color: #2e7d32;
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.2);
+}
+.sidebar-tool-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #f5f5f5;
+    border-color: #e0e0e0;
+    color: #bdbdbd;
+    pointer-events: none;
+}
+.sidebar-tool-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.sidebar-tool-label {
+    font-size: 10px;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+/* --- グリッド設定エリア (サイドバー内) --- */
+#gridSettingsArea {
+    background: #f1f8e9; border: 1px solid #c5e1a5; 
+    border-radius: 8px; padding: 12px; margin-bottom: 10px; 
+}
+.grid-inputs-container { display: flex; gap: 8px; width: 100%; }
+.grid-input-group { flex: 1; min-width: 0; }
+.recommend-controls { 
+    margin-top: 10px; border-top: 1px dashed #a5d6a7; 
+    padding-top: 8px; transition: opacity 0.3s; 
+}
+.recommend-controls.disabled { opacity: 0.5; pointer-events: none; filter: grayscale(100%); }
+
+/* 実寸グリッドボタン */
+#gridBtn:disabled {
+    opacity: 0.6; cursor: not-allowed !important;
+    background-color: #f5f5f5 !important; border-color: #e0e0e0 !important; color: #bdbdbd !important;
+    pointer-events: none;
+}
+#gridBtn.active {
+    border-color: #4caf50 !important; background-color: #f1f8e9 !important; color: #2e7d32 !important;
+    box-shadow: 0 2px 5px rgba(76, 175, 80, 0.2) !important;
+}
+
+/* 枠線削除ボタン（縮尺設定完了までグレーロック） */
+#deleteGridBtn:disabled {
+    opacity: 0.6; cursor: not-allowed !important;
+    background-color: #f5f5f5 !important; border-color: #e0e0e0 !important; color: #bdbdbd !important;
+    pointer-events: none;
+}
+
+/* --- ダッシュボード (浮遊カプセルUI) --- */
+#adjustMessage {
+    position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+    border-radius: 40px; background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.15);
+    padding: 12px 28px;
+    display: none; /* JSで制御 */
+    flex-direction: column; align-items: center; gap: 8px;
+    z-index: 3000; transition: top 0.3s ease, left 0.3s ease, transform 0.3s ease;
+    cursor: grab;
+    user-select: none;
+}
+#adjustMessage.dragging {
+    cursor: grabbing;
+    transition: none;
+}
+#adjustMessage.dragged {
+    transform: none;
+    transition: none;
+}
+#adjustMessage.bottom-pos:not(.dragged) { top: unset; bottom: 90px; } /* BottomNavより上に */
+
+/* ダッシュボードの表示/非表示はJSで制御 */
+
+/* ダッシュボード内の要素 */
+.dashboard-container { display: flex; align-items: flex-start; gap: 16px; }
+.spec-group { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+
+.spec-badge {
+    min-width: 54px; height: 54px; border-radius: 16px;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    color: white; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+    position: relative; padding: 0 10px; box-sizing: border-box;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.spec-badge:active { transform: scale(0.92); }
+.spec-badge.active-spec { 
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.8), 0 0 0 5px #2196f3; 
+    z-index: 10; transform: translateY(-3px);
+}
+.spec-badge.locked-active {
+    background: linear-gradient(135deg, #fbc02d, #f57f17) !important; color: #fff !important;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.8), 0 8px 16px rgba(251, 192, 45, 0.4) !important;
+    transform: scale(1.05); z-index: 20;
+}
+.spec-badge.locked-disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(0.5); }
+
+/* バッジのカラー定義 */
+.badge-lines { background: linear-gradient(135deg, #ffa726, #fb8c00); }
+.badge-chars { background: linear-gradient(135deg, #ec407a, #d81b60); }
+.badge-pt { background: linear-gradient(135deg, #29b6f6, #0288d1); min-width: 60px; }
+.badge-pt-large { min-width: 90px; padding: 10px 18px; }
+.badge-pt-large .spec-label { font-size: 13px; }
+.badge-pt-large .spec-value { font-size: 28px; }
+.badge-density { background: linear-gradient(135deg, #66bb6a, #43a047); min-width: 70px; }
+
+.spec-label { font-size: 9px; font-weight: bold; opacity: 0.95; line-height: 1; margin-top: 2px; }
+/* font-family の指定を削除、または Noto Sans JP に変更 */
+.spec-value { font-size: 19px; font-weight: 800; line-height: 1; font-family: "Noto Sans JP", sans-serif; text-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+
+/* キーボードショートカットガイド */
+.key-btn-wrapper { display: flex; align-items: center; justify-content: center; font-size: 9px; color: #546e7a; font-weight: bold; cursor: pointer; }
+.key-cap {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 18px; background: linear-gradient(to bottom, #fff, #f0f0f0);
+    border: 1px solid #cfd8dc; border-bottom-width: 2px; border-radius: 5px;
+    font-family: "Menlo", monospace; font-size: 11px; color: #444; transition: all 0.1s;
+}
+.key-cap.pressed { transform: translateY(1px); border-bottom-width: 1px; background: #e0e0e0; }
+
+.dash-divider { width: 1px; height: 40px; background: rgba(0,0,0,0.06); margin: 0 2px; }
+.dash-footer { margin-top: 4px; display:flex; flex-direction:column; align-items:center; gap:2px; width: 100%; }
+#guideText { font-size:11px; color:#455a64; font-weight:500; }
+
+/* Density UI */
+.density-control-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; width: 100%; justify-content: center; }
+.toggle-switch { position: relative; width: 36px; height: 20px; display: inline-block; cursor: pointer; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #cfd8dc; border-radius: 20px; transition: .3s;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+.toggle-slider:before {
+    position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white;
+    border-radius: 50%; transition: .3s; box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+input:checked + .toggle-slider { background-color: #4caf50; }
+input:checked + .toggle-slider:before { transform: translateX(16px); }
+
+.density-mode-selector {
+    display: flex; background: rgba(255,255,255,0.6); border-radius: 8px; overflow: hidden; border: 1px solid rgba(0,0,0,0.05); width: 100%; height: 24px;
+}
+.mode-btn {
+    flex: 1; font-size: 10px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: #546e7a; font-weight: bold; transition: all 0.1s; border-right: 1px solid rgba(0,0,0,0.05); padding: 0 6px; white-space: nowrap;
+}
+.mode-btn.active { background: #66bb6a; color: white; }
+
+/* ステップボタン */
+.step-toggle {
+    display: flex; background: rgba(255,255,255,0.5);
+    border: 1px solid rgba(0,0,0,0.05); border-radius: 12px; overflow: hidden;
+}
+.step-btn {
+    padding: 2px 5px; font-size: 9px; cursor: pointer; color: #546e7a; font-weight: bold;
+    transition: all 0.1s; border-right: 1px solid rgba(0,0,0,0.05);
+}
+.step-toggle.vertical { flex-direction: column; width: 24px; height: 74px; margin-left: 6px; }
+.step-toggle.vertical .step-btn { flex: 1; display: flex; align-items: center; justify-content: center; border-right: none; border-bottom: 1px solid rgba(0,0,0,0.05); }
+
+/* ツールチップ（無効化） */
+#sizeTooltip {
+    display: none !important;
+}
+
+/* --- Simulator ツールボタン --- */
+/* 校正・指示モードと共通のスタイル（style.css の .tool-grid, .tool-btn を使用） */
+
+/* Simulatorのラベルは長いテキストがあるため、折り返し・縮小で対応 */
+#ui-group-sim-left .tool-label {
+    font-size: 9px;
+    line-height: 1.1;
+    text-align: center;
+    word-break: keep-all;
+    white-space: nowrap;
+}
+
+/* --- 縮尺設定前のグレーロック --- */
+/* 写植グリッド設定エリア・文字サイズ入力など */
+.disabled-lock {
+    position: relative;
+    opacity: 0.5;
+    pointer-events: none;
+    filter: grayscale(60%);
+}
+.disabled-lock::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(200, 200, 200, 0.3);
+    border-radius: inherit;
+    pointer-events: none;
+}
+
+/* グリッド設定エリアのロック状態 */
+#gridSettingsArea.disabled-lock {
+    background: #eceff1;
+    border-color: #cfd8dc;
+}
+
+/* 無効化された入力フィールド */
+#gridSettingsArea.disabled-lock input,
+#gridSettingsArea.disabled-lock textarea,
+#gridSettingsArea.disabled-lock select {
+    background-color: #eceff1 !important;
+    cursor: not-allowed !important;
+}
+
+/* 文字サイズ入力のロック */
+#sim-fontSizeInput:disabled {
+    background-color: #eceff1 !important;
+    cursor: not-allowed !important;
+    opacity: 0.6;
+}

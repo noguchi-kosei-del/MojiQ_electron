@@ -1,0 +1,34 @@
+/* ========================================= */
+/* main.css - メインスタイルシート */
+/* すべてのCSSモジュールをインポート */
+/* ========================================= */
+
+/* 基本設定・リセット */
+@import url('base.css');
+
+/* ヘッダー・メニューバー */
+@import url('header.css');
+
+/* メインレイアウト構成 */
+@import url('layout.css');
+
+/* サイドバー */
+@import url('sidebar.css');
+
+/* キャンバス関連 */
+@import url('canvas.css');
+
+/* UIコンポーネント */
+@import url('components.css');
+
+/* スタンプ・パレット */
+@import url('stamps.css');
+
+/* ナビゲーション・ページ切替 */
+@import url('navigation.css');
+
+/* 環境設定 */
+@import url('settings.css');
+
+/* ダークモード（最後に読み込み） */
+@import url('dark-mode.css');

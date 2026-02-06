@@ -1,0 +1,525 @@
+/* ========================================= */
+/* navigation.css - ナビゲーション・ページ切替 */
+/* ========================================= */
+
+/* --- Bottom Nav (ページ切り替えフローティングバー) --- */
+.bottom-nav-bar {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateZ(0);
+    will-change: opacity;
+    width: 70%;
+    max-width: 600px;
+    height: 36px;
+    background-color: rgba(40, 40, 40, 0.9);
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 100;
+    opacity: 1;
+    pointer-events: auto;
+    transition: opacity 0.5s ease;
+}
+
+.bottom-nav-bar button {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color 0.2s, transform 0.2s;
+}
+
+.bottom-nav-bar button:hover {
+    background-color: rgba(255,255,255,0.2);
+}
+
+/* ナビゲーションボタンコンテナ（右端配置） */
+.nav-buttons {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.slider-container {
+    flex-grow: 1;
+    margin: 0 8px;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+/* ページ番号バブル（ボタン/スクロール/キー操作時に表示） */
+.slider-bubble {
+    position: absolute;
+    bottom: 20px;
+    transform: translateX(-50%) scale(1);
+    transform-origin: center bottom;
+    background-color: #ff4444;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    pointer-events: none;
+    white-space: nowrap;
+    display: none;
+    z-index: 101;
+    transition: transform 0.15s ease-out, padding 0.15s ease-out, font-size 0.15s ease-out;
+}
+
+.slider-bubble.visible {
+    display: block;
+}
+
+/* ドラッグ中は大きく表示 */
+.slider-bubble.dragging {
+    transform: translateX(-50%) scale(1.3);
+    padding: 6px 12px;
+    font-size: 14px;
+}
+
+.slider-bubble::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -4px;
+    border-width: 4px;
+    border-style: solid;
+    border-color: #ff4444 transparent transparent transparent;
+    transition: border-width 0.15s ease-out, margin-left 0.15s ease-out;
+}
+
+.slider-bubble.dragging::after {
+    border-width: 6px;
+    margin-left: -6px;
+}
+
+
+.bottom-nav-bar.fade-out {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.5s ease, visibility 0s linear 0.5s;
+}
+
+/* --- ユーザー非表示状態 --- */
+.bottom-nav-bar.user-hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+
+/* --- ページバー表示/非表示トグル（左サイドバー下部） --- */
+.sidebar-bottom-actions {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 8px;
+    display: flex;
+    justify-content: flex-start;
+    background: transparent;
+}
+
+.sidebar-bottom-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent !important;
+    background-color: transparent !important;
+    cursor: pointer;
+    color: #555;
+    transition: color 0.2s;
+}
+
+.sidebar-bottom-btn:hover {
+    color: #1976d2;
+    background: transparent !important;
+    background-color: transparent !important;
+}
+
+.sidebar-bottom-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* サイドバー折り畳み時は非表示 */
+.sidebar.collapsed .sidebar-bottom-actions {
+    display: none;
+}
+
+/* スライダー入力 */
+input[type="range"]#pageSlider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: #666;
+    border-radius: 2px;
+    outline: none;
+    margin: 0;
+    border: none;
+    direction: rtl;
+}
+
+input[type="range"]#pageSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #ff4444;
+    border: 2px solid #fff;
+    cursor: pointer;
+}
+
+/* ========================================= */
+/* ハンバーガーメニュー & スライドメニュー */
+/* ========================================= */
+.hamburger-btn {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    margin-left: 4px;
+    margin-right: 8px;
+    border: none;
+    border-radius: 6px;
+    background: transparent !important;
+    cursor: pointer;
+    transition: background 0.2s;
+    outline: none;
+}
+
+.hamburger-btn:hover {
+    background: transparent !important;
+}
+
+.hamburger-btn:focus,
+.hamburger-btn:active,
+.hamburger-btn:focus-visible {
+    background: transparent !important;
+    outline: none;
+    box-shadow: none;
+}
+
+.hamburger-btn.active,
+.hamburger-btn.active:hover {
+    background: transparent !important;
+}
+
+.hamburger-line {
+    position: absolute;
+    display: block;
+    width: 20px;
+    height: 3px;
+    background-color: #333;
+    border-radius: 1.5px;
+    transition: all 0.3s ease;
+}
+
+.hamburger-line:nth-child(1) {
+    top: 10px;
+}
+
+.hamburger-line:nth-child(2) {
+    top: 17px;
+}
+
+.hamburger-line:nth-child(3) {
+    top: 24px;
+}
+
+/* ハンバーガーメニューの×変形 */
+.hamburger-btn.active .hamburger-line:nth-child(1) {
+    top: 17px;
+    transform: rotate(45deg);
+}
+
+.hamburger-btn.active .hamburger-line:nth-child(2) {
+    opacity: 0;
+}
+
+.hamburger-btn.active .hamburger-line:nth-child(3) {
+    top: 17px;
+    transform: rotate(-45deg);
+}
+
+/* スライドメニュー */
+.slide-menu {
+    position: fixed;
+    top: 40px;
+    left: 0;
+    width: 280px;
+    height: calc(100% - 40px);
+    background-color: #fff;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2);
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 9998;
+    overflow-y: auto;
+}
+
+.slide-menu.open {
+    transform: translateX(0);
+}
+
+.slide-menu-header {
+    padding: 16px 24px;
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+    border-bottom: 1px solid #e0e0e0;
+    background-color: #fafafa;
+}
+
+.slide-menu-content {
+    padding: 20px 0;
+}
+
+.slide-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 15px 24px;
+    color: #333;
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.slide-menu-item .external-link-icon {
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.slide-menu-item:hover {
+    background-color: #f5f5f5;
+}
+
+.slide-menu-overlay {
+    position: fixed;
+    top: 40px;
+    left: 0;
+    width: 100%;
+    height: calc(100% - 40px);
+    background-color: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease;
+    z-index: 9997;
+}
+
+.slide-menu-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* スライドメニュー下部ボタンエリア */
+.slide-menu-bottom {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    gap: 8px;
+    padding: 16px 24px;
+    background: inherit;
+}
+
+.slide-menu-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: none;
+    background: none !important;
+    background-color: transparent !important;
+    cursor: pointer;
+    color: #333;
+}
+
+.slide-menu-icon-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+.slide-menu-icon-btn:hover {
+    color: #1976d2;
+}
+
+.slide-menu-icon-btn:hover svg {
+    stroke: #1976d2;
+}
+
+#workspaceFlipBtn.slide-menu-icon-btn:hover {
+    color: #1976d2;
+}
+
+/* PDF読み込み前のグレーアウト状態 */
+.slide-menu-icon-btn.pdf-required:disabled {
+    opacity: 0.3;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.slide-menu-icon-btn.pdf-required:disabled svg {
+    stroke: #999;
+}
+
+/* メニューオープン時にmode-tabsを無効化 */
+.mode-tabs.menu-locked {
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+/* ========================================= */
+/* ページ編集ドロップダウンメニュー */
+/* ========================================= */
+.page-edit-dropdown {
+    position: fixed;
+    width: 220px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    z-index: 10001;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.2s;
+}
+
+/* 吹き出しの三角形（上向き矢印・ボタン中央に配置） */
+.page-edit-dropdown::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: var(--triangle-left, 50%);
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid #ffffff;
+    filter: drop-shadow(0 -2px 2px rgba(0, 0, 0, 0.1));
+}
+
+.page-edit-dropdown.open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.page-edit-dropdown-content {
+    padding: 8px 0;
+}
+
+.page-edit-dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 10px 16px;
+    font-size: 13px;
+    text-align: left;
+    color: #333;
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.page-edit-dropdown-item:hover {
+    background-color: #f0f0f0;
+}
+
+.page-edit-dropdown-item.danger {
+    color: #c62828;
+}
+
+.page-edit-dropdown-item.danger:hover {
+    background-color: #ffebee;
+}
+
+.page-edit-dropdown-divider {
+    height: 1px;
+    background-color: #e0e0e0;
+    margin: 4px 0;
+}
+
+.page-edit-dropdown-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    z-index: 9997;
+    opacity: 0;
+    visibility: hidden;
+}
+
+.page-edit-dropdown-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* ========================================= */
+/* PDF保存ドロップダウンメニュー */
+/* ========================================= */
+.save-pdf-dropdown {
+    width: 180px;
+}
+
+/* 保存オプションのアイテムスタイル */
+.save-pdf-dropdown .page-edit-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+}
+
+.save-pdf-dropdown .dropdown-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* グレーアウト状態（上書き保存不可時） */
+.save-pdf-dropdown .page-edit-dropdown-item:disabled {
+    color: #aaa;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.save-pdf-dropdown .page-edit-dropdown-item:disabled .dropdown-icon svg {
+    stroke: #aaa;
+}
+
+.save-pdf-dropdown .page-edit-dropdown-item:disabled:hover {
+    background-color: transparent;
+}
+

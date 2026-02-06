@@ -1,0 +1,1273 @@
+/* ========================================= */
+/* dark-mode.css - ダークモード */
+/* ========================================= */
+
+body.dark-mode {
+    background-color: #1a1a1a;
+}
+
+/* ヘッダー */
+body.dark-mode .app-mode-switcher {
+    background: #1e1e1e;
+}
+
+body.dark-mode .app-mode-switcher .logo {
+    color: #fff;
+}
+
+body.dark-mode .header-divider {
+    background-color: #555;
+}
+
+/* カスタムメニューバー（ダークモード） */
+body.dark-mode .custom-menu-bar .menu-label {
+    color: #ddd;
+}
+
+body.dark-mode .custom-menu-bar .menu-label:hover,
+body.dark-mode .custom-menu-bar .menu-item.open .menu-label {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .custom-menu-bar .menu-dropdown {
+    background: #2a2a2a;
+    border-color: #444;
+}
+
+body.dark-mode .custom-menu-bar .menu-dropdown-item {
+    color: #ddd;
+}
+
+body.dark-mode .custom-menu-bar .menu-dropdown-item:hover {
+    background-color: #3a3a3a;
+}
+
+body.dark-mode .custom-menu-bar .menu-dropdown-item .shortcut {
+    color: #888;
+}
+
+body.dark-mode .custom-menu-bar .menu-dropdown-divider {
+    background: #444;
+}
+
+/* disabled状態のメニュー項目（ダークモード） */
+body.dark-mode .custom-menu-bar .menu-dropdown-item.disabled {
+    color: #666;
+}
+
+body.dark-mode .custom-menu-bar .menu-dropdown-item.disabled .shortcut {
+    color: #555;
+}
+
+/* disabled状態のヘッダーボタン（ダークモード） */
+body.dark-mode .header-icon-btn:disabled svg,
+body.dark-mode button.header-icon-btn:disabled svg {
+    stroke: #555;
+}
+
+/* ウィンドウコントロール（ダークモード） */
+body.dark-mode .window-control-btn {
+    color: #ddd;
+}
+
+body.dark-mode .window-control-btn:hover,
+body.dark-mode .window-control-btn:focus:hover,
+body.dark-mode .window-control-btn:active:hover,
+body.dark-mode .window-control-btn:focus-visible:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+body.dark-mode .window-control-btn:focus,
+body.dark-mode .window-control-btn:active,
+body.dark-mode .window-control-btn:focus-visible {
+    background: transparent !important;
+}
+
+body.dark-mode .window-control-btn.close-btn:hover,
+body.dark-mode .window-control-btn.close-btn:focus:hover,
+body.dark-mode .window-control-btn.close-btn:active:hover,
+body.dark-mode .window-control-btn.close-btn:focus-visible:hover {
+    background-color: #e81123 !important;
+    color: #fff;
+}
+
+body.dark-mode .header-icon-btn:hover,
+body.dark-mode label.header-icon-btn:hover {
+    background: transparent !important;
+}
+
+body.dark-mode .header-icon-btn:focus,
+body.dark-mode .header-icon-btn:active,
+body.dark-mode .header-icon-btn:focus-visible,
+body.dark-mode label.header-icon-btn:focus,
+body.dark-mode label.header-icon-btn:active,
+body.dark-mode label.header-icon-btn:focus-visible {
+    background: transparent !important;
+}
+
+body.dark-mode .header-icon-btn svg,
+body.dark-mode label.header-icon-btn svg {
+    stroke: #fff;
+}
+
+body.dark-mode .header-icon-btn:hover svg,
+body.dark-mode label.header-icon-btn:hover svg {
+    stroke: #90caf9;
+}
+
+body.dark-mode #workspaceFlipBtn {
+    color: #fff;
+}
+
+body.dark-mode #workspaceFlipBtn:hover {
+    color: #90caf9;
+}
+
+/* 綴じ方向ドロップダウン（ダークモード） */
+body.dark-mode .binding-option.selected .binding-check {
+    color: #90caf9;
+}
+
+body.dark-mode .pdf-filename {
+    color: #8a8a8a;
+}
+
+body.dark-mode .pdf-filename:not(:empty) {
+    background-color: #2a2a2a;
+}
+
+body.dark-mode .mode-tab.active {
+    background: #1a1a1a;
+    color: #ddd;
+}
+
+/* サイドバー */
+body.dark-mode .sidebar {
+    background-color: #252525;
+    border-color: #3a3a3a;
+}
+
+body.dark-mode .sidebar-header {
+    background: #2a2a2a;
+    border-color: #3a3a3a;
+}
+
+body.dark-mode .sidebar-toggle-btn {
+    color: #8a8a8a;
+}
+
+body.dark-mode .sidebar-toggle-btn:hover {
+    background: #3a3a3a;
+    color: #ccc;
+}
+
+/* サイドバー内のラベル・テキスト */
+body.dark-mode h3 {
+    color: #ddd;
+}
+
+body.dark-mode label {
+    color: #aaa;
+}
+
+body.dark-mode .sidebar input[type="text"],
+body.dark-mode .sidebar input[type="number"],
+body.dark-mode .sidebar textarea,
+body.dark-mode .sidebar select {
+    background-color: #333;
+    border-color: #444;
+    color: #eee;
+}
+
+body.dark-mode .sidebar input[type="text"]::placeholder,
+body.dark-mode .sidebar textarea::placeholder {
+    color: #777;
+}
+
+/* ボタン */
+body.dark-mode button:not(.header-zoom-btn) {
+    background-color: #333;
+    border-color: #444;
+    color: #ddd;
+}
+
+body.dark-mode button:not(.header-zoom-btn):hover {
+    background-color: #3a3a3a;
+}
+
+body.dark-mode button.active {
+    background-color: #1a3a5c;
+    border-color: #2196f3;
+    color: #90caf9;
+}
+
+body.dark-mode button:disabled {
+    background-color: #2a2a2a;
+    border-color: #3a3a3a;
+    color: #666;
+}
+
+/* ツールバー */
+body.dark-mode .tool-bar-vertical {
+    background-color: #252525;
+    border-color: #3a3a3a;
+}
+
+body.dark-mode .toolbar-header {
+    background: #2a2a2a;
+    border-color: #3a3a3a;
+}
+
+body.dark-mode .toolbar-toggle-btn {
+    color: #8a8a8a;
+}
+
+body.dark-mode .toolbar-toggle-btn:hover {
+    background: #3a3a3a;
+    color: #ccc;
+}
+
+body.dark-mode .tool-btn-icon {
+    background-color: #333;
+    border-color: #555;
+    color: #ddd;
+}
+
+body.dark-mode .tool-btn-icon:hover {
+    background-color: #3a3a3a;
+    border-color: #666;
+}
+
+body.dark-mode .tool-btn-icon.active {
+    background-color: #1a3a5c;
+    border-color: #2196f3;
+    color: #90caf9;
+}
+
+body.dark-mode .tool-btn-icon.disabled,
+body.dark-mode .tool-btn-icon:disabled {
+    opacity: 0.35;
+    background-color: #2a2a2a;
+    border-color: #444;
+    color: #666;
+}
+
+/* キャンバスエリア */
+body.dark-mode .shared-canvas-area {
+    background-color: #2a2a2a;
+}
+
+/* キャンバスエリアのスクロールバー */
+body.dark-mode .shared-canvas-area::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+body.dark-mode .shared-canvas-area::-webkit-scrollbar-track {
+    background: #333;
+    border-radius: 6px;
+}
+
+body.dark-mode .shared-canvas-area::-webkit-scrollbar-thumb {
+    background: #666;
+    border-radius: 6px;
+    border: 2px solid #333;
+}
+
+body.dark-mode .shared-canvas-area::-webkit-scrollbar-thumb:hover {
+    background: #888;
+}
+
+body.dark-mode .shared-canvas-area::-webkit-scrollbar-corner {
+    background: #333;
+}
+
+/* カラーパレット */
+body.dark-mode .color-swatch {
+    border-color: #555;
+}
+
+body.dark-mode .color-swatch.active-color {
+    box-shadow: 0 0 0 2px #ddd;
+}
+
+/* オプション行 */
+body.dark-mode .option-row {
+    background: #3a3520;
+}
+
+body.dark-mode .option-row.blue-bg {
+    background: #1a3a5c;
+    border-color: #2a4a6c;
+}
+
+body.dark-mode .option-row label {
+    color: #ddd;
+}
+
+/* ズームコントロール */
+body.dark-mode .zoom-control {
+    background: #333;
+    border-color: #444;
+}
+
+body.dark-mode #zoomLabel,
+body.dark-mode #sim-zoomLabel {
+    color: #ddd;
+}
+
+/* ヘッダーズームコントロール */
+body.dark-mode .header-zoom-btn {
+    background: transparent !important;
+    border: none !important;
+}
+
+body.dark-mode .header-zoom-btn:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+body.dark-mode .header-zoom-btn:active {
+    background: rgba(255, 255, 255, 0.15) !important;
+}
+
+body.dark-mode .header-zoom-btn svg {
+    stroke: #ccc;
+}
+
+body.dark-mode .header-zoom-btn:hover svg {
+    stroke: #fff;
+}
+
+body.dark-mode .header-zoom-label {
+    color: #ddd;
+}
+
+body.dark-mode .header-zoom-btn:disabled svg {
+    stroke: #555;
+}
+
+body.dark-mode .header-zoom-control.pdf-required[disabled] .header-zoom-label {
+    color: #555;
+}
+
+body.dark-mode .header-zoom-control.menu-lockable.menu-locked .header-zoom-label {
+    color: #555;
+}
+
+body.dark-mode .header-zoom-btn.menu-lockable.menu-locked svg {
+    stroke: #555;
+}
+
+/* 校正スタンプトグルボタン（統合版） */
+body.dark-mode .proofreading-instruction-toggle-btn {
+    background: #333;
+    border-color: #b71c1c;
+    color: #ef9a9a;
+}
+
+body.dark-mode .proofreading-instruction-toggle-btn:hover {
+    background: #3a2020;
+    border-color: #c62828;
+}
+
+body.dark-mode .proofreading-instruction-toggle-btn.active,
+body.dark-mode .proofreading-instruction-toggle-btn.open {
+    background: #3a2020;
+    border-color: #c62828;
+    color: #ef9a9a;
+}
+
+body.dark-mode .proofreading-instruction-toggle-btn .selected-proofreading-display {
+    background: transparent;
+    border: 1px solid #c62828;
+    color: #ef9a9a;
+}
+
+body.dark-mode .proofreading-instruction-toggle-btn .toggle-arrow svg {
+    stroke: #ddd;
+}
+
+/* 校正スタンプドロップダウン */
+body.dark-mode .proofreading-instruction-dropdown {
+    background: #2a2a2a;
+    border-color: #444;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .proofreading-section-label {
+    color: #aaa;
+    border-bottom-color: #444;
+}
+
+/* 指示スタンプ */
+body.dark-mode .instruction-stamp-toggle-btn {
+    background: #333;
+    border-color: #b71c1c;
+    color: #ef9a9a;
+}
+
+body.dark-mode .instruction-stamp-toggle-btn:hover {
+    background: #3a2020;
+    border-color: #c62828;
+}
+
+body.dark-mode .instruction-stamp-toggle-btn.active {
+    background: #3a2020;
+    border-color: #c62828;
+    color: #ef9a9a;
+}
+
+body.dark-mode .instruction-stamp-toggle-btn .selected-stamp-display {
+    background: transparent;
+    border: 1px solid #c62828;
+    color: #ef9a9a;
+}
+
+body.dark-mode .instruction-stamp-scroll {
+    background: #222;
+    border-color: #444;
+}
+
+body.dark-mode .instruction-stamp-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+body.dark-mode .instruction-stamp-scroll::-webkit-scrollbar-track {
+    background: #333;
+    border-radius: 3px;
+}
+
+body.dark-mode .instruction-stamp-scroll::-webkit-scrollbar-thumb {
+    background: #666;
+    border-radius: 3px;
+}
+
+body.dark-mode .instruction-stamp-scroll::-webkit-scrollbar-thumb:hover {
+    background: #888;
+}
+
+body.dark-mode .instruction-stamp-buttons .stamp-btn {
+    background: #333;
+    border-color: #b71c1c;
+    color: #ef9a9a;
+}
+
+body.dark-mode .instruction-stamp-buttons .stamp-btn:hover {
+    background: #3a2020;
+}
+
+body.dark-mode .instruction-stamp-buttons .stamp-btn.active {
+    background: #3a2020;
+    border-color: #c62828;
+}
+
+/* 校正記号スタンプ（ダークモード） */
+body.dark-mode .proofreading-symbol-toggle-btn {
+    background: #333;
+    border-color: #b71c1c;
+    color: #ef9a9a;
+}
+
+body.dark-mode .proofreading-symbol-toggle-btn:hover {
+    background: #3a2020;
+    border-color: #c62828;
+}
+
+body.dark-mode .proofreading-symbol-toggle-btn.active {
+    background: #3a2020;
+    border-color: #c62828;
+    color: #ef9a9a;
+}
+
+body.dark-mode .proofreading-symbol-toggle-btn .selected-symbol-display {
+    background: transparent;
+    border: 1px solid #c62828;
+    color: #ef9a9a;
+}
+
+body.dark-mode .proofreading-symbol-scroll {
+    background: #222;
+    border-color: #444;
+}
+
+body.dark-mode .proofreading-symbol-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+body.dark-mode .proofreading-symbol-scroll::-webkit-scrollbar-track {
+    background: #333;
+    border-radius: 3px;
+}
+
+body.dark-mode .proofreading-symbol-scroll::-webkit-scrollbar-thumb {
+    background: #666;
+    border-radius: 3px;
+}
+
+body.dark-mode .proofreading-symbol-scroll::-webkit-scrollbar-thumb:hover {
+    background: #888;
+}
+
+body.dark-mode .proofreading-symbol-buttons .symbol-btn {
+    background: #333;
+    border-color: #b71c1c;
+    color: #ef9a9a;
+}
+
+body.dark-mode .proofreading-symbol-buttons .symbol-btn:hover {
+    background: #3a2020;
+}
+
+body.dark-mode .proofreading-symbol-buttons .symbol-btn.active {
+    background: #3a2020;
+    border-color: #c62828;
+}
+
+body.dark-mode .proofreading-symbol-buttons .symbol-btn .symbol-icon {
+    color: #ef9a9a;
+}
+
+body.dark-mode .proofreading-symbol-buttons .symbol-btn .symbol-icon svg {
+    stroke: #ef9a9a;
+}
+
+body.dark-mode .proofreading-symbol-buttons .symbol-btn .symbol-label {
+    color: #8a8a8a;
+}
+
+/* スタンプトグル */
+body.dark-mode .stamp-toggle-btn {
+    background: #333;
+    border-color: #1565c0;
+    color: #90caf9;
+}
+
+body.dark-mode .stamp-toggle-btn:hover {
+    background: #1a3a5c;
+    border-color: #1976d2;
+    color: #bbdefb;
+}
+
+body.dark-mode .stamp-toggle-btn .selected-stamp-display {
+    background: transparent;
+    border: 1px solid #1565c0;
+}
+
+body.dark-mode .stamp-section,
+body.dark-mode .font-section {
+    background: #2a2a2a;
+    border-color: #444;
+}
+
+/* スタンプセクション・フォントセクションのスクロールバー（ダークモード） */
+body.dark-mode .stamp-section::-webkit-scrollbar,
+body.dark-mode .font-section::-webkit-scrollbar {
+    width: 6px;
+}
+
+body.dark-mode .stamp-section::-webkit-scrollbar-track,
+body.dark-mode .font-section::-webkit-scrollbar-track {
+    background: #333;
+    border-radius: 3px;
+}
+
+body.dark-mode .stamp-section::-webkit-scrollbar-thumb,
+body.dark-mode .font-section::-webkit-scrollbar-thumb {
+    background: #666;
+    border-radius: 3px;
+}
+
+body.dark-mode .stamp-section::-webkit-scrollbar-thumb:hover,
+body.dark-mode .font-section::-webkit-scrollbar-thumb:hover {
+    background: #888;
+}
+
+body.dark-mode .stamp-palette .stamp-btn {
+    background: #333;
+    border-color: #555;
+    color: #ddd;
+}
+
+body.dark-mode .stamp-palette .stamp-btn:hover {
+    background: #3a3a3a;
+}
+
+body.dark-mode .stamp-palette .stamp-btn.active {
+    background: transparent;
+    border-color: #2196f3;
+    color: #90caf9;
+}
+
+/* セクションボタン */
+body.dark-mode .section-add-btn,
+body.dark-mode .section-edit-btn,
+body.dark-mode .section-delete-btn {
+    background-color: #333;
+    border-color: #444;
+    color: #ddd;
+}
+
+body.dark-mode .section-delete-btn:hover {
+    background-color: #3a2020;
+    border-color: #c62828;
+    color: #ef9a9a;
+}
+
+body.dark-mode .section-edit-btn:hover {
+    background-color: #3a3520;
+    border-color: #fbc02d;
+    color: #ffd54f;
+}
+
+body.dark-mode .section-delete-btn.active-delete {
+    background-color: #3a2020;
+    color: #ef9a9a;
+    border-color: #c62828;
+}
+
+body.dark-mode .section-edit-btn.active-edit {
+    background-color: #3a3520;
+    color: #ffd54f;
+    border-color: #fbc02d;
+}
+
+body.dark-mode .section-edit-btn:disabled {
+    opacity: 0.5;
+    background-color: #2a2a2a;
+    border-color: #444;
+    color: #666;
+}
+
+body.dark-mode .section-action-row {
+    background-color: #2a2a2a;
+    border-color: #3a3a3a;
+}
+
+/* モーダル */
+body.dark-mode .modal-content {
+    background-color: #2a2a2a;
+    color: #ddd;
+}
+
+body.dark-mode .modal-header {
+    color: #eee;
+}
+
+body.dark-mode .modal-content input[type="text"],
+body.dark-mode .modal-content input[type="number"],
+body.dark-mode .modal-content textarea {
+    background-color: #333;
+    border-color: #444;
+    color: #eee;
+}
+
+body.dark-mode .modal-content input::placeholder,
+body.dark-mode .modal-content textarea::placeholder {
+    color: #777;
+}
+
+/* ドロップダウンメニュー */
+body.dark-mode .page-edit-dropdown {
+    background-color: #2a2a2a;
+}
+
+/* 吹き出しの三角形 */
+body.dark-mode .page-edit-dropdown::before {
+    border-bottom-color: #2a2a2a;
+}
+
+body.dark-mode .page-edit-dropdown-item {
+    color: #ddd;
+}
+
+body.dark-mode .page-edit-dropdown-item:hover {
+    background-color: #3a3a3a;
+}
+
+body.dark-mode .page-edit-dropdown-divider {
+    background-color: #444;
+}
+
+body.dark-mode .page-edit-dropdown-item.danger {
+    color: #ef5350;
+}
+
+body.dark-mode .page-edit-dropdown-item.danger:hover {
+    background-color: rgba(239, 83, 80, 0.15);
+}
+
+/* PDF保存ドロップダウン - グレーアウト状態（ダークモード） */
+body.dark-mode .save-pdf-dropdown .page-edit-dropdown-item:disabled {
+    color: #666;
+}
+
+body.dark-mode .save-pdf-dropdown .page-edit-dropdown-item:disabled .dropdown-icon svg {
+    stroke: #555;
+}
+
+/* ハンバーガーメニュー */
+body.dark-mode .hamburger-btn:hover {
+    background: transparent !important;
+}
+
+body.dark-mode .hamburger-btn:focus,
+body.dark-mode .hamburger-btn:active,
+body.dark-mode .hamburger-btn:focus-visible {
+    background: transparent !important;
+}
+
+body.dark-mode .hamburger-line {
+    background-color: #fff;
+}
+
+/* スライドメニュー */
+body.dark-mode .slide-menu {
+    background-color: #1e1e1e;
+}
+
+body.dark-mode .slide-menu-item {
+    color: #ccc;
+    border-color: rgba(255, 255, 255, 0.05);
+}
+
+body.dark-mode .slide-menu-item .external-link-icon {
+    fill: #ccc;
+}
+
+body.dark-mode .slide-menu-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+body.dark-mode .slide-menu-header {
+    color: #ccc;
+    border-color: rgba(255, 255, 255, 0.1);
+    background-color: #2a2a2a;
+}
+
+/* スライドメニュー下部ボタン */
+body.dark-mode .slide-menu-icon-btn {
+    background: none !important;
+    background-color: transparent !important;
+    color: #ccc;
+}
+
+body.dark-mode .slide-menu-icon-btn svg {
+    stroke: #ccc;
+}
+
+body.dark-mode .slide-menu-icon-btn:hover {
+    color: #64b5f6;
+}
+
+body.dark-mode .slide-menu-icon-btn:hover svg {
+    stroke: #64b5f6;
+}
+
+body.dark-mode .slide-menu-icon-btn.pdf-required:disabled {
+    opacity: 0.3;
+}
+
+body.dark-mode .slide-menu-icon-btn.pdf-required:disabled svg {
+    stroke: #666;
+}
+
+/* ボトムページバー */
+body.dark-mode .bottom-nav-bar {
+    background-color: rgba(20, 20, 20, 0.95);
+}
+
+/* グリッド設定エリア */
+body.dark-mode #gridSettingsArea {
+    color: #aaa;
+}
+
+body.dark-mode #gridSettingsArea div[style*="color:#2e7d32"] {
+    color: #81c784 !important;
+    border-color: #4a5a4a !important;
+}
+
+/* オートフィット設定ドロップダウン */
+body.dark-mode #densitySelect {
+    background-color: #333 !important;
+    border-color: #444 !important;
+    color: #eee !important;
+}
+
+body.dark-mode #densitySelect option {
+    background-color: #333 !important;
+    color: #eee !important;
+}
+
+body.dark-mode #densitySelect option[value="none"] {
+    color: #ef9a9a !important;
+}
+
+/* オートフィット設定ラベル */
+body.dark-mode .recommend-controls label {
+    color: #81c784 !important;
+}
+
+/* スケール表示 */
+body.dark-mode #scaleDisplay {
+    color: #64b5f6 !important;
+}
+
+/* Gドライブボタン */
+body.dark-mode #gdriveJsonBrowserBtn {
+    background-color: #2a3a2a;
+    border-color: #4a6a4a;
+    color: #81c784;
+}
+
+body.dark-mode #gdriveJsonBrowserBtn:hover {
+    background-color: #3a4a3a;
+}
+
+/* JSONフォルダブラウザ */
+body.dark-mode .json-folder-browser-modal {
+    background-color: #2a2a2a;
+}
+
+body.dark-mode .json-folder-path-bar {
+    background: #333;
+    color: #aaa;
+}
+
+body.dark-mode .json-folder-tree {
+    background: #252525;
+    border-color: #444;
+}
+
+body.dark-mode .json-folder-tree::-webkit-scrollbar {
+    width: 6px;
+}
+
+body.dark-mode .json-folder-tree::-webkit-scrollbar-track {
+    background: #333;
+    border-radius: 3px;
+}
+
+body.dark-mode .json-folder-tree::-webkit-scrollbar-thumb {
+    background: #666;
+    border-radius: 3px;
+}
+
+body.dark-mode .json-folder-tree::-webkit-scrollbar-thumb:hover {
+    background: #888;
+}
+
+body.dark-mode .json-folder-item:hover {
+    background: #3a3a3a;
+}
+
+body.dark-mode .json-folder-item.folder {
+    color: #64b5f6;
+}
+
+body.dark-mode .json-folder-item.file {
+    color: #ddd;
+}
+
+body.dark-mode .json-folder-item.file.json-file {
+    color: #81c784;
+}
+
+body.dark-mode .json-folder-item.file.json-file:hover {
+    background: #2a3a2a;
+}
+
+/* 検索バー（ダークモード） */
+body.dark-mode .json-folder-search-bar input {
+    background: #333;
+    border-color: #444;
+    color: #eee;
+}
+
+body.dark-mode .json-folder-search-bar input:focus {
+    border-color: #64b5f6;
+    box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
+}
+
+body.dark-mode .json-folder-search-bar input::placeholder {
+    color: #777;
+}
+
+body.dark-mode .json-search-clear-btn {
+    color: #777;
+}
+
+body.dark-mode .json-search-clear-btn:hover {
+    background: #444;
+    color: #ccc;
+}
+
+body.dark-mode .json-folder-search-results {
+    background: #252525;
+    border-color: #444;
+}
+
+body.dark-mode .json-folder-search-results::-webkit-scrollbar {
+    width: 6px;
+}
+
+body.dark-mode .json-folder-search-results::-webkit-scrollbar-track {
+    background: #333;
+    border-radius: 3px;
+}
+
+body.dark-mode .json-folder-search-results::-webkit-scrollbar-thumb {
+    background: #666;
+    border-radius: 3px;
+}
+
+body.dark-mode .json-folder-search-results::-webkit-scrollbar-thumb:hover {
+    background: #888;
+}
+
+body.dark-mode .json-search-result-count {
+    color: #aaa;
+    border-bottom-color: #444;
+}
+
+body.dark-mode .json-search-result-path {
+    color: #888;
+}
+
+body.dark-mode .json-search-highlight {
+    background-color: #5d5a00;
+    color: #fff;
+}
+
+/* 調整メッセージ（ダッシュボード） */
+body.dark-mode #adjustMessage {
+    background: rgba(30, 30, 30, 0.95);
+}
+
+body.dark-mode .dashboard-container .spec-badge {
+    background: linear-gradient(135deg, #3a3a3a, #2a2a2a);
+}
+
+/* 初期メッセージ */
+body.dark-mode #initialMessage {
+    color: white;
+}
+
+/* キャリブレーションガイド */
+body.dark-mode #calibrationGuide {
+    background: rgba(30, 30, 30, 0.9);
+    color: #ddd;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(255, 255, 255, 0.15);
+}
+
+/* ========================================= */
+/* ビューワーモード */
+/* ========================================= */
+
+/* ビューワーモードボタン アクティブ状態 */
+body.viewer-mode #viewerModeBtn {
+    background: rgba(33, 150, 243, 0.2);
+    border-color: #2196f3;
+}
+
+body.viewer-mode #viewerModeBtn svg {
+    stroke: #2196f3;
+}
+
+body.dark-mode.viewer-mode #viewerModeBtn svg {
+    stroke: #90caf9;
+}
+
+/* ビューワーモード時のUI フェードアウト/フェードイン */
+.sidebar,
+.tool-bar-vertical {
+    transition: opacity 0.3s ease, visibility 0s linear 0.3s, width 0.3s ease, min-width 0.3s ease, padding 0.3s ease, border 0.3s ease;
+}
+
+#adjustMessage,
+.app-mode-switcher {
+    transition: opacity 0.3s ease, visibility 0s linear 0.3s, height 0.3s ease, min-height 0.3s ease, padding 0.3s ease;
+}
+
+body.viewer-mode .sidebar,
+body.viewer-mode .tool-bar-vertical {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    overflow: hidden !important;
+    box-shadow: none !important;
+}
+
+body.viewer-mode .app-mode-switcher {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    box-shadow: none !important;
+}
+
+body.viewer-mode #adjustMessage {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    overflow: hidden;
+}
+
+body.viewer-mode .bottom-nav-bar {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+
+/* フェードイン時はvisibilityを即座に戻す */
+body:not(.viewer-mode) .sidebar,
+body:not(.viewer-mode) .tool-bar-vertical {
+    transition: opacity 0.3s ease, visibility 0s linear 0s, width 0.3s ease, min-width 0.3s ease, padding 0.3s ease, border 0.3s ease;
+}
+
+body:not(.viewer-mode) .bottom-nav-bar:not(.fade-out) {
+    transition: opacity 0.3s ease, visibility 0s linear 0s;
+}
+
+body:not(.viewer-mode) #adjustMessage,
+body:not(.viewer-mode) .app-mode-switcher {
+    transition: opacity 0.3s ease, visibility 0s linear 0s, height 0.3s ease, min-height 0.3s ease, padding 0.3s ease;
+}
+
+/* ビューワーモード時のキャンバスエリア拡張 */
+body.viewer-mode .shared-canvas-area {
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    height: 100vh !important;
+    padding: 0 !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+
+body.viewer-mode .app-container {
+    grid-template-columns: 1fr !important;
+}
+
+/* ビューワーモード時のカーソル */
+body.viewer-mode #canvas-wrapper {
+    cursor: grab;
+}
+
+body.viewer-mode #canvas-wrapper:active {
+    cursor: grabbing;
+}
+
+/* ビューワーモード ナビゲーションヒント（escでビューワーモード解除） */
+.viewer-nav-hint {
+    position: fixed;
+    top: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    border-radius: 12px;
+    padding: 16px 32px;
+    font-size: 28px;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    pointer-events: none;
+}
+
+body.viewer-mode .viewer-nav-hint.show {
+    opacity: 1;
+}
+
+/* ビューワーモード 閉じるボタン（右上角） */
+.viewer-close-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10001;
+    width: 44px;
+    height: 44px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease, background-color 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+}
+
+.viewer-close-btn svg {
+    stroke: #fff;
+    width: 20px;
+    height: 20px;
+}
+
+.viewer-close-btn.show {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.viewer-close-btn:hover {
+    background: rgba(255, 80, 80, 0.9);
+    transform: scale(1.1);
+}
+
+.viewer-close-btn:active {
+    transform: scale(0.95);
+}
+
+/* ========================================= */
+/* 数値入力のスピンボタン（上下矢印）ダークモード対応 */
+/* ========================================= */
+
+body.dark-mode input[type="number"] {
+    background-color: #2a2a2a;
+    border-color: #444;
+    color: #ddd;
+}
+
+body.dark-mode input[type="number"]::-webkit-inner-spin-button,
+body.dark-mode input[type="number"]::-webkit-outer-spin-button {
+    filter: invert(0.8);
+}
+
+body.dark-mode #lineWidthInput {
+    color: #64b5f6 !important;
+}
+
+/* 印刷設定モーダル（ダークモード） */
+body.dark-mode .print-setting-label {
+    color: #ddd;
+}
+
+body.dark-mode .print-select,
+body.dark-mode .print-input-number,
+body.dark-mode .print-input-text {
+    background-color: #333;
+    border-color: #444;
+    color: #eee;
+}
+
+body.dark-mode .print-input-text:disabled {
+    background-color: #2a2a2a;
+    color: #666;
+}
+
+body.dark-mode .print-radio-label {
+    color: #ddd;
+}
+
+/* ローディングオーバーレイ（ダークモード） */
+body.dark-mode .loading-content {
+    background-color: #2a2a2a;
+}
+
+body.dark-mode .loading-title {
+    color: #eee;
+}
+
+body.dark-mode .loading-progress-bar {
+    background-color: #444;
+}
+
+body.dark-mode .loading-progress-text {
+    color: #aaa;
+}
+
+body.dark-mode .loading-overlay.spinner-mode .loading-title::after {
+    border-color: #444;
+    border-top-color: #21cbf3;
+}
+
+/* メモ機能（ダークモード） */
+body.dark-mode .memo-toggle-btn {
+    background: #2a2a2a;
+    border-color: #ffa500;
+    color: #ffb74d;
+}
+
+body.dark-mode .memo-toggle-btn:hover {
+    background: #3d2a1a;
+    border-color: #ffb74d;
+}
+
+body.dark-mode .memo-toggle-btn.open {
+    background: #3a3a3a;
+    border-color: #888;
+    color: #aaa;
+}
+
+body.dark-mode .memo-textarea {
+    background: #222;
+    border-color: #444;
+    color: #eee;
+}
+
+body.dark-mode .memo-textarea:focus {
+    border-color: #888;
+    background: #2a2a2a;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.05);
+}
+
+body.dark-mode .memo-textarea::placeholder {
+    color: #777;
+}
+
+body.dark-mode .memo-textarea::-webkit-scrollbar {
+    width: 6px;
+}
+
+body.dark-mode .memo-textarea::-webkit-scrollbar-track {
+    background: #333;
+    border-radius: 3px;
+}
+
+body.dark-mode .memo-textarea::-webkit-scrollbar-thumb {
+    background: #666;
+    border-radius: 3px;
+}
+
+body.dark-mode .memo-textarea::-webkit-scrollbar-thumb:hover {
+    background: #888;
+}
+
+body.dark-mode .memo-clear-btn {
+    background: transparent;
+    border-color: #444;
+    color: #aaa;
+}
+
+body.dark-mode .memo-clear-btn:hover {
+    background: #3a2020;
+    border-color: #c62828;
+    color: #ef9a9a;
+}
+
+/* サイドバー下部ボタン（ページバートグル） */
+body.dark-mode .sidebar-bottom-btn {
+    color: #aaa;
+    background: transparent !important;
+    background-color: transparent !important;
+}
+
+body.dark-mode .sidebar-bottom-btn:hover {
+    color: #64b5f6;
+    background: transparent !important;
+    background-color: transparent !important;
+}
