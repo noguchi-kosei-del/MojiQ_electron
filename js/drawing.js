@@ -394,10 +394,16 @@ window.MojiQDrawing = (function() {
 
     /**
      * 現在の描画コンテキストから色と線幅を取得
+     * colorPickerの値を直接使用することで、ページ移動後も正しい色が保持される
      */
     function getCurrentDrawingStyle() {
+        // MojiQCanvasContext.getColor()はcolorPicker.valueを返す
+        // ctx.strokeStyleはページ移動後の描画オブジェクトレンダリングで変わるため使用しない
+        const color = (window.MojiQCanvasContext && MojiQCanvasContext.getColor)
+            ? MojiQCanvasContext.getColor()
+            : (ctx.strokeStyle || '#000000');
         return {
-            color: ctx.strokeStyle || '#000000',
+            color: color,
             lineWidth: ctx.lineWidth || 2
         };
     }
@@ -837,6 +843,8 @@ window.MojiQDrawing = (function() {
 
         if (state.interactionState === 2) {
             ctx.putImageData(snapshot, 0, 0);
+            // ページ移動後も正しい色でプレビュー描画するためにinitContextを呼び出す
+            MojiQCanvasContext.initContext();
             const leaderStart = getLeaderStartPos(pos);
             // プレビュー描画はキャンバス座標を使用
             const leaderStartCanvas = getLeaderStartPosCanvas(canvasPos);
@@ -850,6 +858,8 @@ window.MojiQDrawing = (function() {
         // 折れ線モードのプレビュー描画
         if (state.interactionState === 3 && state.currentMode === 'polyline' && polylinePointsCanvas.length > 0) {
             ctx.putImageData(polylineSnapshot, 0, 0);
+            // ページ移動後も正しい色でプレビュー描画するためにinitContextを呼び出す
+            MojiQCanvasContext.initContext();
 
             // 確定済みの折れ線を描画（キャンバス座標を使用）
             ctx.beginPath();
@@ -874,6 +884,8 @@ window.MojiQDrawing = (function() {
             currentPos = pos;  // currentPosを更新（ローカル座標）
             currentPosCanvas = canvasPos;  // キャンバス座標
             ctx.putImageData(snapshot, 0, 0);
+            // ページ移動後も正しい色でプレビュー描画するためにinitContextを呼び出す
+            MojiQCanvasContext.initContext();
 
             // キャンバス座標で距離を計算（プレビュー用）
             const dist = Math.sqrt(Math.pow(canvasPos.x - startPosCanvas.x, 2) + Math.pow(canvasPos.y - startPosCanvas.y, 2));
@@ -955,6 +967,8 @@ window.MojiQDrawing = (function() {
             currentPos = pos;  // currentPosを更新（ローカル座標）
             currentPosCanvas = canvasPos;  // キャンバス座標
             ctx.putImageData(labeledRectSnapshot, 0, 0);
+            // ページ移動後も正しい色でプレビュー描画するためにinitContextを呼び出す
+            MojiQCanvasContext.initContext();
             ctx.beginPath();
             // 正方形のプレビューを描画（短い辺に合わせる）- キャンバス座標
             const minX = Math.min(startPosCanvas.x, canvasPos.x);
@@ -1031,6 +1045,8 @@ window.MojiQDrawing = (function() {
                 currentPosCanvas = canvasPos;  // キャンバス座標（プレビュー用）
 
                 ctx.putImageData(snapshot, 0, 0);
+                // ページ移動後も正しい色でプレビュー描画するためにinitContextを呼び出す
+                MojiQCanvasContext.initContext();
                 ctx.beginPath();
                 const normalizedModeForDraw = normalizeMode(state.currentMode);
                 if (normalizedModeForDraw === 'rect') {
@@ -1067,6 +1083,7 @@ window.MojiQDrawing = (function() {
                         ctx.save();
                         ctx.lineWidth = 3;
                         ctx.strokeStyle = '#ffffff';
+                        ctx.lineJoin = 'round';
                         ctx.strokeText(state.selectedFontInfo.name, textX, textY);
                         ctx.restore();
 
@@ -1361,7 +1378,7 @@ window.MojiQDrawing = (function() {
                     ctx.restore();
                 } else if ([
                     'toruStamp', 'torutsumeStamp', 'torumamaStamp',
-                    'zenkakuakiStamp', 'nibunakiStamp', 'shibunakiStamp'
+                    'zenkakuakiStamp', 'nibunakiStamp', 'shibunakiStamp', 'kaigyouStamp'
                 ].includes(state.currentMode)) {
                     // 指示スタンプのドラッグ中：指示線のプレビューを表示（先端に●）- キャンバス座標
                     const dist = Math.sqrt(Math.pow(canvasPos.x - startPosCanvas.x, 2) + Math.pow(canvasPos.y - startPosCanvas.y, 2));
@@ -2040,6 +2057,8 @@ window.MojiQDrawing = (function() {
         const leaderStart = getLeaderStartPos(endPos);          // ローカル座標（保存用）
         const leaderStartCanvas = getLeaderStartPosCanvas(endPosCanvas);  // キャンバス座標（描画用）
         ctx.putImageData(snapshot, 0, 0);
+        // ページ移動後も正しい色で描画するためにinitContextを呼び出す
+        MojiQCanvasContext.initContext();
         ctx.beginPath();
         ctx.moveTo(leaderStartCanvas.x, leaderStartCanvas.y);  // キャンバス座標で描画
         ctx.lineTo(endPosCanvas.x, endPosCanvas.y);

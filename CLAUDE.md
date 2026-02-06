@@ -5,7 +5,7 @@ PDF/画像の校正・注釈ツール（デスクトップアプリケーショ�
 ## プロジェクト概要
 
 - **アプリ名**: MojiQ
-- **バージョン**: 2.0.3
+- **バージョン**: 2.0.4
 - **識別子**: com.mojiq.app
 - **目的**: PDF/JPEGファイルへの校正指示・注釈付け、写植サイズシミュレーション
 
@@ -421,3 +421,42 @@ G:\共有ドライブ\CLLENN\編集部フォルダ\編集企画部\編集企画_
 | F12 | 開発者ツール |
 | 左右キー | ページ送り |
 | Space+ドラッグ | パン（移動） |
+
+## 変更履歴
+
+### v2.0.4 (2026-02-06)
+
+#### バグ修正
+
+1. **校正指示ツール/校正記号ツールの色がページ移動後に黒に戻る問題を修正**
+   - **原因**: `getCurrentDrawingStyle()`関数が`ctx.strokeStyle`を使用して色を取得していたが、ページ移動時に`renderAll()`が呼ばれ、描画オブジェクトをレンダリングする際に`ctx.strokeStyle`が変更されていた
+   - **修正**: `MojiQCanvasContext.getColor()`を使用して`colorPicker.value`から直接色を取得するように変更
+   - **対象ファイル**: [drawing.js](js/drawing.js)
+
+2. **ページ移動後のドラッグ時に黒い線が描画される問題を修正**
+   - **原因**: `ctx.putImageData()`でキャンバスのピクセルデータを復元しても、`ctx.strokeStyle`などのコンテキスト設定は変更されないため、前のページでレンダリングされたオブジェクトの色が残っていた
+   - **修正**: すべての`ctx.putImageData()`呼び出し後に`MojiQCanvasContext.initContext()`を追加し、正しい色を設定し直すように変更
+   - **修正箇所**:
+     - interactionState === 2（引出線プレビュー描画）
+     - interactionState === 3（折れ線モードプレビュー）
+     - interactionState === 1（ラベル付き枠線の引出線フェーズ）
+     - interactionState === 5（ラベル付き枠線の枠線描画中）
+     - マーカーモード
+     - 形状描画モード（rect, ellipse, line等）
+     - `finalizeAnnotation()`関数
+   - **対象ファイル**: [drawing.js](js/drawing.js)
+
+3. **テキストと校正記号スタンプの白フチの角が尖る問題を修正**
+   - **原因**: `ctx.lineJoin`が`'round'`に設定されていなかったため、`strokeText()`や図形描画時に角が尖っていた
+   - **修正**: 白フチを描画するすべての箇所に`ctx.lineJoin = 'round'`を追加
+   - **修正箇所**:
+     - フォントラベルプレビューの白フチ
+     - フォントラベルレンダリングの白フチ
+     - 全スタンプ（済, 小, ルビ, トル, トルツメ, トルママ, 全角アキ, 半角アキ, 四分アキ, 改行）のレンダリング
+     - `drawWithOutline()`関数（3箇所）
+   - **対象ファイル**: [drawing.js](js/drawing.js), [drawing-renderer.js](js/drawing-renderer.js)
+
+#### 設定変更
+
+4. **マーカーのデフォルト線幅を6pxに変更**
+   - **対象ファイル**: [settings.js](js/settings.js)

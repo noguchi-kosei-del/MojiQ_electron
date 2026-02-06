@@ -1729,6 +1729,7 @@ window.MojiQDrawingRenderer = (function() {
         ctx.save();
         ctx.lineWidth = 3;
         ctx.strokeStyle = '#ffffff';
+        ctx.lineJoin = 'round';
         ctx.strokeText(obj.fontName || '', obj.textX, obj.textY);
         ctx.restore();
 
@@ -1756,6 +1757,7 @@ window.MojiQDrawingRenderer = (function() {
             ctx.save();
             ctx.lineWidth = 3;
             ctx.strokeStyle = '#ffffff';
+            ctx.lineJoin = 'round';
             ctx.strokeText(char, px, py);
             ctx.restore();
             ctx.fillText(char, px, py);
@@ -1869,6 +1871,7 @@ window.MojiQDrawingRenderer = (function() {
         ctx.textBaseline = 'middle';
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 3;
+        ctx.lineJoin = 'round';
         ctx.strokeText('済', x, y);
 
         // 「済」の文字
@@ -1910,6 +1913,7 @@ window.MojiQDrawingRenderer = (function() {
         ctx.textBaseline = 'middle';
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 1.5;
+        ctx.lineJoin = 'round';
         ctx.strokeText('小', x, y);
 
         // 「小」の文字
@@ -1972,6 +1976,7 @@ window.MojiQDrawingRenderer = (function() {
         ctx.textBaseline = 'middle';
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 3;
+        ctx.lineJoin = 'round';
         ctx.strokeText('ルビ', x, y);
 
         // 「ルビ」の文字
@@ -2022,6 +2027,7 @@ window.MojiQDrawingRenderer = (function() {
         ctx.textBaseline = 'middle';
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 4;
+        ctx.lineJoin = 'round';
         ctx.strokeText('トル', x, y);
 
         // 「トル」の文字
@@ -2048,6 +2054,7 @@ window.MojiQDrawingRenderer = (function() {
         ctx.textBaseline = 'middle';
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 4;
+        ctx.lineJoin = 'round';
         ctx.strokeText('トルツメ', x, y);
 
         // 「トルツメ」の文字
@@ -2074,6 +2081,7 @@ window.MojiQDrawingRenderer = (function() {
         ctx.textBaseline = 'middle';
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 4;
+        ctx.lineJoin = 'round';
         ctx.strokeText('トルママ', x, y);
 
         // 「トルママ」の文字
@@ -2100,6 +2108,7 @@ window.MojiQDrawingRenderer = (function() {
         ctx.textBaseline = 'middle';
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 4;
+        ctx.lineJoin = 'round';
         ctx.strokeText('全角アキ', x, y);
 
         // 「全角アキ」の文字
@@ -2126,6 +2135,7 @@ window.MojiQDrawingRenderer = (function() {
         ctx.textBaseline = 'middle';
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 4;
+        ctx.lineJoin = 'round';
         ctx.strokeText('半角アキ', x, y);
 
         // 「半角アキ」の文字
@@ -2152,6 +2162,7 @@ window.MojiQDrawingRenderer = (function() {
         ctx.textBaseline = 'middle';
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 4;
+        ctx.lineJoin = 'round';
         ctx.strokeText('四分アキ', x, y);
 
         // 「四分アキ」の文字
@@ -2178,6 +2189,7 @@ window.MojiQDrawingRenderer = (function() {
         ctx.textBaseline = 'middle';
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 4;
+        ctx.lineJoin = 'round';
         ctx.strokeText('改行', x, y);
 
         // 「改行」の文字
@@ -2259,6 +2271,7 @@ window.MojiQDrawingRenderer = (function() {
             ctx.save();
             ctx.lineWidth = 3;
             ctx.strokeStyle = '#ffffff';
+            ctx.lineJoin = 'round';
             ctx.strokeText(char, px, py);
             ctx.restore();
             ctx.fillText(char, px, py);
@@ -2354,6 +2367,7 @@ window.MojiQDrawingRenderer = (function() {
                 ctx.save();
                 ctx.lineWidth = 3;
                 ctx.strokeStyle = '#ffffff';
+                ctx.lineJoin = 'round';
                 ctx.strokeText(char, px, py);
                 ctx.restore();
                 ctx.fillText(char, px, py);
