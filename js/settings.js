@@ -12,7 +12,7 @@ window.MojiQSettings = (function() {
         // ツール別線幅設定
         toolLineWidths: {
             draw: 2,        // ペン
-            marker: 5,      // マーカー
+            marker: 6,      // マーカー
             eraser: 10,     // 消しゴム
             line: 2,        // 直線
             arrow: 2,       // 矢印

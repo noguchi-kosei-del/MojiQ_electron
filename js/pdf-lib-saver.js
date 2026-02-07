@@ -81,11 +81,15 @@ window.MojiQPdfLibSaver = (function() {
         }
 
         // 高解像度でレンダリングするためのスケール
-        const scale = 2;
+        const scale = 4;  // 高解像度PDF出力用（テキスト・スタンプのぼやけ防止）
         const canvas = document.createElement('canvas');
         canvas.width = width * scale;
         canvas.height = height * scale;
         const ctx = canvas.getContext('2d');
+
+        // 画像スムージング設定
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
 
         // 透明な背景
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -176,11 +180,15 @@ window.MojiQPdfLibSaver = (function() {
         }
 
         // 高解像度でレンダリングするためのスケール
-        const scale = 2;
+        const scale = 4;  // 高解像度PDF出力用（テキスト・スタンプのぼやけ防止）
         const canvas = document.createElement('canvas');
         canvas.width = spreadWidth * scale;
         canvas.height = spreadHeight * scale;
         const ctx = canvas.getContext('2d');
+
+        // 画像スムージング設定
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
 
         // 透明な背景
         ctx.clearRect(0, 0, canvas.width, canvas.height);

@@ -5,7 +5,7 @@ PDF/画像の校正・注釈ツール（デスクトップアプリケーショ�
 ## プロジェクト概要
 
 - **アプリ名**: MojiQ
-- **バージョン**: 2.0.3
+- **バージョン**: 2.0.4
 - **識別子**: com.mojiq.app
 - **目的**: PDF/JPEGファイルへの校正指示・注釈付け、写植サイズシミュレーション
 
@@ -421,3 +421,49 @@ G:\共有ドライブ\CLLENN\編集部フォルダ\編集企画部\編集企画_
 | F12 | 開発者ツール |
 | 左右キー | ページ送り |
 | Space+ドラッグ | パン（移動） |
+
+## 変更履歴
+
+### 2026-02-07
+#### PDF保存時のテキスト・スタンプぼやけ修正
+- **問題**: PDF保存時にテキストやスタンプがぼやけて表示される
+- **原因**: `pdf-lib-saver.js`でCanvas描画をPNG化する際の解像度スケール（`scale = 2`）が不十分
+- **修正内容**:
+  - `renderDrawingObjectsToPng()`: `scale = 2` → `scale = 4` に変更
+  - `renderSpreadDrawingObjectsToPng()`: `scale = 2` → `scale = 4` に変更
+  - 両関数にCanvas画像スムージング設定を追加（`imageSmoothingEnabled = true`, `imageSmoothingQuality = 'high'`）
+- **修正ファイル**: `js/pdf-lib-saver.js`
+
+#### PDF保存時の白フチ外側の黒いシミ修正
+- **問題**: PDF保存時にテキストやスタンプの白フチ外側に黒いシミが発生
+- **原因**: Canvas描画時にストロークの`lineJoin`が未設定で、アンチエイリアスによる半透明ピクセルが透明背景との合成で暗く見える
+- **修正内容**:
+  - すべての白フチ描画箇所に`ctx.lineJoin = 'round'`と`ctx.lineCap = 'round'`を追加
+  - 白フチを複数回描画（太いものから細いものへ）してアンチエイリアスの半透明ピクセルを覆う
+  - 対象関数: `drawWithOutline`, `renderDoneStamp`, `renderKomojiStamp`, `renderRubyStamp`, `renderToruStamp`, `renderTorutsumeStamp`, `renderTorumamaStamp`, `renderZenkakuakiStamp`, `renderNibunakiStamp`, `renderShibunakiStamp`, `renderKaigyouStamp`, `renderFontLabel`, `renderAnnotationText`
+- **修正ファイル**: `js/drawing-renderer.js`
+
+#### 済スタンプ・ルビスタンプの枠内白塗りつぶし
+- **問題**: スタンプの枠内が透明で背景が見えてしまう
+- **修正内容**:
+  - 済スタンプ: 円の内側を白で塗りつぶし（`radius + 2`で少し大きめに）
+  - ルビスタンプ: 角丸長方形の内側を白で塗りつぶし（外側に2pxのマージン）
+- **修正ファイル**: `js/drawing-renderer.js`
+
+#### 消しゴムで消したオブジェクトのカット/ペースト修正
+- **問題**: 消しゴムで一部を消したオブジェクトをCtrl+X/Ctrl+Vでカット/ペーストすると、消した部分が元に戻る
+- **原因**:
+  - カット時に関連する消しゴムオブジェクトが一緒にコピーされていなかった
+  - ペースト時に消しゴムの`linkedObjectIds`が古いIDのままだった
+- **修正内容**:
+  - `cutSelected()`: 選択オブジェクトに関連する消しゴム（`linkedObjectIds`で紐づけ）も一緒にクリップボードにコピー・削除
+  - `pasteFromClipboard()`: IDマッピングを作成し、消しゴムの`linkedObjectIds`を新しいIDに変換
+- **修正ファイル**: `js/drawing-select.js`
+
+#### 消しゴムで消した部分のPDF保存時ぼやけ修正
+- **問題**: 消しゴムで消した枠線がPDF保存時にぼやけて表示される
+- **原因**: `renderObjectWithErasers`関数で、オフスクリーンキャンバスのスケーリングに`window.devicePixelRatio`を使用していたが、PDF保存時はメインキャンバスが`scale=4`でスケーリングされているため解像度が不一致
+- **修正内容**:
+  - `ctx.getTransform()`で現在のキャンバスのスケーリング係数を取得
+  - オフスクリーンキャンバスに現在のスケーリングを適用
+- **修正ファイル**: `js/drawing-renderer.js`

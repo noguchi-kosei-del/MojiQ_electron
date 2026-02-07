@@ -396,8 +396,10 @@ window.MojiQDrawing = (function() {
      * 現在の描画コンテキストから色と線幅を取得
      */
     function getCurrentDrawingStyle() {
+        // colorPickerから色を取得（ctx.strokeStyleはページ切り替え時にリセットされるため使用しない）
+        const color = window.MojiQCanvasContext ? MojiQCanvasContext.getColor() : (ctx.strokeStyle || '#000000');
         return {
-            color: ctx.strokeStyle || '#000000',
+            color: color,
             lineWidth: ctx.lineWidth || 2
         };
     }
@@ -689,6 +691,10 @@ window.MojiQDrawing = (function() {
             'zenkakuakiStamp', 'nibunakiStamp', 'shibunakiStamp', 'kaigyouStamp'
         ];
         if (instructionStampModes.includes(state.currentMode)) {
+            // 描画コンテキストを確実に初期化（色が黒になる不具合を防ぐ）
+            if (window.MojiQCanvasContext) {
+                MojiQCanvasContext.initContext();
+            }
             state.interactionState = 1;
             startPos = pos;           // ローカル座標（保存用）
             currentPos = pos;
@@ -700,6 +706,10 @@ window.MojiQDrawing = (function() {
 
         // ラベル付き枠線モードの処理（引出線→枠線をシームレスに）
         if (state.currentMode === 'labeledRect') {
+            // 描画コンテキストを確実に初期化（色が黒になる不具合を防ぐ）
+            if (window.MojiQCanvasContext) {
+                MojiQCanvasContext.initContext();
+            }
             // 引出線描画フェーズを開始
             state.interactionState = 1;
             startPos = pos;           // ローカル座標（保存用）

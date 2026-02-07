@@ -2026,14 +2026,45 @@ window.MojiQDrawingSelect = (function() {
         clipboard.isCut = true;
         clipboard.sourcePageNum = pageNum;
 
+        // 選択されたオブジェクトのIDを収集
+        const selectedIds = new Set();
+        for (const idx of selectedIndices) {
+            if (objects[idx] && objects[idx].id) {
+                selectedIds.add(objects[idx].id);
+            }
+        }
+
+        // 選択されたオブジェクトに関連する消しゴムオブジェクトのインデックスを収集
+        const relatedEraserIndices = new Set();
+        objects.forEach((obj, idx) => {
+            if (obj.type === 'eraser' && obj.linkedObjectIds) {
+                // この消しゴムが選択されたオブジェクトに関連しているかチェック
+                const hasRelatedObject = obj.linkedObjectIds.some(id => selectedIds.has(id));
+                if (hasRelatedObject) {
+                    relatedEraserIndices.add(idx);
+                }
+            }
+        });
+
         // インデックス順にコピー（後で削除時にずれないよう逆順で削除するため）
         const sortedIndices = [...selectedIndices].sort((a, b) => a - b);
+        const selectedIndicesSet = new Set(selectedIndices);
         for (const idx of sortedIndices) {
             clipboard.objects.push(MojiQClone.deep(objects[idx]));
         }
 
-        // 選択されたオブジェクトを削除（逆順で削除してインデックスずれを防ぐ）
-        const reverseIndices = [...selectedIndices].sort((a, b) => b - a);
+        // 関連する消しゴムオブジェクトもコピー（選択オブジェクトと一緒に）
+        for (const idx of relatedEraserIndices) {
+            if (!selectedIndicesSet.has(idx)) {
+                clipboard.objects.push(MojiQClone.deep(objects[idx]));
+            }
+        }
+
+        // 削除対象のインデックスをマージ
+        const allIndicesToDelete = new Set([...selectedIndices, ...relatedEraserIndices]);
+
+        // 選択されたオブジェクトと関連消しゴムを削除（逆順で削除してインデックスずれを防ぐ）
+        const reverseIndices = [...allIndicesToDelete].sort((a, b) => b - a);
         for (const idx of reverseIndices) {
             DrawingObjects.removeObject(pageNum, idx);
         }
@@ -2066,10 +2097,15 @@ window.MojiQDrawingSelect = (function() {
         const offset = clipboard.isCut ? 0 : 20;
 
         const newIndices = [];
+        // 元のIDと新しいIDのマッピング（消しゴムのlinkedObjectIds更新用）
+        const idMapping = {};
 
         for (const obj of clipboard.objects) {
             // オブジェクトを深くコピー
             const newObj = MojiQClone.deep(obj);
+
+            // 元のIDを保存
+            const oldId = newObj.id;
 
             // 新しいIDを生成（重複を避けるため）
             delete newObj.id;
@@ -2081,9 +2117,26 @@ window.MojiQDrawingSelect = (function() {
 
             // オブジェクトを追加
             const newId = DrawingObjects.addObject(pageNum, newObj);
+
+            // IDマッピングを記録
+            if (oldId) {
+                idMapping[oldId] = newId;
+            }
+
             const newIndex = DrawingObjects.findIndexById(pageNum, newId);
             if (newIndex >= 0) {
                 newIndices.push(newIndex);
+            }
+        }
+
+        // 消しゴムオブジェクトのlinkedObjectIdsを新しいIDに更新
+        const objects = DrawingObjects.getPageObjects(pageNum);
+        for (const index of newIndices) {
+            const obj = objects[index];
+            if (obj && obj.type === 'eraser' && obj.linkedObjectIds) {
+                obj.linkedObjectIds = obj.linkedObjectIds.map(oldId => {
+                    return idMapping[oldId] || oldId;
+                });
             }
         }
 

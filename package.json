@@ -1,6 +1,6 @@
 {
   "name": "mojiq",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "MojiQ",
   "main": "electron/main.js",
   "scripts": {
