@@ -48,7 +48,7 @@ window.SimulatorUndoRedo = (function() {
         // 調整モードを解除
         State.set('pendingGridState', null);
         State.set('isGridAdjusting', false);
-        adjustMessage.style.display = 'none';
+        adjustMessage.classList.remove('active');
         sizeTooltip.style.display = 'none';
 
         // キャンバスをクリアして全グリッドを再描画
@@ -87,7 +87,7 @@ window.SimulatorUndoRedo = (function() {
         // 調整モードを解除
         State.set('pendingGridState', null);
         State.set('isGridAdjusting', false);
-        adjustMessage.style.display = 'none';
+        adjustMessage.classList.remove('active');
         sizeTooltip.style.display = 'none';
 
         // キャンバスをクリアして全グリッドを再描画

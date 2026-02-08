@@ -55,7 +55,7 @@ window.SimulatorTools = (function() {
         State.set('isGridAdjusting', false);
         State.set('isGridMoving', false);
         State.set('pendingGridState', null);
-        adjustMessage.style.display = 'none';
+        adjustMessage.classList.remove('active');
         sizeTooltip.style.display = 'none';
         canvas.style.cursor = 'default';
         if (currentMode === 'grid') {
@@ -90,7 +90,7 @@ window.SimulatorTools = (function() {
         State.set('isGridMoving', false);
         State.set('isResizing', false);
 
-        adjustMessage.style.display = 'none';
+        adjustMessage.classList.remove('active');
         sizeTooltip.style.display = 'none';
 
         // キャンバスをクリアして残りのグリッドを再描画
@@ -141,7 +141,7 @@ window.SimulatorTools = (function() {
         State.set('isGridMoving', false);
         State.set('isResizing', false);
 
-        adjustMessage.style.display = 'none';
+        adjustMessage.classList.remove('active');
         sizeTooltip.style.display = 'none';
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);

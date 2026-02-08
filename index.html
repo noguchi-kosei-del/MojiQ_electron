@@ -566,6 +566,13 @@
                         <option value="tight">文字大きめ</option>
                         <option value="none">余白なし</option>
                     </select>
+
+                    <!-- adjustMessage: グリッド調整時に表示 -->
+                    <div id="adjustMessage">
+                        <span class="adjust-label">サイズ</span>
+                        <span class="adjust-value" id="monPt">-</span>
+                        <span class="adjust-unit">pt</span>
+                    </div>
                 </div>
 
                 <!-- 文字サイズUIは非表示、機能は維持 -->
@@ -641,61 +648,6 @@
                 <canvas id="whiteboard" class="canvas-layer"></canvas>
 
                 <canvas id="sim-whiteboard" class="canvas-layer"></canvas>
-            </div>
-
-            <div id="adjustMessage">
-                <div class="dashboard-container">
-                    <div class="spec-group" style="display:none;">
-                        <div id="badgeLines" class="spec-badge badge-lines">
-                            <span class="spec-label">行数</span><span class="spec-value" id="monLines">-</span>
-                        </div>
-                        <div class="key-btn-wrapper"><div class="key-cap">G</div></div>
-                    </div>
-                    <div class="spec-group" style="display:none;">
-                        <div id="badgeChars" class="spec-badge badge-chars">
-                            <span class="spec-label" id="lblChars">文字</span><span class="spec-value" id="monChars">-</span>
-                        </div>
-                        <div class="key-btn-wrapper"><div class="key-cap">C</div></div>
-                    </div>
-                    <div class="spec-group" style="flex-direction: row; align-items: center;">
-                        <div style="display:flex; flex-direction:column; align-items:center;">
-                            <div id="badgePt" class="spec-badge badge-pt badge-pt-large">
-                                <span class="spec-label">サイズ</span><span class="spec-value" id="monPt">-</span>
-                            </div>
-                            <div class="key-btn-wrapper" style="display:none;"><div class="key-cap">S</div></div>
-                        </div>
-                        <div class="step-toggle vertical" style="display:none;">
-                            <div class="step-btn" data-step="1.0">1.0</div>
-                            <div class="step-btn" data-step="0.5">0.5</div>
-                            <div class="step-btn" data-step="0.1">0.1</div>
-                        </div>
-                    </div>
-                    <div class="spec-group" style="display:none;">
-                        <div class="density-control-row">
-                            <div id="badgeDensity" class="spec-badge badge-density">
-                                <span class="spec-label">余白</span><span class="spec-value" id="monDensity">標準</span>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="dashDensityToggle" checked>
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                        <div class="density-mode-selector" id="dashDensitySelector">
-                             <div class="mode-btn active" data-val="standard">標準</div>
-                             <div class="mode-btn" data-val="loose">広</div>
-                             <div class="mode-btn" data-val="tight">詰</div>
-                        </div>
-                        <div class="key-btn-wrapper"><div class="key-cap">Q</div></div>
-                    </div>
-                    <div class="spec-group" style="display:none;">
-                        <div id="btnWritingMode" class="spec-badge" style="background: linear-gradient(135deg, #607d8b, #455a64); min-width: 55px;">
-                            <span class="spec-label">方向</span><span class="spec-value" id="iconWritingMode">A↓</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="dash-footer">
-                    <div id="guideText"></div>
-                </div>
             </div>
 
             <div id="sizeTooltip"></div>

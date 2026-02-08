@@ -1294,7 +1294,7 @@ window.MojiQPdfManager = (function() {
             if (window.SimulatorState) {
                 window.SimulatorState.resetAllData();
                 const adjustMessage = document.getElementById('adjustMessage');
-                if (adjustMessage) adjustMessage.style.display = 'none';
+                if (adjustMessage) adjustMessage.classList.remove('active');
                 const sizeTooltip = document.getElementById('sizeTooltip');
                 if (sizeTooltip) sizeTooltip.style.display = 'none';
             }
@@ -1598,7 +1598,7 @@ window.MojiQPdfManager = (function() {
                 window.SimulatorState.resetAllData();
                 // SimulatorのUI状態もリセット
                 const adjustMessage = document.getElementById('adjustMessage');
-                if (adjustMessage) adjustMessage.style.display = 'none';
+                if (adjustMessage) adjustMessage.classList.remove('active');
                 const sizeTooltip = document.getElementById('sizeTooltip');
                 if (sizeTooltip) sizeTooltip.style.display = 'none';
             }
@@ -2777,7 +2777,7 @@ window.MojiQPdfManager = (function() {
             if (window.SimulatorState) {
                 window.SimulatorState.resetAllData();
                 const adjustMessage = document.getElementById('adjustMessage');
-                if (adjustMessage) adjustMessage.style.display = 'none';
+                if (adjustMessage) adjustMessage.classList.remove('active');
                 const sizeTooltip = document.getElementById('sizeTooltip');
                 if (sizeTooltip) sizeTooltip.style.display = 'none';
             }
@@ -2904,7 +2904,7 @@ window.MojiQPdfManager = (function() {
             if (window.SimulatorState) {
                 window.SimulatorState.resetAllData();
                 const adjustMessage = document.getElementById('adjustMessage');
-                if (adjustMessage) adjustMessage.style.display = 'none';
+                if (adjustMessage) adjustMessage.classList.remove('active');
                 const sizeTooltip = document.getElementById('sizeTooltip');
                 if (sizeTooltip) sizeTooltip.style.display = 'none';
             }

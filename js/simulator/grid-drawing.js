@@ -124,7 +124,7 @@ window.SimulatorGridDrawing = (function() {
                 window.SimulatorUI.updateFixedTooltip(pendingGridState, null);
             }
 
-            adjustMessage.style.display = 'flex';
+            adjustMessage.classList.add('active');
 
             if (window.SimulatorUI) {
                 window.SimulatorUI.updateDensityUIState();
@@ -140,7 +140,7 @@ window.SimulatorGridDrawing = (function() {
         } else {
             State.set('pendingGridState', null);
             State.set('isGridAdjusting', false);
-            adjustMessage.style.display = 'none';
+            adjustMessage.classList.remove('active');
             sizeTooltip.style.display = 'none';
 
             const currentMode = State.get('currentMode');

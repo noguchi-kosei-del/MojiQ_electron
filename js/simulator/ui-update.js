@@ -69,59 +69,21 @@ window.SimulatorUI = (function() {
     // ダッシュボード数値更新
     function updateDashboardValues() {
         const pendingGridState = State.get('pendingGridState');
-        const monLines = DOM.get('monLines');
-        const monChars = DOM.get('monChars');
         const monPt = DOM.get('monPt');
-        const monDensity = DOM.get('monDensity');
-        const densitySelect = DOM.get('densitySelect');
+
+        if (!monPt) return;
 
         if (!pendingGridState) {
-            monLines.textContent = '-';
-            monChars.textContent = '-';
             monPt.textContent = '-';
             return;
         }
 
-        monLines.textContent = pendingGridState.lines;
-        monChars.textContent = pendingGridState.chars;
-        monPt.textContent = pendingGridState.ptSize + 'pt';
-
-        // 余白モードも更新
-        if (monDensity && densitySelect) {
-            const density = densitySelect.value;
-            if (density === 'loose') monDensity.textContent = '広';
-            else if (density === 'standard') monDensity.textContent = '標準';
-            else if (density === 'tight') monDensity.textContent = '詰';
-            else if (density === 'none') monDensity.textContent = 'なし';
-        }
+        monPt.textContent = pendingGridState.ptSize;
     }
 
     // ダッシュボードハイライト更新
     function updateDashboardHighlight() {
-        const badgeLines = DOM.get('badgeLines');
-        const badgeChars = DOM.get('badgeChars');
-        const badgePt = DOM.get('badgePt');
-        const pendingGridState = State.get('pendingGridState');
-        const wheelMode = State.get('wheelMode');
-
-        [badgeLines, badgeChars, badgePt].forEach(b => {
-            b.classList.remove('active-spec', 'locked-active', 'locked-disabled');
-        });
-
-        if (!pendingGridState) return;
-
-        if (pendingGridState.isLocked) {
-            if (wheelMode === 'chars') badgeChars.classList.add('locked-active');
-            else if (wheelMode === 'lines') badgeLines.classList.add('locked-active');
-
-            if (wheelMode !== 'chars') badgeChars.classList.add('locked-disabled');
-            if (wheelMode !== 'lines') badgeLines.classList.add('locked-disabled');
-            badgePt.classList.add('locked-disabled');
-        } else {
-            if (wheelMode === 'lines') badgeLines.classList.add('active-spec');
-            else if (wheelMode === 'chars') badgeChars.classList.add('active-spec');
-            else if (wheelMode === 'pt') badgePt.classList.add('active-spec');
-        }
+        // シンプル表示のため、ハイライト機能は無効化
     }
 
     // Density UI状態更新
@@ -299,9 +261,7 @@ window.SimulatorUI = (function() {
         const dashDensityToggle = DOM.get('dashDensityToggle');
         const dashDensitySelector = DOM.get('dashDensitySelector');
         const densitySelect = DOM.get('densitySelect');
-        const badgeLines = DOM.get('badgeLines');
-        const badgeChars = DOM.get('badgeChars');
-        const badgePt = DOM.get('badgePt');
+        // badgeLines, badgeChars, badgePtは削除済み（シンプル表示化）
         const gridTextInput = DOM.get('gridTextInput');
         const gridLinesInput = DOM.get('gridLinesInput');
         const gridCharsInput = DOM.get('gridCharsInput');
@@ -469,40 +429,7 @@ window.SimulatorUI = (function() {
             });
         });
 
-        // バッジクリックイベント
-        if (badgeLines) {
-            badgeLines.onclick = () => {
-                const pendingGridState = State.get('pendingGridState');
-                if (!pendingGridState || pendingGridState.isLocked) return;
-                setWheelMode('lines');
-            };
-        }
-
-        if (badgeChars) {
-            badgeChars.onclick = () => {
-                const pendingGridState = State.get('pendingGridState');
-                if (!pendingGridState) return;
-                const wheelMode = State.get('wheelMode');
-                if (wheelMode === 'chars') {
-                    toggleLockMode();
-                } else {
-                    if (pendingGridState.isLocked) toggleLockMode();
-                    setWheelMode('chars');
-                }
-            };
-        }
-
-        if (badgeDensity) {
-            badgeDensity.onclick = () => {
-                const pendingGridState = State.get('pendingGridState');
-                if (pendingGridState && pendingGridState.isLocked) return;
-                // toggle density
-            };
-        }
-
-        if (badgePt) {
-            badgePt.onclick = () => setWheelMode('pt');
-        }
+        // バッジクリックイベント（badgeLines, badgeChars, badgeDensity, badgePtは削除済み）
 
         // セリフ自動計測（テキスト入力時の自動計算）
         // 入力された文字数と行数に応じてグリッドサイズを自動調整

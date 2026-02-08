@@ -138,31 +138,56 @@
     pointer-events: none;
 }
 
-/* --- ダッシュボード (浮遊カプセルUI) --- */
+/* --- サイズ表示 (サイドバー内) --- */
 #adjustMessage {
-    position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
-    border-radius: 40px; background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.15);
-    padding: 12px 28px;
-    display: none; /* JSで制御 */
-    flex-direction: column; align-items: center; gap: 8px;
-    z-index: 3000; transition: top 0.3s ease, left 0.3s ease, transform 0.3s ease;
-    cursor: grab;
-    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #e0e0e0;
+    border: 1px solid #bdbdbd;
+    opacity: 0.5;
+    transition: opacity 0.3s, background 0.3s, border-color 0.3s;
 }
-#adjustMessage.dragging {
-    cursor: grabbing;
-    transition: none;
-}
-#adjustMessage.dragged {
-    transform: none;
-    transition: none;
-}
-#adjustMessage.bottom-pos:not(.dragged) { top: unset; bottom: 90px; } /* BottomNavより上に */
 
-/* ダッシュボードの表示/非表示はJSで制御 */
+#adjustMessage.active {
+    background: #e1f5fe;
+    border-color: #4fc3f7;
+    opacity: 1;
+}
+
+#adjustMessage .adjust-label {
+    font-size: 11px;
+    font-weight: bold;
+    color: #666;
+}
+
+#adjustMessage.active .adjust-label {
+    color: #0277bd;
+}
+
+#adjustMessage .adjust-value {
+    font-size: 18px;
+    font-weight: bold;
+    color: #999;
+    font-family: "Noto Sans JP", sans-serif;
+}
+
+#adjustMessage.active .adjust-value {
+    color: #01579b;
+}
+
+#adjustMessage .adjust-unit {
+    font-size: 11px;
+    color: #999;
+}
+
+#adjustMessage.active .adjust-unit {
+    color: #0277bd;
+}
 
 /* ダッシュボード内の要素 */
 .dashboard-container { display: flex; align-items: flex-start; gap: 16px; }

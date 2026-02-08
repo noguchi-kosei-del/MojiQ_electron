@@ -938,9 +938,28 @@ body.dark-mode .json-search-highlight {
     color: #fff;
 }
 
-/* 調整メッセージ（ダッシュボード） */
+/* 調整メッセージ（サイズ表示） */
 body.dark-mode #adjustMessage {
-    background: rgba(30, 30, 30, 0.95);
+    background: #2a2a2a;
+    border-color: #3a3a3a;
+}
+body.dark-mode #adjustMessage .adjust-label,
+body.dark-mode #adjustMessage .adjust-unit {
+    color: #888;
+}
+body.dark-mode #adjustMessage .adjust-value {
+    color: #aaa;
+}
+body.dark-mode #adjustMessage.active {
+    background: #1a3a4a;
+    border-color: #4fc3f7;
+}
+body.dark-mode #adjustMessage.active .adjust-label,
+body.dark-mode #adjustMessage.active .adjust-unit {
+    color: #4fc3f7;
+}
+body.dark-mode #adjustMessage.active .adjust-value {
+    color: #81d4fa;
 }
 
 body.dark-mode .dashboard-container .spec-badge {

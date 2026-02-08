@@ -64,7 +64,7 @@ window.SimulatorEventHandlers = (function() {
 
             window.SimulatorGridDrawing.drawFixedGrid(pendingGridState, true);
 
-            adjustMessage.style.display = 'flex';
+            adjustMessage.classList.add('active');
 
             if (window.SimulatorUI) {
                 window.SimulatorUI.updateDensityUIState();
@@ -699,7 +699,7 @@ window.SimulatorEventHandlers = (function() {
             }
 
             State.set('isGridAdjusting', true);
-            adjustMessage.style.display = 'flex';
+            adjustMessage.classList.add('active');
 
             const updatedPendingGridState = State.get('pendingGridState');
             const cellSize = updatedPendingGridState.ptSize * State.MM_PER_PT * pixelsPerMm;

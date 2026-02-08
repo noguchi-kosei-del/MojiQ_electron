@@ -424,6 +424,25 @@ G:\共有ドライブ\CLLENN\編集部フォルダ\編集企画部\編集企画_
 
 ## 変更履歴
 
+### 2026-02-08
+#### 写植グリッドサイズ表示のサイドバー移動・シンプル化
+- **変更内容**:
+  - `adjustMessage`（写植グリッドのサイズ表示）をキャンバス上の浮遊UIからサイドバーの`gridSettingsArea`内に移動
+  - 複雑なダッシュボードUI（行数・文字数・余白・方向バッジ）をシンプルな「サイズ - pt」表示に変更
+  - 常に表示（グレーアウト状態）→ グリッド描画時にアクティブ化（水色背景）
+- **修正ファイル**:
+  - `index.html`: adjustMessage HTMLをgridSettingsArea内に移動、シンプル構造に変更
+  - `css/simulator.css`: サイドバー内表示用スタイル、グレーアウト/アクティブ状態
+  - `css/dark-mode.css`: ダークモード対応
+  - `js/simulator/ui-update.js`: updateDashboardValues/updateDashboardHighlightを簡素化、削除したバッジ参照を削除
+  - `js/simulator/grid-drawing.js`, `event-handlers.js`, `tools.js`, `undo-redo.js`, `js/pdf-manager.js`: `style.display`を`classList.add/remove('active')`に変更
+
+#### 縮尺合わせShiftスナップ機能の修正
+- **問題**: 計測モードでShiftキーを押しながらドラッグしても水平・垂直にスナップしない
+- **原因**: `ui-update.js`でHTMLから削除した`badgeDensity`を参照し`ReferenceError`が発生、`SimulatorKeyboard.init()`が実行されず`mojiq:shift`イベントが受信されなかった
+- **修正内容**: `ui-update.js`から削除済みバッジ（badgeLines, badgeChars, badgePt, badgeDensity）への参照を削除
+- **修正ファイル**: `js/simulator/ui-update.js`
+
 ### 2026-02-07
 #### PDF保存時のテキスト・スタンプぼやけ修正
 - **問題**: PDF保存時にテキストやスタンプがぼやけて表示される
