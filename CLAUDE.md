@@ -421,8 +421,51 @@ G:\共有ドライブ\CLLENN\編集部フォルダ\編集企画部\編集企画_
 | F12 | 開発者ツール |
 | 左右キー | ページ送り |
 | Space+ドラッグ | パン（移動） |
+| Shift+ドラッグ | スナップ描画（ペン/マーカー→直線、直線→水平/垂直、枠線→正方形、楕円→正円） |
 
 ## 変更履歴
+
+### 2026-02-09
+#### マーカーツールのデフォルト太さ変更
+- **変更内容**: マーカーツールのデフォルト線幅を6px→8pxに変更
+- **修正ファイル**: `js/settings.js`
+
+#### Shiftキーによるスナップ描画機能の追加
+- **機能概要**: 各描画ツールでShiftキーを押しながら描画すると、形状がスナップされる
+- **対応ツール**:
+  - **ペン/マーカー**: 水平・垂直方向にスナップ（直線描画）
+  - **直線/直線+テキスト指示**: 水平・垂直方向にスナップ
+  - **枠線/枠線+テキスト指示**: 正方形にスナップ
+  - **楕円/楕円+テキスト指示**: 正円にスナップ
+- **修正ファイル**:
+  - `js/drawing.js`: スナップ描画処理の実装（プレビュー描画・保存処理）、パン操作判定の除外
+  - `js/mode-controller.js`: Shiftキー押下時のカーソル変更判定の除外
+  - `js/shortcuts.js`: Shiftキー押下時のデフォルト動作防止、フォーカス制御
+
+#### Shiftキー操作の改善
+- **問題**: 上記ツール選択時にShiftキーを押すと、パン操作モードになる・カーソルが手のひらに変わる・UIにフォーカスが入る
+- **修正内容**:
+  - スナップ描画対応ツール選択時はShift+クリックでパン操作にならないよう修正
+  - スナップ描画対応ツール選択時はShiftキー押下でカーソルが変わらないよう修正
+  - スナップ描画対応ツール選択時はShiftキー押下でUIフォーカスが発生しないよう`e.preventDefault()`と`document.activeElement.blur()`を追加
+- **対象モード**: `draw`, `marker`, `line`, `lineAnnotated`, `rect`, `rectAnnotated`, `ellipse`, `ellipseAnnotated`
+- **修正ファイル**: `js/drawing.js`, `js/mode-controller.js`, `js/shortcuts.js`
+
+#### PDF保存時の白フチ黒いシミ対策
+- **問題**: PDF保存時にテキストとスタンプの白フチ周りに黒いシミが残る
+- **原因**: アンチエイリアス処理による半透明ピクセルが透明背景と合成されて暗く見える
+- **修正内容**:
+  - **shadowBlur追加**: 全ての白フチ描画にshadowBlurを追加（アンチエイリアスの端を白い影で覆う）
+  - **最終的なlineWidth設定**:
+    - テキスト（renderText）: lineWidth 5→1 + shadowBlur=4
+    - 図形テキスト（renderAnnotationText, renderAnnotation）: lineWidth 5→1 + shadowBlur=4
+    - スタンプ文字（トル系）: lineWidth 8→2 + shadowBlur=5
+    - 済スタンプ枠線: lineWidth 6→2 + shadowBlur=5
+    - ルビスタンプ枠線: lineWidth 5→1 + shadowBlur=5
+    - 小文字スタンプ: lineWidth 5→1 + shadowBlur=5
+    - フォントラベル: lineWidth 6→1 + shadowBlur=6
+  - **済・ルビスタンプ**: 文字の白フチは内側が白塗りつぶしのため不要として削除
+- **修正ファイル**: `js/drawing-renderer.js`
 
 ### 2026-02-08
 #### 写植グリッドサイズ表示のサイドバー移動・シンプル化

@@ -775,10 +775,13 @@ window.MojiQModeController = (function() {
 
         // Shiftキーイベント (shortcuts.js連携)
         boundHandlers.shiftHandler = (e) => {
+            // ペン・マーカー・直線モードではShiftはスナップ描画用なのでカーソルを変えない
+            const shiftSnapModes = ['draw', 'marker', 'line', 'lineAnnotated', 'rect', 'rectAnnotated', 'ellipse', 'ellipseAnnotated'];
+            const isSnapMode = shiftSnapModes.includes(state.currentMode);
             if (e.detail.down) {
                 if (!state.isShiftPressed) {
                     state.isShiftPressed = true;
-                    if (!state.isPanning) mojiqCanvas.classList.add('cursor-grab');
+                    if (!state.isPanning && !isSnapMode) mojiqCanvas.classList.add('cursor-grab');
                 }
             } else {
                 state.isShiftPressed = false;

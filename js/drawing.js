@@ -585,7 +585,9 @@ window.MojiQDrawing = (function() {
         const isHandModeDrag = (state.currentMode === 'hand' && isLeftClick);
         const isSpaceLeftDrag = (state.isSpacePressed && isLeftClick);
         // 選択モードではShift+クリックは複数選択用なのでパン操作にしない
-        const isShiftLeftDrag = (state.isShiftPressed && isLeftClick && state.currentMode !== 'select');
+        // ペン・マーカー・直線モードではShift+クリックはスナップ描画用なのでパン操作にしない
+        const shiftSnapModes = ['select', 'draw', 'marker', 'line', 'lineAnnotated', 'rect', 'rectAnnotated', 'ellipse', 'ellipseAnnotated'];
+        const isShiftLeftDrag = (state.isShiftPressed && isLeftClick && !shiftSnapModes.includes(state.currentMode));
         const isCtrlRightDrag = ((e.ctrlKey || e.metaKey) && isRightClick);
 
         if (isHandModeDrag || isSpaceLeftDrag || isShiftLeftDrag || isMiddleClick || isCtrlRightDrag) {
@@ -978,11 +980,28 @@ window.MojiQDrawing = (function() {
         }
 
         if (state.interactionState === 1) {
+            // Shiftキーによる水平・垂直スナップ（ペンとマーカー）
+            let drawPos = pos;
+            let drawCanvasPos = canvasPos;
+            if (e.shiftKey && (state.currentMode === 'draw' || state.currentMode === 'marker')) {
+                const dx = Math.abs(canvasPos.x - startPosCanvas.x);
+                const dy = Math.abs(canvasPos.y - startPosCanvas.y);
+                if (dx > dy) {
+                    // 水平方向にスナップ
+                    drawCanvasPos = { x: canvasPos.x, y: startPosCanvas.y };
+                    drawPos = { x: pos.x, y: startPos.y };
+                } else {
+                    // 垂直方向にスナップ
+                    drawCanvasPos = { x: startPosCanvas.x, y: canvasPos.y };
+                    drawPos = { x: startPos.x, y: pos.y };
+                }
+            }
+
             if (state.currentMode === 'marker') {
                 // ローカル座標を保存用配列に追加
-                currentStrokePoints.push({ x: pos.x, y: pos.y });
+                currentStrokePoints.push({ x: drawPos.x, y: drawPos.y });
                 // キャンバス座標をプレビュー用配列に追加
-                currentStrokePointsCanvas.push({ x: canvasPos.x, y: canvasPos.y });
+                currentStrokePointsCanvas.push({ x: drawCanvasPos.x, y: drawCanvasPos.y });
 
                 ctx.putImageData(snapshot, 0, 0);
                 MojiQCanvasContext.initContext();
@@ -1007,15 +1026,15 @@ window.MojiQDrawing = (function() {
                 }
             } else if (state.currentMode === 'draw') {
                 // ローカル座標を保存用配列に追加
-                currentStrokePoints.push({ x: pos.x, y: pos.y });
+                currentStrokePoints.push({ x: drawPos.x, y: drawPos.y });
                 // キャンバス座標をプレビュー用配列に追加
-                currentStrokePointsCanvas.push({ x: canvasPos.x, y: canvasPos.y });
+                currentStrokePointsCanvas.push({ x: drawCanvasPos.x, y: drawCanvasPos.y });
 
                 // プレビューはキャンバス座標で描画
-                ctx.lineTo(canvasPos.x, canvasPos.y);
+                ctx.lineTo(drawCanvasPos.x, drawCanvasPos.y);
                 ctx.stroke();
                 ctx.beginPath();
-                ctx.moveTo(canvasPos.x, canvasPos.y);
+                ctx.moveTo(drawCanvasPos.x, drawCanvasPos.y);
             } else if (state.currentMode === 'eraser') {
                 // ローカル座標を保存用配列に追加
                 currentStrokePoints.push({ x: pos.x, y: pos.y });
@@ -1045,8 +1064,14 @@ window.MojiQDrawing = (function() {
                 const normalizedModeForDraw = normalizeMode(state.currentMode);
                 if (normalizedModeForDraw === 'rect') {
                     // プレビューはキャンバス座標で描画
-                    const w = canvasPos.x - startPosCanvas.x;
-                    const h = canvasPos.y - startPosCanvas.y;
+                    let w = canvasPos.x - startPosCanvas.x;
+                    let h = canvasPos.y - startPosCanvas.y;
+                    // Shiftキーで正方形にスナップ
+                    if (e.shiftKey) {
+                        const size = Math.max(Math.abs(w), Math.abs(h));
+                        w = size * Math.sign(w || 1);
+                        h = size * Math.sign(h || 1);
+                    }
                     ctx.rect(startPosCanvas.x, startPosCanvas.y, w, h);
                     ctx.stroke();
 
@@ -1085,11 +1110,17 @@ window.MojiQDrawing = (function() {
                     }
                 } else if (normalizedModeForDraw === 'ellipse') {
                     // プレビューはキャンバス座標で描画
-                    const w = Math.abs(canvasPos.x - startPosCanvas.x);
-                    const h = Math.abs(canvasPos.y - startPosCanvas.y);
-                    const cx = startPosCanvas.x + (canvasPos.x - startPosCanvas.x) / 2;
-                    const cy = startPosCanvas.y + (canvasPos.y - startPosCanvas.y) / 2;
-                    ctx.ellipse(cx, cy, w / 2, h / 2, 0, 0, 2 * Math.PI);
+                    let w = canvasPos.x - startPosCanvas.x;
+                    let h = canvasPos.y - startPosCanvas.y;
+                    // Shiftキーで正円にスナップ
+                    if (e.shiftKey) {
+                        const size = Math.max(Math.abs(w), Math.abs(h));
+                        w = size * Math.sign(w || 1);
+                        h = size * Math.sign(h || 1);
+                    }
+                    const cx = startPosCanvas.x + w / 2;
+                    const cy = startPosCanvas.y + h / 2;
+                    ctx.ellipse(cx, cy, Math.abs(w) / 2, Math.abs(h) / 2, 0, 0, 2 * Math.PI);
                     ctx.stroke();
                 } else if (state.currentMode === 'semicircle') {
                     // プレビューはキャンバス座標で描画
@@ -1685,13 +1716,23 @@ window.MojiQDrawing = (function() {
                 }
 
                 // 矩形をオブジェクトとして保存
-                const w = Math.abs(currentPos.x - startPos.x);
-                const h = Math.abs(currentPos.y - startPos.y);
+                // Shiftキーで正方形にスナップ
+                let rectEndX = currentPos.x;
+                let rectEndY = currentPos.y;
+                if (state.isShiftPressed) {
+                    const w = currentPos.x - startPos.x;
+                    const h = currentPos.y - startPos.y;
+                    const size = Math.max(Math.abs(w), Math.abs(h));
+                    rectEndX = startPos.x + size * Math.sign(w || 1);
+                    rectEndY = startPos.y + size * Math.sign(h || 1);
+                }
+                const w = Math.abs(rectEndX - startPos.x);
+                const h = Math.abs(rectEndY - startPos.y);
                 if (w > 5 && h > 5) {
                     saveObjectToPage({
                         type: 'rect',
                         startPos: { ...startPos },
-                        endPos: { ...currentPos },
+                        endPos: { x: rectEndX, y: rectEndY },
                         color: style.color,
                         lineWidth: style.lineWidth
                     });
@@ -1712,13 +1753,23 @@ window.MojiQDrawing = (function() {
 
             if (normalizedModeForSave === 'ellipse') {
                 // 楕円をオブジェクトとして保存
-                const w = Math.abs(currentPos.x - startPos.x);
-                const h = Math.abs(currentPos.y - startPos.y);
+                // Shiftキーで正円にスナップ
+                let ellipseEndX = currentPos.x;
+                let ellipseEndY = currentPos.y;
+                if (state.isShiftPressed) {
+                    const w = currentPos.x - startPos.x;
+                    const h = currentPos.y - startPos.y;
+                    const size = Math.max(Math.abs(w), Math.abs(h));
+                    ellipseEndX = startPos.x + size * Math.sign(w || 1);
+                    ellipseEndY = startPos.y + size * Math.sign(h || 1);
+                }
+                const w = Math.abs(ellipseEndX - startPos.x);
+                const h = Math.abs(ellipseEndY - startPos.y);
                 if (w > 5 && h > 5) {
                     saveObjectToPage({
                         type: 'ellipse',
                         startPos: { ...startPos },
-                        endPos: { ...currentPos },
+                        endPos: { x: ellipseEndX, y: ellipseEndY },
                         color: style.color,
                         lineWidth: style.lineWidth
                     });

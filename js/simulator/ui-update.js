@@ -61,11 +61,6 @@ window.SimulatorUI = (function() {
         }
     }
 
-    // ツールチップ更新（無効化）
-    function updateFixedTooltip(state, e) {
-        // ポップアップ表示を削除
-    }
-
     // ダッシュボード数値更新
     function updateDashboardValues() {
         const pendingGridState = State.get('pendingGridState');
@@ -79,11 +74,6 @@ window.SimulatorUI = (function() {
         }
 
         monPt.textContent = pendingGridState.ptSize;
-    }
-
-    // ダッシュボードハイライト更新
-    function updateDashboardHighlight() {
-        // シンプル表示のため、ハイライト機能は無効化
     }
 
     // Density UI状態更新
@@ -109,8 +99,6 @@ window.SimulatorUI = (function() {
         pendingGridState.isLocked = !pendingGridState.isLocked;
         State.set('pendingGridState', pendingGridState);
 
-        updateDashboardHighlight();
-
         const ctx = DOM.getCtx();
         const snapshot = State.get('snapshot');
         ctx.putImageData(snapshot, 0, 0);
@@ -120,7 +108,6 @@ window.SimulatorUI = (function() {
     // ホイールモード設定
     function setWheelMode(mode) {
         State.set('wheelMode', mode);
-        updateDashboardHighlight();
     }
 
     // ダッシュボードドラッグ機能
@@ -261,7 +248,6 @@ window.SimulatorUI = (function() {
         const dashDensityToggle = DOM.get('dashDensityToggle');
         const dashDensitySelector = DOM.get('dashDensitySelector');
         const densitySelect = DOM.get('densitySelect');
-        // badgeLines, badgeChars, badgePtは削除済み（シンプル表示化）
         const gridTextInput = DOM.get('gridTextInput');
         const gridLinesInput = DOM.get('gridLinesInput');
         const gridCharsInput = DOM.get('gridCharsInput');
@@ -429,8 +415,6 @@ window.SimulatorUI = (function() {
             });
         });
 
-        // バッジクリックイベント（badgeLines, badgeChars, badgeDensity, badgePtは削除済み）
-
         // セリフ自動計測（テキスト入力時の自動計算）
         // 入力された文字数と行数に応じてグリッドサイズを自動調整
         if (gridTextInput) {
@@ -502,9 +486,7 @@ window.SimulatorUI = (function() {
         updateWritingModeIcon: updateWritingModeIcon,
         updateStepVisuals: updateStepVisuals,
         checkMessageOverlap: checkMessageOverlap,
-        updateFixedTooltip: updateFixedTooltip,
         updateDashboardValues: updateDashboardValues,
-        updateDashboardHighlight: updateDashboardHighlight,
         updateDensityUIState: updateDensityUIState,
         toggleLockMode: toggleLockMode,
         setWheelMode: setWheelMode,

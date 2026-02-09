@@ -162,17 +162,27 @@ window.MojiQShortcuts = (function() {
                 }
             }
 
+            // 1.5. Shiftキー (パン操作の開始 / スナップ描画) - isInputActiveチェックより前に処理
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+                // ペン・マーカー・直線モードではスナップ描画用なのでデフォルト動作を防ぐ
+                const currentMode = window.MojiQStore && window.MojiQStore.get('drawing.currentMode');
+                const shiftSnapModes = ['draw', 'marker', 'line', 'lineAnnotated', 'rect', 'rectAnnotated', 'ellipse', 'ellipseAnnotated'];
+                if (shiftSnapModes.includes(currentMode)) {
+                    e.preventDefault();
+                    // フォーカスがある場合は外す（UIにフォーカスが入る問題の対策）
+                    if (document.activeElement && document.activeElement !== document.body) {
+                        document.activeElement.blur();
+                    }
+                }
+                window.dispatchEvent(new CustomEvent('mojiq:shift', { detail: { down: true } }));
+            }
+
             if (isInputActive(e)) return;
 
             // 1. スペースキー (パン操作の開始)
             if (e.code === 'Space') {
                 e.preventDefault();
                 window.dispatchEvent(new CustomEvent('mojiq:space', { detail: { down: true } }));
-            }
-
-            // 1.5. Shiftキー (パン操作の開始)
-            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
-                window.dispatchEvent(new CustomEvent('mojiq:shift', { detail: { down: true } }));
             }
 
             // 3. ページ送り (矢印キー) - 長押し対応

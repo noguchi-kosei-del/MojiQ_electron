@@ -69,7 +69,6 @@ window.SimulatorEventHandlers = (function() {
             if (window.SimulatorUI) {
                 window.SimulatorUI.updateDensityUIState();
                 window.SimulatorUI.updateWritingModeIcon();
-                window.SimulatorUI.updateDashboardHighlight();
                 window.SimulatorUI.updateDashboardValues();
             }
 
@@ -404,7 +403,6 @@ window.SimulatorEventHandlers = (function() {
 
                 ctx.putImageData(snapshot, 0, 0);
                 window.SimulatorGridDrawing.drawFixedGrid(pendingGridState, true);
-                if (window.SimulatorUI) window.SimulatorUI.updateFixedTooltip(pendingGridState, e);
                 return;
             }
 
@@ -708,8 +706,6 @@ window.SimulatorEventHandlers = (function() {
             const h = (isHorizontal ? updatedPendingGridState.lines : updatedPendingGridState.chars) * cellSize;
 
             if (window.SimulatorUI) {
-                window.SimulatorUI.updateFixedTooltip(updatedPendingGridState, null);
-                window.SimulatorUI.updateDashboardHighlight();
                 window.SimulatorUI.updateDensityUIState();
                 window.SimulatorUI.updateDashboardValues();
             }

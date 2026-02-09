@@ -120,16 +120,12 @@ window.SimulatorGridDrawing = (function() {
             State.set('snapshot', snapshot);
 
             drawFixedGrid(pendingGridState, true);
-            if (window.SimulatorUI) {
-                window.SimulatorUI.updateFixedTooltip(pendingGridState, null);
-            }
 
             adjustMessage.classList.add('active');
 
             if (window.SimulatorUI) {
                 window.SimulatorUI.updateDensityUIState();
                 window.SimulatorUI.updateWritingModeIcon();
-                window.SimulatorUI.updateDashboardHighlight();
                 window.SimulatorUI.updateDashboardValues();
             }
 

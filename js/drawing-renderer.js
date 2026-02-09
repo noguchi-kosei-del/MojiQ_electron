@@ -1728,12 +1728,16 @@ window.MojiQDrawingRenderer = (function() {
         ctx.textAlign = obj.textAlign || 'left';
         ctx.textBaseline = obj.endPos.y > obj.startPos.y ? 'top' : 'bottom';
 
-        // 白い縁取り - 複数回描画でアンチエイリアスの黒シミ対策
+        // 白い縁取り - 複数回描画+shadowBlurでアンチエイリアスの黒シミ対策
         ctx.save();
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
         ctx.strokeStyle = '#ffffff';
-        for (let lw = 5; lw >= 3; lw--) {
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        for (let lw = 6; lw >= 1; lw--) {
             ctx.lineWidth = lw;
             ctx.strokeText(obj.fontName || '', obj.textX, obj.textY);
         }
@@ -1758,19 +1762,21 @@ window.MojiQDrawingRenderer = (function() {
         const x = obj.startPos.x;
         const y = obj.startPos.y;
 
-        // 白い縁取り付きでテキストを描画（複数回描画でアンチエイリアスの黒シミ対策）
+        // 白い縁取り付きでテキストを描画（スタンプと同じ方式：shadowBlur+複数回描画）
         const drawWithOutline = (char, px, py) => {
             ctx.save();
+            ctx.strokeStyle = '#ffffff';
             ctx.lineJoin = 'round';
             ctx.lineCap = 'round';
-            ctx.strokeStyle = '#ffffff';
-            // 白フチを複数回描画してアンチエイリアスの半透明ピクセルを覆う
-            ctx.lineWidth = 5;
-            ctx.strokeText(char, px, py);
-            ctx.lineWidth = 4;
-            ctx.strokeText(char, px, py);
-            ctx.lineWidth = 3;
-            ctx.strokeText(char, px, py);
+            ctx.shadowColor = '#ffffff';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            for (let lw = 5; lw >= 1; lw--) {
+                ctx.lineWidth = lw;
+                ctx.strokeText(char, px, py);
+            }
+            ctx.shadowBlur = 0;
             ctx.restore();
             ctx.fillText(char, px, py);
         };
@@ -1869,6 +1875,22 @@ window.MojiQDrawingRenderer = (function() {
         ctx.fillStyle = '#ffffff';
         ctx.fill();
 
+        // 外側の円（白フチ）- 複数回描画+shadowBlurでアンチエイリアスの黒シミ対策
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        for (let lw = 6; lw >= 2; lw--) {
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, 2 * Math.PI);
+            ctx.lineWidth = lw;
+            ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+
         // 外側の円（枠線）
         ctx.beginPath();
         ctx.arc(x, y, radius, 0, 2 * Math.PI);
@@ -1876,7 +1898,7 @@ window.MojiQDrawingRenderer = (function() {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // 「済」の文字
+        // 「済」の文字（内側が白塗りつぶしなので白フチ不要）
         ctx.font = `bold ${size * 0.6}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -1898,16 +1920,21 @@ window.MojiQDrawingRenderer = (function() {
         const color = obj.color || '#ff0000';
         const radius = size / 2;
 
-        // 外側の円（白フチ）- 複数回描画でアンチエイリアスの黒シミ対策
+        // 外側の円（白フチ）- 複数回描画+shadowBlurでアンチエイリアスの黒シミ対策
         ctx.strokeStyle = '#ffffff';
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
-        for (let lw = 4.5; lw >= 2.5; lw -= 1) {
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        for (let lw = 5; lw >= 1; lw--) {
             ctx.beginPath();
             ctx.arc(x, y, radius, 0, 2 * Math.PI);
             ctx.lineWidth = lw;
             ctx.stroke();
         }
+        ctx.shadowBlur = 0;
 
         // 外側の円（枠線）
         ctx.beginPath();
@@ -1916,15 +1943,22 @@ window.MojiQDrawingRenderer = (function() {
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // 「小」の文字（白フチ）- 複数回描画
+        // 「小」の文字（白フチ）- 複数回描画+shadowBlur
         ctx.font = `bold ${size * 0.6}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.strokeStyle = '#ffffff';
-        for (let lw = 3.5; lw >= 1.5; lw -= 1) {
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        for (let lw = 5; lw >= 1; lw--) {
             ctx.lineWidth = lw;
             ctx.strokeText('小', x, y);
         }
+        ctx.shadowBlur = 0;
 
         // 「小」の文字
         ctx.fillStyle = color;
@@ -1973,13 +2007,28 @@ window.MojiQDrawingRenderer = (function() {
         ctx.fillStyle = '#ffffff';
         ctx.fill();
 
+        // 外側の角丸長方形（白フチ）- 複数回描画+shadowBlurでアンチエイリアスの黒シミ対策
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        for (let lw = 5; lw >= 1; lw--) {
+            drawRoundedRect(rectX, rectY, width, height, cornerRadius);
+            ctx.lineWidth = lw;
+            ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+
         // 外側の角丸長方形（枠線）
         drawRoundedRect(rectX, rectY, width, height, cornerRadius);
         ctx.strokeStyle = color;
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // 「ルビ」の文字
+        // 「ルビ」の文字（内側が白塗りつぶしなので白フチ不要）
         ctx.font = `bold ${size * 0.45}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -2024,17 +2073,22 @@ window.MojiQDrawingRenderer = (function() {
             ctx.closePath();
         };
 
-        // 「トル」の文字（白フチ）- 複数回描画でアンチエイリアスの黒シミ対策
+        // 「トル」の文字（白フチ）- 複数回描画+shadowBlurでアンチエイリアスの黒シミ対策
         ctx.font = `bold ${size * 0.9}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.strokeStyle = '#ffffff';
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
-        for (let lw = 6; lw >= 4; lw--) {
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        for (let lw = 8; lw >= 2; lw--) {
             ctx.lineWidth = lw;
             ctx.strokeText('トル', x, y);
         }
+        ctx.shadowBlur = 0;
 
         // 「トル」の文字
         ctx.fillStyle = color;
@@ -2054,17 +2108,22 @@ window.MojiQDrawingRenderer = (function() {
         const size = obj.size || 28;
         const color = obj.color || '#ff0000';
 
-        // 「トルツメ」の文字（白フチ）- 複数回描画でアンチエイリアスの黒シミ対策
+        // 「トルツメ」の文字（白フチ）- 複数回描画+shadowBlurでアンチエイリアスの黒シミ対策
         ctx.font = `bold ${size * 0.9}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.strokeStyle = '#ffffff';
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
-        for (let lw = 6; lw >= 4; lw--) {
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        for (let lw = 8; lw >= 2; lw--) {
             ctx.lineWidth = lw;
             ctx.strokeText('トルツメ', x, y);
         }
+        ctx.shadowBlur = 0;
 
         // 「トルツメ」の文字
         ctx.fillStyle = color;
@@ -2091,10 +2150,16 @@ window.MojiQDrawingRenderer = (function() {
         ctx.strokeStyle = '#ffffff';
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
-        for (let lw = 6; lw >= 4; lw--) {
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        for (let lw = 8; lw >= 2; lw--) {
             ctx.lineWidth = lw;
             ctx.strokeText('トルママ', x, y);
         }
+
+        ctx.shadowBlur = 0;
 
         // 「トルママ」の文字
         ctx.fillStyle = color;
@@ -2121,10 +2186,16 @@ window.MojiQDrawingRenderer = (function() {
         ctx.strokeStyle = '#ffffff';
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
-        for (let lw = 6; lw >= 4; lw--) {
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        for (let lw = 8; lw >= 2; lw--) {
             ctx.lineWidth = lw;
             ctx.strokeText('全角アキ', x, y);
         }
+
+        ctx.shadowBlur = 0;
 
         // 「全角アキ」の文字
         ctx.fillStyle = color;
@@ -2151,10 +2222,16 @@ window.MojiQDrawingRenderer = (function() {
         ctx.strokeStyle = '#ffffff';
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
-        for (let lw = 6; lw >= 4; lw--) {
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        for (let lw = 8; lw >= 2; lw--) {
             ctx.lineWidth = lw;
             ctx.strokeText('半角アキ', x, y);
         }
+
+        ctx.shadowBlur = 0;
 
         // 「半角アキ」の文字
         ctx.fillStyle = color;
@@ -2181,10 +2258,16 @@ window.MojiQDrawingRenderer = (function() {
         ctx.strokeStyle = '#ffffff';
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
-        for (let lw = 6; lw >= 4; lw--) {
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        for (let lw = 8; lw >= 2; lw--) {
             ctx.lineWidth = lw;
             ctx.strokeText('四分アキ', x, y);
         }
+
+        ctx.shadowBlur = 0;
 
         // 「四分アキ」の文字
         ctx.fillStyle = color;
@@ -2211,10 +2294,16 @@ window.MojiQDrawingRenderer = (function() {
         ctx.strokeStyle = '#ffffff';
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
-        for (let lw = 6; lw >= 4; lw--) {
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        for (let lw = 8; lw >= 2; lw--) {
             ctx.lineWidth = lw;
             ctx.strokeText('改行', x, y);
         }
+
+        ctx.shadowBlur = 0;
 
         // 「改行」の文字
         ctx.fillStyle = color;
@@ -2290,19 +2379,21 @@ window.MojiQDrawingRenderer = (function() {
 
         const lines = ann.text.split('\n');
 
-        // 白い縁取り付きでテキストを描画（複数回描画でアンチエイリアスの黒シミ対策）
+        // 白い縁取り付きでテキストを描画（スタンプと同じ方式：shadowBlur+複数回描画）
         const drawWithOutline = (char, px, py) => {
             ctx.save();
+            ctx.strokeStyle = '#ffffff';
             ctx.lineJoin = 'round';
             ctx.lineCap = 'round';
-            ctx.strokeStyle = '#ffffff';
-            // 白フチを複数回描画してアンチエイリアスの半透明ピクセルを覆う
-            ctx.lineWidth = 5;
-            ctx.strokeText(char, px, py);
-            ctx.lineWidth = 4;
-            ctx.strokeText(char, px, py);
-            ctx.lineWidth = 3;
-            ctx.strokeText(char, px, py);
+            ctx.shadowColor = '#ffffff';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            for (let lw = 5; lw >= 1; lw--) {
+                ctx.lineWidth = lw;
+                ctx.strokeText(char, px, py);
+            }
+            ctx.shadowBlur = 0;
             ctx.restore();
             ctx.fillText(char, px, py);
         };
@@ -2392,16 +2483,21 @@ window.MojiQDrawingRenderer = (function() {
 
             const lines = ann.text.split('\n');
 
-            // 白い縁取り付きでテキストを描画（複数回描画でアンチエイリアスの黒シミ対策）
+            // 白い縁取り付きでテキストを描画（スタンプと同じ方式：shadowBlur+複数回描画）
             const drawWithOutline = (char, px, py) => {
                 ctx.save();
+                ctx.strokeStyle = '#ffffff';
                 ctx.lineJoin = 'round';
                 ctx.lineCap = 'round';
-                ctx.strokeStyle = '#ffffff';
-                for (let lw = 5; lw >= 3; lw--) {
+                ctx.shadowColor = '#ffffff';
+                ctx.shadowBlur = 4;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+                for (let lw = 5; lw >= 1; lw--) {
                     ctx.lineWidth = lw;
                     ctx.strokeText(char, px, py);
                 }
+                ctx.shadowBlur = 0;
                 ctx.restore();
                 ctx.fillText(char, px, py);
             };
