@@ -106,7 +106,7 @@ window.MojiQPdfLibSaver = (function() {
         const savedSelectedIndex = DrawingObjects.getSelectedIndex(pageNum);
         DrawingObjects.deselectObject(pageNum);
 
-        // エクスポートモードを有効化（マーカーのmultiply無効化）
+        // エクスポートモードを有効化（マーカーの色を事前計算）
         DrawingRenderer.setExportMode(true);
 
         // 描画オブジェクトをレンダリング
@@ -208,7 +208,7 @@ window.MojiQPdfLibSaver = (function() {
             const savedSelectedIndex = DrawingObjects.getSelectedIndex(spreadKey);
             DrawingObjects.deselectObject(spreadKey);
 
-            // エクスポートモードを有効化（マーカーのmultiply無効化）
+            // エクスポートモードを有効化（マーカーの色を事前計算）
             DrawingRenderer.setExportMode(true);
             DrawingRenderer.renderAll(ctx, spreadKey);
             DrawingRenderer.setExportMode(false);
@@ -220,7 +220,7 @@ window.MojiQPdfLibSaver = (function() {
             ctx.restore();
         } else {
             // フォールバック: 左右ページを個別にレンダリング
-            // エクスポートモードを有効化
+            // エクスポートモードを有効化（マーカーの色を事前計算）
             DrawingRenderer.setExportMode(true);
 
             // 左ページの描画オブジェクト

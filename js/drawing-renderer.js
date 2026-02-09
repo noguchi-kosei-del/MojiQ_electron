@@ -1655,10 +1655,20 @@ window.MojiQDrawingRenderer = (function() {
         if (!obj.points || obj.points.length < 2) return;
 
         ctx.save();
-        ctx.globalAlpha = obj.opacity || 0.3;
-        // エクスポートモードではmultiplyを使わない（透明背景で正しく表示するため）
-        if (!exportMode) {
+
+        const originalColor = obj.color || '#ffff00';
+        const opacity = obj.opacity || 0.3;
+
+        if (exportMode) {
+            // エクスポートモード：描画時と同じ自然な色で透明度を維持
+            // 色はそのまま、透明度を少しだけ補正してmultiply効果に近づける
+            ctx.strokeStyle = originalColor;
+            ctx.globalAlpha = Math.min(opacity * 1.3, 0.5);  // 透明度を軽く補正
+        } else {
+            // 通常モード：multiply合成で描画
+            ctx.globalAlpha = opacity;
             ctx.globalCompositeOperation = 'multiply';
+            ctx.strokeStyle = originalColor;
         }
 
         ctx.beginPath();
@@ -1673,7 +1683,6 @@ window.MojiQDrawingRenderer = (function() {
         const last = obj.points[obj.points.length - 1];
         ctx.lineTo(last.x, last.y);
 
-        ctx.strokeStyle = obj.color || '#ffff00';
         ctx.lineWidth = obj.lineWidth || 20;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
@@ -1789,52 +1798,111 @@ window.MojiQDrawingRenderer = (function() {
 
             // 句読点など右上に移動させる文字 - 中点「・」は中央配置のため含めない
             const punctuationChars = ['、', '。', '，', '．', '｡', '､'];
+            const rotationChars = ['ー', '−', '―', '…', '(', ')', '（', '）', '[', ']', '「', '」', '～', '〜', '＝', '='];
 
+            // 全ての文字の位置と属性を事前計算
+            const allChars = [];
             lines.forEach((line, colIndex) => {
                 const currentX = x - (colIndex * lineHeight);
                 let cursorY = 0;
-                const charData = Array.from(line).map(char => {
+                Array.from(line).forEach(char => {
                     let h = fontSize;
                     if (char === ' ') h = fontSize * 0.3;
                     const centerY = cursorY + (h / 2);
                     cursorY += h;
-                    return { char, centerY };
-                });
 
-                charData.forEach((item) => {
-                    const char = item.char;
-                    const currentY = y + item.centerY;
-                    if (char === ' ') return;
+                    if (char !== ' ') {
+                        const needsRotation = rotationChars.includes(char);
+                        const isPunctuation = punctuationChars.includes(char);
+                        let px = currentX;
+                        let py = y + centerY;
 
-                    const needsRotation = ['ー', '−', '―', '…', '(', ')', '（', '）', '[', ']', '「', '」', '～', '〜', '＝', '='].includes(char);
-                    const isPunctuation = punctuationChars.includes(char);
+                        if (isPunctuation) {
+                            px = currentX + fontSize * 0.7;
+                            py = y + centerY - fontSize * 0.55;
+                        }
 
-                    if (needsRotation) {
-                        ctx.save();
-                        ctx.translate(currentX, currentY);
-                        ctx.rotate(Math.PI / 2);
-                        drawWithOutline(char, 0, 0);
-                        ctx.restore();
-                    } else if (isPunctuation) {
-                        // 句読点は右上に移動（文字の右端に配置）
-                        const offsetX = fontSize * 0.7;
-                        const offsetY = -fontSize * 0.55;
-                        drawWithOutline(char, currentX + offsetX, currentY + offsetY);
-                    } else {
-                        drawWithOutline(char, currentX, currentY);
+                        allChars.push({ char, px, py, needsRotation, currentX, currentY: y + centerY });
                     }
                 });
             });
+
+            // 1パス目：全ての白フチを描画（shadowBlur+複数回描画）
+            ctx.save();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.shadowColor = '#ffffff';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+
+            allChars.forEach(item => {
+                if (item.needsRotation) {
+                    ctx.save();
+                    ctx.translate(item.currentX, item.currentY);
+                    ctx.rotate(Math.PI / 2);
+                    for (let lw = 5; lw >= 1; lw--) {
+                        ctx.lineWidth = lw;
+                        ctx.strokeText(item.char, 0, 0);
+                    }
+                    ctx.restore();
+                } else {
+                    for (let lw = 5; lw >= 1; lw--) {
+                        ctx.lineWidth = lw;
+                        ctx.strokeText(item.char, item.px, item.py);
+                    }
+                }
+            });
+            ctx.restore();
+
+            // 2パス目：全ての文字本体を描画
+            allChars.forEach(item => {
+                if (item.needsRotation) {
+                    ctx.save();
+                    ctx.translate(item.currentX, item.currentY);
+                    ctx.rotate(Math.PI / 2);
+                    ctx.fillText(item.char, 0, 0);
+                    ctx.restore();
+                } else {
+                    ctx.fillText(item.char, item.px, item.py);
+                }
+            });
         } else {
             // 横書き
-            ctx.textAlign = obj.align || 'left';
             ctx.textBaseline = 'top';
             const lineHeight = fontSize * 1.2;
 
-            lines.forEach((line, index) => {
-                const currentY = y + (index * lineHeight);
-                drawWithOutline(line, x, currentY);
-            });
+            // 複数行の場合は常に左揃え（右揃えだと各行がバラバラになるため）
+            if (lines.length > 1 && obj.align === 'right') {
+                // 右揃えで作成されたテキストを左揃えで描画する場合、x座標を調整
+                // 最大行幅を計算
+                let maxLineWidth = 0;
+                lines.forEach(line => {
+                    let width = 0;
+                    for (const char of line) {
+                        if (char.charCodeAt(0) < 128) {
+                            width += fontSize * 0.6;
+                        } else {
+                            width += fontSize;
+                        }
+                    }
+                    maxLineWidth = Math.max(maxLineWidth, width);
+                });
+
+                ctx.textAlign = 'left';
+                const adjustedX = x - maxLineWidth;
+                lines.forEach((line, index) => {
+                    const currentY = y + (index * lineHeight);
+                    drawWithOutline(line, adjustedX, currentY);
+                });
+            } else {
+                ctx.textAlign = obj.align || 'left';
+                lines.forEach((line, index) => {
+                    const currentY = y + (index * lineHeight);
+                    drawWithOutline(line, x, currentY);
+                });
+            }
         }
 
         ctx.restore();
@@ -2379,7 +2447,7 @@ window.MojiQDrawingRenderer = (function() {
 
         const lines = ann.text.split('\n');
 
-        // 白い縁取り付きでテキストを描画（スタンプと同じ方式：shadowBlur+複数回描画）
+        // 白い縁取り付きでテキストを描画（横書き用：shadowBlur+複数回描画）
         const drawWithOutline = (char, px, py) => {
             ctx.save();
             ctx.strokeStyle = '#ffffff';
@@ -2406,52 +2474,110 @@ window.MojiQDrawingRenderer = (function() {
 
             // 句読点など右上に移動させる文字 - 中点「・」は中央配置のため含めない
             const punctuationChars = ['、', '。', '，', '．', '｡', '､'];
+            const rotationChars = ['ー', '−', '―', '…', '(', ')', '（', '）', '[', ']', '「', '」', '～', '〜', '＝', '='];
 
+            // 全ての文字の位置と属性を事前計算
+            const allChars = [];
             lines.forEach((line, colIndex) => {
                 const currentX = ann.x - (colIndex * lineHeight);
                 let cursorY = 0;
-                const charData = Array.from(line).map(char => {
+                Array.from(line).forEach(char => {
                     let h = fontSize;
                     if (char === ' ') h = fontSize * 0.3;
                     const centerY = cursorY + (h / 2);
                     cursorY += h;
-                    return { char, centerY };
-                });
 
-                charData.forEach((item) => {
-                    const char = item.char;
-                    const currentY = ann.y + item.centerY;
-                    if (char === ' ') return;
+                    if (char !== ' ') {
+                        const needsRotation = rotationChars.includes(char);
+                        const isPunctuation = punctuationChars.includes(char);
+                        let px = currentX;
+                        let py = ann.y + centerY;
 
-                    const needsRotation = ['ー', '−', '―', '…', '(', ')', '（', '）', '[', ']', '「', '」', '～', '〜', '＝', '='].includes(char);
-                    const isPunctuation = punctuationChars.includes(char);
+                        if (isPunctuation) {
+                            px = currentX + fontSize * 0.7;
+                            py = ann.y + centerY - fontSize * 0.55;
+                        }
 
-                    if (needsRotation) {
-                        ctx.save();
-                        ctx.translate(currentX, currentY);
-                        ctx.rotate(Math.PI / 2);
-                        drawWithOutline(char, 0, 0);
-                        ctx.restore();
-                    } else if (isPunctuation) {
-                        // 句読点は右上に移動（文字の右端に配置）
-                        const offsetX = fontSize * 0.7;
-                        const offsetY = -fontSize * 0.55;
-                        drawWithOutline(char, currentX + offsetX, currentY + offsetY);
-                    } else {
-                        drawWithOutline(char, currentX, currentY);
+                        allChars.push({ char, px, py, needsRotation, currentX, currentY: ann.y + centerY });
                     }
                 });
             });
+
+            // 1パス目：全ての白フチを描画（shadowBlur+複数回描画）
+            ctx.save();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.shadowColor = '#ffffff';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+
+            allChars.forEach(item => {
+                if (item.needsRotation) {
+                    ctx.save();
+                    ctx.translate(item.currentX, item.currentY);
+                    ctx.rotate(Math.PI / 2);
+                    for (let lw = 5; lw >= 1; lw--) {
+                        ctx.lineWidth = lw;
+                        ctx.strokeText(item.char, 0, 0);
+                    }
+                    ctx.restore();
+                } else {
+                    for (let lw = 5; lw >= 1; lw--) {
+                        ctx.lineWidth = lw;
+                        ctx.strokeText(item.char, item.px, item.py);
+                    }
+                }
+            });
+            ctx.restore();
+
+            // 2パス目：全ての文字本体を描画
+            allChars.forEach(item => {
+                if (item.needsRotation) {
+                    ctx.save();
+                    ctx.translate(item.currentX, item.currentY);
+                    ctx.rotate(Math.PI / 2);
+                    ctx.fillText(item.char, 0, 0);
+                    ctx.restore();
+                } else {
+                    ctx.fillText(item.char, item.px, item.py);
+                }
+            });
         } else {
             // 横書き
-            ctx.textAlign = ann.align || 'left';
             ctx.textBaseline = 'top';
             const lineHeight = fontSize * 1.2;
 
-            lines.forEach((line, index) => {
-                const currentY = ann.y + (index * lineHeight);
-                drawWithOutline(line, ann.x, currentY);
-            });
+            // 複数行の場合は常に左揃え（右揃えだと各行がバラバラになるため）
+            if (lines.length > 1 && ann.align === 'right') {
+                // 右揃えで作成されたテキストを左揃えで描画する場合、x座標を調整
+                let maxLineWidth = 0;
+                lines.forEach(line => {
+                    let width = 0;
+                    for (const char of line) {
+                        if (char.charCodeAt(0) < 128) {
+                            width += fontSize * 0.6;
+                        } else {
+                            width += fontSize;
+                        }
+                    }
+                    maxLineWidth = Math.max(maxLineWidth, width);
+                });
+
+                ctx.textAlign = 'left';
+                const adjustedX = ann.x - maxLineWidth;
+                lines.forEach((line, index) => {
+                    const currentY = ann.y + (index * lineHeight);
+                    drawWithOutline(line, adjustedX, currentY);
+                });
+            } else {
+                ctx.textAlign = ann.align || 'left';
+                lines.forEach((line, index) => {
+                    const currentY = ann.y + (index * lineHeight);
+                    drawWithOutline(line, ann.x, currentY);
+                });
+            }
         }
 
         ctx.restore();
@@ -2483,7 +2609,7 @@ window.MojiQDrawingRenderer = (function() {
 
             const lines = ann.text.split('\n');
 
-            // 白い縁取り付きでテキストを描画（スタンプと同じ方式：shadowBlur+複数回描画）
+            // 白い縁取り付きでテキストを描画（横書き用：shadowBlur+複数回描画）
             const drawWithOutline = (char, px, py) => {
                 ctx.save();
                 ctx.strokeStyle = '#ffffff';
@@ -2510,52 +2636,110 @@ window.MojiQDrawingRenderer = (function() {
 
                 // 句読点など右上に移動させる文字 - 中点「・」は中央配置のため含めない
                 const punctuationChars = ['、', '。', '，', '．', '｡', '､'];
+                const rotationChars = ['ー', '−', '―', '…', '(', ')', '（', '）', '[', ']', '「', '」', '～', '〜', '＝', '='];
 
+                // 全ての文字の位置と属性を事前計算
+                const allChars = [];
                 lines.forEach((line, colIndex) => {
                     const currentX = ann.x - (colIndex * lineHeight);
                     let cursorY = 0;
-                    const charData = Array.from(line).map(char => {
+                    Array.from(line).forEach(char => {
                         let h = fontSize;
                         if (char === ' ') h = fontSize * 0.3;
                         const centerY = cursorY + (h / 2);
                         cursorY += h;
-                        return { char, centerY };
-                    });
 
-                    charData.forEach((item) => {
-                        const char = item.char;
-                        const currentY = ann.y + item.centerY;
-                        if (char === ' ') return;
+                        if (char !== ' ') {
+                            const needsRotation = rotationChars.includes(char);
+                            const isPunctuation = punctuationChars.includes(char);
+                            let px = currentX;
+                            let py = ann.y + centerY;
 
-                        const needsRotation = ['ー', '−', '―', '…', '(', ')', '（', '）', '[', ']', '「', '」', '～', '〜', '＝', '='].includes(char);
-                        const isPunctuation = punctuationChars.includes(char);
+                            if (isPunctuation) {
+                                px = currentX + fontSize * 0.7;
+                                py = ann.y + centerY - fontSize * 0.55;
+                            }
 
-                        if (needsRotation) {
-                            ctx.save();
-                            ctx.translate(currentX, currentY);
-                            ctx.rotate(Math.PI / 2);
-                            drawWithOutline(char, 0, 0);
-                            ctx.restore();
-                        } else if (isPunctuation) {
-                            // 句読点は右上に移動（文字の右端に配置）
-                            const offsetX = fontSize * 0.7;
-                            const offsetY = -fontSize * 0.55;
-                            drawWithOutline(char, currentX + offsetX, currentY + offsetY);
-                        } else {
-                            drawWithOutline(char, currentX, currentY);
+                            allChars.push({ char, px, py, needsRotation, currentX, currentY: ann.y + centerY });
                         }
                     });
                 });
+
+                // 1パス目：全ての白フチを描画（shadowBlur+複数回描画）
+                ctx.save();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineJoin = 'round';
+                ctx.lineCap = 'round';
+                ctx.shadowColor = '#ffffff';
+                ctx.shadowBlur = 4;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+
+                allChars.forEach(item => {
+                    if (item.needsRotation) {
+                        ctx.save();
+                        ctx.translate(item.currentX, item.currentY);
+                        ctx.rotate(Math.PI / 2);
+                        for (let lw = 5; lw >= 1; lw--) {
+                            ctx.lineWidth = lw;
+                            ctx.strokeText(item.char, 0, 0);
+                        }
+                        ctx.restore();
+                    } else {
+                        for (let lw = 5; lw >= 1; lw--) {
+                            ctx.lineWidth = lw;
+                            ctx.strokeText(item.char, item.px, item.py);
+                        }
+                    }
+                });
+                ctx.restore();
+
+                // 2パス目：全ての文字本体を描画
+                allChars.forEach(item => {
+                    if (item.needsRotation) {
+                        ctx.save();
+                        ctx.translate(item.currentX, item.currentY);
+                        ctx.rotate(Math.PI / 2);
+                        ctx.fillText(item.char, 0, 0);
+                        ctx.restore();
+                    } else {
+                        ctx.fillText(item.char, item.px, item.py);
+                    }
+                });
             } else {
                 // 横書き
-                ctx.textAlign = ann.align || 'left';
                 ctx.textBaseline = 'top';
                 const lineHeight = fontSize * 1.2;
 
-                lines.forEach((line, index) => {
-                    const currentY = ann.y + (index * lineHeight);
-                    drawWithOutline(line, ann.x, currentY);
-                });
+                // 複数行の場合は常に左揃え（右揃えだと各行がバラバラになるため）
+                if (lines.length > 1 && ann.align === 'right') {
+                    // 右揃えで作成されたテキストを左揃えで描画する場合、x座標を調整
+                    let maxLineWidth = 0;
+                    lines.forEach(line => {
+                        let width = 0;
+                        for (const char of line) {
+                            if (char.charCodeAt(0) < 128) {
+                                width += fontSize * 0.6;
+                            } else {
+                                width += fontSize;
+                            }
+                        }
+                        maxLineWidth = Math.max(maxLineWidth, width);
+                    });
+
+                    ctx.textAlign = 'left';
+                    const adjustedX = ann.x - maxLineWidth;
+                    lines.forEach((line, index) => {
+                        const currentY = ann.y + (index * lineHeight);
+                        drawWithOutline(line, adjustedX, currentY);
+                    });
+                } else {
+                    ctx.textAlign = ann.align || 'left';
+                    lines.forEach((line, index) => {
+                        const currentY = ann.y + (index * lineHeight);
+                        drawWithOutline(line, ann.x, currentY);
+                    });
+                }
             }
 
             ctx.restore();
