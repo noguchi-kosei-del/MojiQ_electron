@@ -520,3 +520,40 @@ button.header-icon-btn:disabled svg {
 .header-zoom-btn.menu-lockable.menu-locked svg {
     stroke: #999;
 }
+
+/* --- ヘッダー回転コントロール --- */
+.header-rotate-control {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    padding: 0 4px;
+}
+
+.header-rotate-label {
+    font-size: 13px;
+    color: #333;
+    min-width: 28px;
+    text-align: center;
+    user-select: none;
+}
+
+/* 回転コントロール disabled状態 */
+.header-rotate-control.pdf-required[disabled] {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.header-rotate-control.pdf-required[disabled] .header-rotate-label {
+    color: #999;
+}
+
+/* メニュー展開時のロック状態 */
+.header-rotate-control.menu-lockable.menu-locked {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.header-rotate-control.menu-lockable.menu-locked .header-rotate-label {
+    color: #999;
+}

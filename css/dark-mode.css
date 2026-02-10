@@ -358,6 +358,19 @@ body.dark-mode .header-zoom-btn.menu-lockable.menu-locked svg {
     stroke: #555;
 }
 
+/* ヘッダー回転コントロール */
+body.dark-mode .header-rotate-label {
+    color: #ddd;
+}
+
+body.dark-mode .header-rotate-control.pdf-required[disabled] .header-rotate-label {
+    color: #555;
+}
+
+body.dark-mode .header-rotate-control.menu-lockable.menu-locked .header-rotate-label {
+    color: #555;
+}
+
 /* 校正スタンプトグルボタン（統合版） */
 body.dark-mode .proofreading-instruction-toggle-btn {
     background: #333;
@@ -1145,6 +1158,149 @@ body.viewer-mode .viewer-nav-hint.show {
 .viewer-close-btn:hover {
     background: rgba(255, 80, 80, 0.9);
     transform: scale(1.1);
+}
+
+/* 校正チェックパネル */
+body.dark-mode .calibration-toggle-btn {
+    background: #1a2a3d;
+    border-color: #42a5f5;
+    color: #64b5f6;
+}
+
+body.dark-mode .calibration-toggle-btn:hover {
+    background: #2a3a4d;
+    border-color: #64b5f6;
+}
+
+body.dark-mode .calibration-toggle-btn svg {
+    stroke: #64b5f6;
+}
+
+body.dark-mode .calibration-breadcrumb {
+    background: #333;
+}
+
+body.dark-mode .calibration-crumb {
+    color: #64b5f6;
+}
+
+body.dark-mode .calibration-crumb-current {
+    color: #ddd;
+}
+
+body.dark-mode .calibration-folder-list {
+    background: #252525;
+    border-color: #444;
+}
+
+body.dark-mode .calibration-folder-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+body.dark-mode .calibration-folder-list::-webkit-scrollbar-track {
+    background: #333;
+    border-radius: 3px;
+}
+
+body.dark-mode .calibration-folder-list::-webkit-scrollbar-thumb {
+    background: #666;
+    border-radius: 3px;
+}
+
+body.dark-mode .calibration-folder-list::-webkit-scrollbar-thumb:hover {
+    background: #888;
+}
+
+body.dark-mode .calibration-item:hover {
+    background: #3a3a3a;
+}
+
+body.dark-mode .calibration-folder {
+    color: #64b5f6;
+}
+
+body.dark-mode .calibration-folder .calibration-icon svg {
+    stroke: #64b5f6;
+}
+
+body.dark-mode .calibration-file {
+    color: #81c784;
+}
+
+body.dark-mode .calibration-file:hover {
+    background: #2a3a2a;
+}
+
+body.dark-mode .calibration-file .calibration-icon svg {
+    stroke: #81c784;
+}
+
+body.dark-mode .calibration-result-title {
+    color: #ddd;
+}
+
+body.dark-mode .calibration-back-btn {
+    border-color: #444;
+    color: #aaa;
+}
+
+body.dark-mode .calibration-back-btn:hover {
+    background: #1a2a3d;
+    border-color: #42a5f5;
+    color: #64b5f6;
+}
+
+body.dark-mode .calibration-tab {
+    background: #333;
+    border-color: #444;
+    color: #aaa;
+}
+
+body.dark-mode .calibration-tab:hover {
+    background: #1a2a3d;
+}
+
+body.dark-mode .calibration-tab.active {
+    background: #1565c0;
+    color: white;
+    border-color: #1976d2;
+}
+
+body.dark-mode .calibration-category {
+    border-color: #444;
+}
+
+body.dark-mode .calibration-category-header {
+    background: #333;
+}
+
+body.dark-mode .calibration-category-header:hover {
+    background: #3a3a3a;
+}
+
+body.dark-mode .calibration-category-name {
+    color: #ddd;
+}
+
+body.dark-mode .calibration-table td {
+    border-bottom-color: #333;
+}
+
+body.dark-mode .cal-page {
+    color: #aaa;
+}
+
+body.dark-mode .cal-excerpt {
+    color: #ccc;
+}
+
+body.dark-mode .cal-content {
+    color: #ef9a9a;
+}
+
+body.dark-mode .calibration-loading,
+body.dark-mode .calibration-empty {
+    color: #777;
 }
 
 .viewer-close-btn:active {

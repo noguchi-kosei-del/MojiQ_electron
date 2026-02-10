@@ -87,5 +87,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 直接印刷機能（pdf-to-printer）
   getPrinters: () => ipcRenderer.invoke('get-printers'),
   printPdfDirect: (options) => ipcRenderer.invoke('print-pdf-direct', options),
-  printPdfWithDialog: (pdfBase64Data) => ipcRenderer.invoke('print-pdf-with-dialog', pdfBase64Data)
+  printPdfWithDialog: (pdfBase64Data) => ipcRenderer.invoke('print-pdf-with-dialog', pdfBase64Data),
+
+  // 校正チェックデータ読み込み
+  getCalibrationBasePath: () => ipcRenderer.invoke('get-calibration-base-path'),
+  listCalibrationDirectory: (dirPath) => ipcRenderer.invoke('list-calibration-directory', dirPath),
+  readCalibrationFile: (filePath) => ipcRenderer.invoke('read-calibration-file', filePath)
 });

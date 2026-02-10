@@ -71,6 +71,9 @@ window.MojiQPdfManager = (function() {
     // 保存後の変更追跡フラグ（trueの場合、最後の保存から変更がある）
     let hasUnsavedChanges = false;
 
+    // グローバル回転状態（全ページ共通、0, 90, 180度）
+    let globalRotation = 0;
+
     // コールバック
     let toggleAppLockCallback = null;
 
@@ -997,8 +1000,28 @@ window.MojiQPdfManager = (function() {
 
         if (window.syncSimulatorFromScript) window.syncSimulatorFromScript(pageNum);
 
+        // --- 回転を適用（グローバル回転） ---
+        applyRotationToCanvas();
+
         // --- 隣接ページのプリフェッチを開始 ---
         schedulePrefetch(pageNum, containerWidth, containerHeight);
+    }
+
+    /**
+     * キャンバスに回転を適用（グローバル回転を使用）
+     */
+    function applyRotationToCanvas() {
+        if (!canvasWrapper) return;
+
+        // 回転ラベルを更新
+        updateRotateLabel();
+
+        // CSSで回転を適用
+        if (globalRotation === 0) {
+            canvasWrapper.style.transform = '';
+        } else {
+            canvasWrapper.style.transform = `rotate(${globalRotation}deg)`;
+        }
     }
 
     /**
@@ -1282,6 +1305,7 @@ window.MojiQPdfManager = (function() {
             state.originalPdfBytesArray = [];
             state.currentZoom = 1.0;
             imagePageData = {};
+            globalRotation = 0; // 回転状態もリセット
             // ImageBitmapキャッシュをクリア
             for (const key in imageBitmapCache) {
                 if (imageBitmapCache[key] && typeof imageBitmapCache[key].close === 'function') {
@@ -1582,6 +1606,9 @@ window.MojiQPdfManager = (function() {
 
             // ズームを100%にリセット
             state.currentZoom = 1.0;
+
+            // 回転状態をリセット
+            globalRotation = 0;
 
             // 画像ページデータをクリア
             imagePageData = {};
@@ -2128,6 +2155,16 @@ window.MojiQPdfManager = (function() {
      * イベントリスナーのセットアップ
      */
     function setupEventListeners() {
+        // 回転ボタン
+        const rotateBtn = document.getElementById('rotateBtn');
+        const rotateLabel = document.getElementById('rotateLabel');
+        if (rotateBtn) {
+            rotateBtn.addEventListener('click', () => {
+                if (state.totalPages === 0) return;
+                rotateCurrentPage();
+            });
+        }
+
         // PDF/画像アップロード
         if (pdfUpload) {
             boundHandlers.pdfUploadChange = (e) => {
@@ -2773,6 +2810,9 @@ window.MojiQPdfManager = (function() {
             // ズームを100%にリセット
             state.currentZoom = 1.0;
 
+            // 回転状態をリセット
+            globalRotation = 0;
+
             // Simulatorの全データをリセット
             if (window.SimulatorState) {
                 window.SimulatorState.resetAllData();
@@ -2888,6 +2928,9 @@ window.MojiQPdfManager = (function() {
 
             // ズームを100%にリセット
             state.currentZoom = 1.0;
+
+            // 回転状態をリセット
+            globalRotation = 0;
 
             state.pdfDocs.push(pdf);
 
@@ -3981,6 +4024,12 @@ window.MojiQPdfManager = (function() {
             // グローバル状態更新
             if (!window.MojiQGlobal) window.MojiQGlobal = {};
             window.MojiQGlobal.pdfLoaded = true;
+
+            // 見開きモードでは回転をリセット
+            if (canvasWrapper) {
+                canvasWrapper.style.transform = '';
+            }
+            updateRotateLabel();
 
         } finally {
             isSpreadRendering = false;
@@ -5220,6 +5269,60 @@ window.MojiQPdfManager = (function() {
         return MojiQDrawingObjects.getSpreadPageKey(currentSpreadIndex);
     }
 
+    /**
+     * グローバル回転角度を取得（全ページ共通）
+     * @returns {number} - 回転角度 (0, 90, 180)
+     */
+    function getPageRotation() {
+        return globalRotation;
+    }
+
+    /**
+     * グローバル回転角度を設定（全ページ共通）
+     * @param {number} rotation - 回転角度 (0, 90, 180)
+     */
+    function setPageRotation(rotation) {
+        globalRotation = rotation;
+        updateRotateLabel();
+    }
+
+    /**
+     * 表示を回転（90度ずつ、0→90→180→0、全ページ共通）
+     */
+    function rotateCurrentPage() {
+        if (state.totalPages === 0) return;
+
+        // 0 → 90 → 180 → 0 の順で回転（270で割ることで180の次は0に戻る）
+        const newRotation = (globalRotation + 90) % 270;
+
+        setPageRotation(newRotation);
+
+        // キャッシュをクリアして再描画
+        if (singlePageCache) {
+            singlePageCache.clear();
+        }
+
+        // 変更フラグを立てる
+        hasUnsavedChanges = true;
+
+        // 再描画
+        if (spreadViewMode) {
+            renderSpreadView(currentSpreadIndex);
+        } else {
+            renderPage(state.currentPageNum);
+        }
+    }
+
+    /**
+     * 回転ラベルを更新
+     */
+    function updateRotateLabel() {
+        const rotateLabel = document.getElementById('rotateLabel');
+        if (rotateLabel) {
+            rotateLabel.textContent = `${globalRotation}°`;
+        }
+    }
+
     return {
         init,
         cleanup,  // メモリリーク対策: イベントリスナー解除
@@ -5276,6 +5379,11 @@ window.MojiQPdfManager = (function() {
         // 上書き保存可否判定用（ファイルパスが設定されているか）
         canOverwriteSave: () => !!currentSaveFilePath,
         // 名前を付けて保存（常に新規ダイアログを表示）
-        saveAsNew
+        saveAsNew,
+        // 回転関連
+        getPageRotation,
+        setPageRotation,
+        rotateCurrentPage,
+        updateRotateLabel
     };
 })();

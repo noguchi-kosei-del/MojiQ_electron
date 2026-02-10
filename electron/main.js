@@ -27,6 +27,9 @@ if (!gotTheLock) {
 // JSONフォルダのベースパス
 const JSON_FOLDER_BASE_PATH = 'G:\\共有ドライブ\\CLLENN\\編集部フォルダ\\編集企画部\\編集企画_C班(AT業務推進)\\DTP制作部\\JSONフォルダ';
 
+// 写植・校正用テキストログフォルダのベースパス（校正チェックデータ読み込み用）
+const TXT_FOLDER_BASE_PATH = 'G:\\共有ドライブ\\CLLENN\\編集部フォルダ\\編集企画部\\写植・校正用テキストログ';
+
 // 更新ファイル配置フォルダ
 const UPDATE_FOLDER = 'G:\\共有ドライブ\\CLLENN\\編集部フォルダ\\編集企画部\\編集企画_C班(AT業務推進)\\DTP制作部\\App_installer';
 
@@ -67,6 +70,19 @@ function isPathInJsonFolder(filePath) {
   // JSONフォルダ内のパスかチェック（大文字小文字を区別しない - Windows対応）
   const normalizedPath = resolved.toLowerCase();
   const normalizedBase = jsonFolderResolved.toLowerCase();
+
+  return normalizedPath.startsWith(normalizedBase + path.sep) || normalizedPath === normalizedBase;
+}
+
+// 写植・校正用テキストログフォルダ内のパスかどうかを検証
+function isPathInTxtFolder(filePath) {
+  if (!isPathSafe(filePath)) return false;
+
+  const resolved = path.resolve(filePath);
+  const txtFolderResolved = path.resolve(TXT_FOLDER_BASE_PATH);
+
+  const normalizedPath = resolved.toLowerCase();
+  const normalizedBase = txtFolderResolved.toLowerCase();
 
   return normalizedPath.startsWith(normalizedBase + path.sep) || normalizedPath === normalizedBase;
 }
@@ -968,5 +984,52 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
+  }
+});
+
+// ========================================
+// 校正チェックデータ読み込み用IPCハンドラー
+// ========================================
+
+// 校正チェックデータ用のベースパスを取得
+ipcMain.handle('get-calibration-base-path', () => {
+  return TXT_FOLDER_BASE_PATH;
+});
+
+// 校正チェックデータ用のフォルダ一覧を取得
+ipcMain.handle('list-calibration-directory', async (event, dirPath) => {
+  try {
+    const targetPath = dirPath || TXT_FOLDER_BASE_PATH;
+
+    if (!isPathInTxtFolder(targetPath)) {
+      return { success: false, error: 'アクセスが許可されていないパスです' };
+    }
+
+    const items = fs.readdirSync(targetPath, { withFileTypes: true });
+
+    const result = items.map(item => ({
+      name: item.name,
+      path: path.join(targetPath, item.name),
+      isDirectory: item.isDirectory(),
+      isFile: item.isFile()
+    }));
+
+    return { success: true, items: result, currentPath: targetPath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// 校正チェックデータJSONファイルを読み込み
+ipcMain.handle('read-calibration-file', async (event, filePath) => {
+  try {
+    if (!isPathInTxtFolder(filePath)) {
+      return { success: false, error: 'アクセスが許可されていないパスです' };
+    }
+
+    const data = fs.readFileSync(filePath, 'utf-8');
+    return { success: true, data: JSON.parse(data) };
+  } catch (error) {
+    return { success: false, error: error.message };
   }
 });

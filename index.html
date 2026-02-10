@@ -426,6 +426,41 @@
         </div>
     </div>
 
+    <!-- 校正チェックモーダル -->
+    <div id="calibrationModal" class="modal-overlay">
+        <div class="modal-content calibration-modal">
+            <div class="modal-header">
+                <span>校正チェックjsonを選択してください</span>
+            </div>
+            <!-- フォルダブラウザ -->
+            <div class="calibration-browser" id="calibrationBrowser">
+                <div class="calibration-breadcrumb" id="calibrationBreadcrumb">
+                    <span class="calibration-crumb calibration-crumb-root" onclick="CalibrationPanel.goToRoot()">TOP</span>
+                </div>
+                <div class="calibration-folder-list" id="calibrationFolderList">
+                    <div class="calibration-loading">読み込み中...</div>
+                </div>
+            </div>
+            <!-- チェック結果表示エリア -->
+            <div class="calibration-result" id="calibrationResult" style="display:none;">
+                <div class="calibration-result-header">
+                    <span class="calibration-result-title" id="calibrationResultTitle"></span>
+                    <button class="calibration-back-btn" onclick="CalibrationPanel.goBack()">戻る</button>
+                </div>
+                <!-- タブ切り替え -->
+                <div class="calibration-tabs" id="calibrationTabs">
+                    <button class="calibration-tab active" data-type="variation" onclick="CalibrationPanel.switchTab('variation')">提案チェック</button>
+                    <button class="calibration-tab" data-type="simple" onclick="CalibrationPanel.switchTab('simple')">正誤チェック</button>
+                </div>
+                <div class="calibration-table-wrapper" id="calibrationTableArea">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="calibrationModalCancelBtn">閉じる</button>
+            </div>
+        </div>
+    </div>
+
     <div id="sim-textModal" class="modal-overlay">
         <div style="background:white; padding:20px; border-radius:16px; width:320px; display:flex; flex-direction:column; gap:10px; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
             <strong style="color:#333;">テキスト入力 (Sim)</strong>
@@ -607,6 +642,17 @@
                         <path id="textLayerSlash" d="M4 4L20 20" style="display: none;"/>
                     </svg>
                 </button>
+                <!-- 回転ボタン -->
+                <button id="rotateBtn" class="sidebar-bottom-btn pdf-required" title="回転" disabled>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <!-- 右上の円弧と矢印 -->
+                        <path d="M20 8A8 8 0 0 0 8 4"/>
+                        <polyline points="20 4 20 8 16 8"/>
+                        <!-- 左下の円弧と矢印 -->
+                        <path d="M4 16a8 8 0 0 0 12 4"/>
+                        <polyline points="4 20 4 16 8 16"/>
+                    </svg>
+                </button>
             </div>
         </div>
 
@@ -748,6 +794,7 @@
     <div id="stampContainer"></div>
     <div class="add-font-row">
         <button id="gdriveJsonBrowserBtn"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5a1 1 0 011-1h4l2 2h6a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1V5z"/></svg> 作品仕様を読み込み</button>
+        <button id="calibrationToggleBtn" class="calibration-toggle-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> 校正チェック</button>
     </div>
 </div>
             </div>
@@ -855,6 +902,7 @@
     <script src="js/ui/dropdown-positioner.js" defer></script>
     <script src="js/ui/proofreading-ui.js" defer></script>
     <script src="js/ui/history-panel.js" defer></script>
+    <script src="js/ui/calibration-panel.js" defer></script>
     <!-- メインエントリーポイント -->
     <script src="js/script.js" defer></script>
     <!-- Simulator モジュール群 -->

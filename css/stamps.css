@@ -543,17 +543,19 @@
 
 .add-font-row #addSizeBtn,
 .add-font-row #addFontBtn,
-.add-font-row #gdriveJsonBrowserBtn {
+.add-font-row #gdriveJsonBrowserBtn,
+.add-font-row #calibrationToggleBtn {
     grid-column: 1 / -1;
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    gap: 4px;
+    justify-content: flex-start;
+    gap: 6px;
 }
 
 .add-font-row #addSizeBtn svg,
 .add-font-row #addFontBtn svg,
-.add-font-row #gdriveJsonBrowserBtn svg {
+.add-font-row #gdriveJsonBrowserBtn svg,
+.add-font-row #calibrationToggleBtn svg {
     vertical-align: middle;
     flex-shrink: 0;
 }
