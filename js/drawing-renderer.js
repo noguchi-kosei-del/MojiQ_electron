@@ -729,6 +729,7 @@ window.MojiQDrawingRenderer = (function() {
 
         // 回転がある場合、クリック座標を逆回転してローカル座標系に変換
         let testPos = pos;
+
         if (obj.rotation) {
             // 図形のみのバウンディングボックスから回転中心を計算
             const shapeBounds = getShapeBoundsOnly(obj);
@@ -737,8 +738,8 @@ window.MojiQDrawingRenderer = (function() {
             // 逆回転を適用
             const cos = Math.cos(-obj.rotation);
             const sin = Math.sin(-obj.rotation);
-            const dx = pos.x - centerX;
-            const dy = pos.y - centerY;
+            const dx = testPos.x - centerX;
+            const dy = testPos.y - centerY;
             testPos = {
                 x: centerX + dx * cos - dy * sin,
                 y: centerY + dx * sin + dy * cos

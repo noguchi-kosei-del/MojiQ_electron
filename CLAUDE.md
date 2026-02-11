@@ -426,29 +426,17 @@ G:\共有ドライブ\CLLENN\編集部フォルダ\編集企画部\編集企画_
 ## 変更履歴
 
 ### 2026-02-11
-#### PDFページ回転時の描画オブジェクト回転対応
-- **機能概要**: PDFページを回転ボタンで回転させた場合、新規描画するオブジェクトも回転角度に合わせて表示
-- **対象オブジェクト**:
-  - テキスト: ページ回転に合わせて回転（ページコンテンツと同じ向き）
-  - スタンプ（トル、トルツメ等）: ページ回転に合わせて回転
-  - 校正記号（半円、くの字、L字、Z字、コの字、□、△）: ページ回転に合わせて回転
-- **仕様**:
-  - 初回起動時（0度）を基準として、回転ボタンで回転させた角度分だけ描画を回転
-  - プレビュー描画時にも回転を適用（描画中の見た目と保存後の見た目が一致）
-  - 画面座標で向き判定を行い、ページ回転に関係なく直感的な操作を維持
-- **修正ファイル**: `js/drawing.js`（getCurrentPageRotation, drawWithPageRotation, saveObjectToPage, プレビュー描画処理）
-
-#### 削除ボタンの回転対応
-- **機能概要**: 選択オブジェクトの削除ボタンもページ回転に合わせて表示
-- **修正内容**:
-  - 削除ボタン描画時にオブジェクトの回転角度を適用
-  - ヒットテストでクリック座標を逆回転変換して正しく判定
-- **修正ファイル**: `js/drawing-renderer.js`（renderSelectionHandles, hitTestDeleteButton）
-
-#### オブジェクト手動回転機能の制限
-- **変更内容**: 回転ハンドルを画像オブジェクトのみに表示するよう変更
-- **理由**: テキストや校正記号はページ回転に連動するため、個別の手動回転は不要
-- **修正ファイル**: `js/drawing-renderer.js`, `js/drawing-select.js`
+#### ページ回転機能の削除
+- **変更内容**: 回転ボタンと回転関連のロジックをすべて削除
+- **理由**: CSS transform座標系の複雑さにより、描画とヒットテストの座標が一致しない問題が解決困難だったため
+- **削除内容**:
+  - 回転ボタン（rotateBtn）
+  - globalRotation変数とCSS transform回転
+  - getPageRotation/setPageRotation/rotateCurrentPage関数
+  - drawWithPageRotation/getCurrentPageRotation関数
+  - getPageRotationRadians関数
+  - PDF保存時の回転適用（page.setRotation）
+- **修正ファイル**: `js/pdf-manager.js`, `js/drawing.js`, `js/drawing-renderer.js`, `js/pdf-lib-saver.js`, `index.html`, `css/header.css`, `css/dark-mode.css`
 
 ### 2026-02-10
 #### オブジェクト回転機能の追加
@@ -485,28 +473,6 @@ G:\共有ドライブ\CLLENN\編集部フォルダ\編集企画部\編集企画_
   - 回転中心の計算に`getShapeBoundsOnly()`を使用
   - 選択枠・リサイズハンドル・回転ハンドルも図形のみのバウンディングボックスを使用
 - **修正ファイル**: `js/drawing-renderer.js`, `js/drawing-select.js`
-
-#### 画像回転時のポインターずれ修正
-- **問題**: 画像を回転させて描画すると、ポインター位置と描画位置がずれる
-- **原因**: CSS `transform: rotate()` でキャンバスを回転させた際、回転の中心点（transform-origin: center）を考慮した座標変換が行われていなかった
-- **修正内容**:
-  - 回転の中心点（バウンディングボックスの中心）を基準に座標変換を実装
-  - クリック座標を中心からの相対座標に変換
-  - 回転角度の逆回転（-rotation）を三角関数で適用
-  - 逆回転後の座標をキャンバス座標に変換
-  - `canvasWrapper.offsetWidth/offsetHeight`で回転前のCSSサイズを取得してスケール計算
-- **修正ファイル**: `js/utils.js`（getCanvasCoordinates）, `js/drawing.js`（getPos）, `js/simulator/event-handlers.js`（getPos）
-
-#### 画像回転機能の追加
-- **機能概要**: PDF/画像を90度・180度回転して表示できる機能を追加
-- **仕様**:
-  - 回転は時計回りに90度→180度→0度でサイクル
-  - 全ページ共通の回転（ページごとではなくグローバル設定）
-  - 回転状態はページ移動しても維持される
-  - PDF保存時にも回転が反映される
-- **UI**: サイドバー下部のコメントテキストボタンの右に回転ボタンを配置
-- **アイコン**: 2つの矢印が円を描くデザイン
-- **修正ファイル**: `js/pdf-manager.js`, `index.html`, `css/header.css`, `css/dark-mode.css`
 
 #### 校正チェックモーダルの修正
 - **問題**: 校正チェックモーダルで別のボタンを押してから開くと「読み込み中」のまま進まない

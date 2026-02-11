@@ -358,19 +358,6 @@ body.dark-mode .header-zoom-btn.menu-lockable.menu-locked svg {
     stroke: #555;
 }
 
-/* ヘッダー回転コントロール */
-body.dark-mode .header-rotate-label {
-    color: #ddd;
-}
-
-body.dark-mode .header-rotate-control.pdf-required[disabled] .header-rotate-label {
-    color: #555;
-}
-
-body.dark-mode .header-rotate-control.menu-lockable.menu-locked .header-rotate-label {
-    color: #555;
-}
-
 /* 校正スタンプトグルボタン（統合版） */
 body.dark-mode .proofreading-instruction-toggle-btn {
     background: #333;
