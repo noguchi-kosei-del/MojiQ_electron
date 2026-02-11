@@ -17,6 +17,11 @@ window.MojiQDrawingRenderer = (function() {
     const DELETE_BUTTON_SIZE = 24;  // 削除ボタンのサイズ
     const DELETE_BUTTON_OFFSET = 8; // 選択枠からのオフセット
 
+    // 回転ハンドル関連の定数（Constantsから取得）
+    const ROTATION_HANDLE_DISTANCE = Constants ? Constants.ROTATION.HANDLE_DISTANCE : 25;
+    const ROTATION_HANDLE_RADIUS = Constants ? Constants.ROTATION.HANDLE_RADIUS : 6;
+    const ROTATION_HANDLE_COLOR = Constants ? Constants.ROTATION.HANDLE_COLOR : '#4CAF50';
+
     // ビューポートカリング設定（定数から取得）
     const cullingConfig = {
         enabled: Constants ? Constants.CULLING.ENABLED : true,
@@ -438,10 +443,307 @@ window.MojiQDrawingRenderer = (function() {
     }
 
     /**
+     * オブジェクトの図形のみのバウンディングボックスを取得（アノテーション除外）
+     * 回転中心の計算用
+     */
+    function getShapeBoundsOnly(obj) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+        switch (obj.type) {
+            case 'line':
+            case 'arrow':
+            case 'doubleArrow':
+            case 'doubleArrowAnnotated':
+                minX = Math.min(obj.startPos.x, obj.endPos.x);
+                maxX = Math.max(obj.startPos.x, obj.endPos.x);
+                minY = Math.min(obj.startPos.y, obj.endPos.y);
+                maxY = Math.max(obj.startPos.y, obj.endPos.y);
+                break;
+
+            case 'rect':
+                minX = Math.min(obj.startPos.x, obj.endPos.x);
+                maxX = Math.max(obj.startPos.x, obj.endPos.x);
+                minY = Math.min(obj.startPos.y, obj.endPos.y);
+                maxY = Math.max(obj.startPos.y, obj.endPos.y);
+                break;
+
+            case 'labeledRect':
+                minX = Math.min(obj.startPos.x, obj.endPos.x);
+                maxX = Math.max(obj.startPos.x, obj.endPos.x);
+                minY = Math.min(obj.startPos.y, obj.endPos.y);
+                maxY = Math.max(obj.startPos.y, obj.endPos.y);
+                // 引出線がある場合はその範囲も含める
+                if (obj.leaderLine) {
+                    minX = Math.min(minX, obj.leaderLine.start.x, obj.leaderLine.end.x);
+                    maxX = Math.max(maxX, obj.leaderLine.start.x, obj.leaderLine.end.x);
+                    minY = Math.min(minY, obj.leaderLine.start.y, obj.leaderLine.end.y);
+                    maxY = Math.max(maxY, obj.leaderLine.start.y, obj.leaderLine.end.y);
+                }
+                break;
+
+            case 'fontLabel':
+                minX = Math.min(obj.startPos.x, obj.endPos.x);
+                maxX = Math.max(obj.startPos.x, obj.endPos.x);
+                minY = Math.min(obj.startPos.y, obj.endPos.y);
+                maxY = Math.max(obj.startPos.y, obj.endPos.y);
+                if (obj.textX !== undefined && obj.textY !== undefined) {
+                    const fontSize = obj.fontSize || 12;
+                    const fontName = obj.fontName || '';
+                    const textWidth = fontName.length * fontSize * 0.7;
+                    if (obj.textAlign === 'left') {
+                        maxX = Math.max(maxX, obj.textX + textWidth);
+                    } else {
+                        minX = Math.min(minX, obj.textX - textWidth);
+                    }
+                    minY = Math.min(minY, obj.textY - fontSize);
+                    maxY = Math.max(maxY, obj.textY + fontSize);
+                }
+                break;
+
+            case 'ellipse':
+            case 'semicircle':
+            case 'chevron':
+            case 'lshape':
+            case 'zshape':
+            case 'bracket':
+            case 'rectSymbolStamp':
+            case 'triangleSymbolStamp':
+                const w = Math.abs(obj.endPos.x - obj.startPos.x);
+                const h = Math.abs(obj.endPos.y - obj.startPos.y);
+                const cx = obj.startPos.x + (obj.endPos.x - obj.startPos.x) / 2;
+                const cy = obj.startPos.y + (obj.endPos.y - obj.startPos.y) / 2;
+                minX = cx - w / 2;
+                maxX = cx + w / 2;
+                minY = cy - h / 2;
+                maxY = cy + h / 2;
+                break;
+
+            case 'pen':
+            case 'marker':
+            case 'eraser':
+            case 'polyline':
+                if (obj.points && obj.points.length > 0) {
+                    obj.points.forEach(p => {
+                        minX = Math.min(minX, p.x);
+                        maxX = Math.max(maxX, p.x);
+                        minY = Math.min(minY, p.y);
+                        maxY = Math.max(maxY, p.y);
+                    });
+                }
+                break;
+
+            case 'text':
+                const txtFontSize = obj.fontSize || 16;
+                const text = obj.text || '';
+                const lines = text.split('\n');
+                const x = obj.startPos.x;
+                const y = obj.startPos.y;
+
+                if (obj.isVertical) {
+                    const lineHeight = txtFontSize * 1.1;
+                    const charCounts = lines.map(line => Array.from(line).length);
+                    const maxCharsInLine = Math.max(...charCounts, 1);
+                    const textHeight = maxCharsInLine * txtFontSize;
+                    const totalWidth = Math.max(lines.length, 1) * lineHeight;
+
+                    minX = x - totalWidth;
+                    maxX = x + txtFontSize / 2;
+                    minY = y - txtFontSize / 2;
+                    maxY = y + textHeight + txtFontSize / 2;
+                } else {
+                    const lineHeight = txtFontSize * 1.2;
+                    const charWidths = lines.map(line => {
+                        let width = 0;
+                        for (const char of line) {
+                            if (char.charCodeAt(0) < 128) {
+                                width += txtFontSize * 0.6;
+                            } else {
+                                width += txtFontSize;
+                            }
+                        }
+                        return width;
+                    });
+                    const maxLineWidth = Math.max(...charWidths, txtFontSize);
+                    const textHeight = lines.length * lineHeight;
+
+                    if (obj.align === 'right') {
+                        minX = x - maxLineWidth;
+                        maxX = x;
+                    } else {
+                        minX = x;
+                        maxX = x + maxLineWidth;
+                    }
+                    minY = y;
+                    maxY = y + textHeight;
+                }
+
+                // 引出線がある場合はその領域も含める（textオブジェクト自体の引出線）
+                if (obj.leaderLine) {
+                    if (obj.leaderLine.start) {
+                        minX = Math.min(minX, obj.leaderLine.start.x);
+                        maxX = Math.max(maxX, obj.leaderLine.start.x);
+                        minY = Math.min(minY, obj.leaderLine.start.y);
+                        maxY = Math.max(maxY, obj.leaderLine.start.y);
+                    }
+                    if (obj.leaderLine.end) {
+                        minX = Math.min(minX, obj.leaderLine.end.x);
+                        maxX = Math.max(maxX, obj.leaderLine.end.x);
+                        minY = Math.min(minY, obj.leaderLine.end.y);
+                        maxY = Math.max(maxY, obj.leaderLine.end.y);
+                    }
+                }
+                break;
+
+            case 'image':
+                minX = obj.startPos.x;
+                minY = obj.startPos.y;
+                maxX = obj.endPos.x;
+                maxY = obj.endPos.y;
+                break;
+
+            case 'doneStamp':
+                const doneStampSize = obj.size || 28;
+                const doneHalfSize = doneStampSize / 2;
+                minX = obj.startPos.x - doneHalfSize;
+                maxX = obj.startPos.x + doneHalfSize;
+                minY = obj.startPos.y - doneHalfSize;
+                maxY = obj.startPos.y + doneHalfSize;
+                break;
+
+            case 'komojiStamp':
+                const komojiStampSize = obj.size || 28;
+                const komojiHalfSize = komojiStampSize / 2;
+                minX = obj.startPos.x - komojiHalfSize;
+                maxX = obj.startPos.x + komojiHalfSize;
+                minY = obj.startPos.y - komojiHalfSize;
+                maxY = obj.startPos.y + komojiHalfSize;
+                break;
+
+            case 'rubyStamp':
+                const rubySize = obj.size || 28;
+                const rubyWidth = rubySize * 1.8 / 2;
+                const rubyHeight = rubySize * 0.9 / 2;
+                minX = obj.startPos.x - rubyWidth;
+                maxX = obj.startPos.x + rubyWidth;
+                minY = obj.startPos.y - rubyHeight;
+                maxY = obj.startPos.y + rubyHeight;
+                break;
+
+            case 'toruStamp':
+                const toruSize = obj.size || 28;
+                const toruWidth = toruSize * 1.8 / 2;
+                const toruHeight = toruSize * 0.9 / 2;
+                minX = obj.startPos.x - toruWidth;
+                maxX = obj.startPos.x + toruWidth;
+                minY = obj.startPos.y - toruHeight;
+                maxY = obj.startPos.y + toruHeight;
+                break;
+
+            case 'torutsumeStamp':
+                const torutsumeSize = obj.size || 28;
+                const torutsumeWidth = torutsumeSize * 2.5 / 2;
+                const torutsumeHeight = torutsumeSize * 0.9 / 2;
+                minX = obj.startPos.x - torutsumeWidth;
+                maxX = obj.startPos.x + torutsumeWidth;
+                minY = obj.startPos.y - torutsumeHeight;
+                maxY = obj.startPos.y + torutsumeHeight;
+                break;
+
+            case 'torumamaStamp':
+                const torumamaSize = obj.size || 28;
+                const torumamaWidth = torumamaSize * 2.5 / 2;
+                const torumamaHeight = torumamaSize * 0.9 / 2;
+                minX = obj.startPos.x - torumamaWidth;
+                maxX = obj.startPos.x + torumamaWidth;
+                minY = obj.startPos.y - torumamaHeight;
+                maxY = obj.startPos.y + torumamaHeight;
+                break;
+
+            case 'zenkakuakiStamp':
+                const zenkakuakiSize = obj.size || 28;
+                const zenkakuakiWidth = zenkakuakiSize * 3.0 / 2;
+                const zenkakuakiHeight = zenkakuakiSize * 0.9 / 2;
+                minX = obj.startPos.x - zenkakuakiWidth;
+                maxX = obj.startPos.x + zenkakuakiWidth;
+                minY = obj.startPos.y - zenkakuakiHeight;
+                maxY = obj.startPos.y + zenkakuakiHeight;
+                break;
+
+            case 'nibunakiStamp':
+                const nibunakiSize = obj.size || 28;
+                const nibunakiWidth = nibunakiSize * 3.0 / 2;
+                const nibunakiHeight = nibunakiSize * 0.9 / 2;
+                minX = obj.startPos.x - nibunakiWidth;
+                maxX = obj.startPos.x + nibunakiWidth;
+                minY = obj.startPos.y - nibunakiHeight;
+                maxY = obj.startPos.y + nibunakiHeight;
+                break;
+
+            case 'shibunakiStamp':
+                const shibunakiSize = obj.size || 28;
+                const shibunakiWidth = shibunakiSize * 3.0 / 2;
+                const shibunakiHeight = shibunakiSize * 0.9 / 2;
+                minX = obj.startPos.x - shibunakiWidth;
+                maxX = obj.startPos.x + shibunakiWidth;
+                minY = obj.startPos.y - shibunakiHeight;
+                maxY = obj.startPos.y + shibunakiHeight;
+                break;
+
+            case 'kaigyouStamp':
+                const kaigyouSize = obj.size || 28;
+                const kaigyouWidth = kaigyouSize * 1.5 / 2;
+                const kaigyouHeight = kaigyouSize * 0.9 / 2;
+                minX = obj.startPos.x - kaigyouWidth;
+                maxX = obj.startPos.x + kaigyouWidth;
+                minY = obj.startPos.y - kaigyouHeight;
+                maxY = obj.startPos.y + kaigyouHeight;
+                break;
+
+            default:
+                if (obj.startPos) {
+                    minX = obj.startPos.x;
+                    minY = obj.startPos.y;
+                }
+                if (obj.endPos) {
+                    maxX = obj.endPos.x;
+                    maxY = obj.endPos.y;
+                }
+        }
+
+        // 線の太さを考慮
+        const padding = (obj.lineWidth || 2) / 2 + 2;
+        minX -= padding;
+        minY -= padding;
+        maxX += padding;
+        maxY += padding;
+
+        // アノテーションは除外（回転中心計算用）
+        return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    }
+
+    /**
      * 点がオブジェクト上にあるかヒットテスト
      */
     function hitTest(pos, obj, tolerance) {
         tolerance = tolerance || 5;
+
+        // 回転がある場合、クリック座標を逆回転してローカル座標系に変換
+        let testPos = pos;
+        if (obj.rotation) {
+            // 図形のみのバウンディングボックスから回転中心を計算
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            // 逆回転を適用
+            const cos = Math.cos(-obj.rotation);
+            const sin = Math.sin(-obj.rotation);
+            const dx = pos.x - centerX;
+            const dy = pos.y - centerY;
+            testPos = {
+                x: centerX + dx * cos - dy * sin,
+                y: centerY + dx * sin + dy * cos
+            };
+        }
 
         let hitOnObject = false;
 
@@ -450,25 +752,25 @@ window.MojiQDrawingRenderer = (function() {
             case 'arrow':
             case 'doubleArrow':
             case 'doubleArrowAnnotated':
-                hitOnObject = hitTestLine(pos, obj.startPos, obj.endPos, tolerance + (obj.lineWidth || 2) / 2);
+                hitOnObject = hitTestLine(testPos, obj.startPos, obj.endPos, tolerance + (obj.lineWidth || 2) / 2);
                 break;
 
             case 'rect':
-                hitOnObject = hitTestRect(pos, obj, tolerance);
+                hitOnObject = hitTestRect(testPos, obj, tolerance);
                 break;
 
             case 'labeledRect':
                 // 枠線部分のヒットテスト
-                hitOnObject = hitTestRect(pos, obj, tolerance);
+                hitOnObject = hitTestRect(testPos, obj, tolerance);
                 // 引出線のヒットテスト
                 if (!hitOnObject && obj.leaderLine) {
-                    hitOnObject = hitTestLine(pos, obj.leaderLine.start, obj.leaderLine.end, tolerance + (obj.lineWidth || 2) / 2);
+                    hitOnObject = hitTestLine(testPos, obj.leaderLine.start, obj.leaderLine.end, tolerance + (obj.lineWidth || 2) / 2);
                 }
                 break;
 
             case 'fontLabel':
                 // 枠線部分のヒットテスト
-                hitOnObject = hitTestRect(pos, obj, tolerance);
+                hitOnObject = hitTestRect(testPos, obj, tolerance);
                 // フォント名ラベル部分のヒットテスト
                 if (!hitOnObject && obj.textX !== undefined && obj.textY !== undefined) {
                     const fontSize = obj.fontSize || 12;
@@ -484,67 +786,67 @@ window.MojiQDrawingRenderer = (function() {
                     }
                     const textMinY = obj.textY - fontSize / 2;
                     const textMaxY = obj.textY + fontSize / 2;
-                    hitOnObject = pos.x >= textMinX - tolerance && pos.x <= textMaxX + tolerance &&
-                                  pos.y >= textMinY - tolerance && pos.y <= textMaxY + tolerance;
+                    hitOnObject = testPos.x >= textMinX - tolerance && testPos.x <= textMaxX + tolerance &&
+                                  testPos.y >= textMinY - tolerance && testPos.y <= textMaxY + tolerance;
                 }
                 break;
 
             case 'ellipse':
-                hitOnObject = hitTestEllipse(pos, obj, tolerance);
+                hitOnObject = hitTestEllipse(testPos, obj, tolerance);
                 break;
 
             case 'semicircle':
-                hitOnObject = hitTestSemicircle(pos, obj, tolerance);
+                hitOnObject = hitTestSemicircle(testPos, obj, tolerance);
                 break;
 
             case 'chevron':
-                hitOnObject = hitTestChevron(pos, obj, tolerance);
+                hitOnObject = hitTestChevron(testPos, obj, tolerance);
                 break;
 
             case 'lshape':
-                hitOnObject = hitTestLshape(pos, obj, tolerance);
+                hitOnObject = hitTestLshape(testPos, obj, tolerance);
                 break;
 
             case 'zshape':
-                hitOnObject = hitTestZshape(pos, obj, tolerance);
+                hitOnObject = hitTestZshape(testPos, obj, tolerance);
                 break;
 
             case 'bracket':
-                hitOnObject = hitTestBracket(pos, obj, tolerance);
+                hitOnObject = hitTestBracket(testPos, obj, tolerance);
                 break;
 
             case 'rectSymbolStamp':
-                hitOnObject = hitTestRect(pos, obj, tolerance);
+                hitOnObject = hitTestRect(testPos, obj, tolerance);
                 break;
 
             case 'triangleSymbolStamp':
-                hitOnObject = hitTestTriangle(pos, obj, tolerance);
+                hitOnObject = hitTestTriangle(testPos, obj, tolerance);
                 break;
 
             case 'pen':
             case 'marker':
             case 'eraser':
-                hitOnObject = hitTestPath(pos, obj.points, tolerance + (obj.lineWidth || 2) / 2);
+                hitOnObject = hitTestPath(testPos, obj.points, tolerance + (obj.lineWidth || 2) / 2);
                 break;
 
             case 'polyline':
                 // 折れ線のヒットテスト（連続した線分として判定）
-                hitOnObject = hitTestPolyline(pos, obj.points, tolerance + (obj.lineWidth || 2) / 2);
+                hitOnObject = hitTestPolyline(testPos, obj.points, tolerance + (obj.lineWidth || 2) / 2);
                 break;
 
             case 'text':
             case 'image':
                 const bounds = getBounds(obj);
-                hitOnObject = pos.x >= bounds.x && pos.x <= bounds.x + bounds.width &&
-                       pos.y >= bounds.y && pos.y <= bounds.y + bounds.height;
+                hitOnObject = testPos.x >= bounds.x && testPos.x <= bounds.x + bounds.width &&
+                       testPos.y >= bounds.y && testPos.y <= bounds.y + bounds.height;
                 break;
 
             case 'doneStamp':
                 // 済スタンプの円形ヒットテスト
                 const stampSizeHit = obj.size || 28;
                 const radiusHit = stampSizeHit / 2 + tolerance;
-                const dxStamp = pos.x - obj.startPos.x;
-                const dyStamp = pos.y - obj.startPos.y;
+                const dxStamp = testPos.x - obj.startPos.x;
+                const dyStamp = testPos.y - obj.startPos.y;
                 hitOnObject = (dxStamp * dxStamp + dyStamp * dyStamp) <= (radiusHit * radiusHit);
                 break;
 
@@ -552,8 +854,8 @@ window.MojiQDrawingRenderer = (function() {
                 // 小文字スタンプの円形ヒットテスト
                 const komojiStampSizeHit = obj.size || 28;
                 const komojiRadiusHit = komojiStampSizeHit / 2 + tolerance;
-                const dxKomoji = pos.x - obj.startPos.x;
-                const dyKomoji = pos.y - obj.startPos.y;
+                const dxKomoji = testPos.x - obj.startPos.x;
+                const dyKomoji = testPos.y - obj.startPos.y;
                 hitOnObject = (dxKomoji * dxKomoji + dyKomoji * dyKomoji) <= (komojiRadiusHit * komojiRadiusHit);
                 break;
 
@@ -562,8 +864,8 @@ window.MojiQDrawingRenderer = (function() {
                 const rubySizeHit = obj.size || 28;
                 const rubyWidthHit = rubySizeHit * 1.8 / 2 + tolerance;
                 const rubyHeightHit = rubySizeHit * 0.9 / 2 + tolerance;
-                hitOnObject = Math.abs(pos.x - obj.startPos.x) <= rubyWidthHit &&
-                              Math.abs(pos.y - obj.startPos.y) <= rubyHeightHit;
+                hitOnObject = Math.abs(testPos.x - obj.startPos.x) <= rubyWidthHit &&
+                              Math.abs(testPos.y - obj.startPos.y) <= rubyHeightHit;
                 break;
 
             case 'toruStamp':
@@ -571,8 +873,8 @@ window.MojiQDrawingRenderer = (function() {
                 const toruSizeHit = obj.size || 28;
                 const toruWidthHit = toruSizeHit * 1.8 / 2 + tolerance;
                 const toruHeightHit = toruSizeHit * 0.9 / 2 + tolerance;
-                hitOnObject = Math.abs(pos.x - obj.startPos.x) <= toruWidthHit &&
-                              Math.abs(pos.y - obj.startPos.y) <= toruHeightHit;
+                hitOnObject = Math.abs(testPos.x - obj.startPos.x) <= toruWidthHit &&
+                              Math.abs(testPos.y - obj.startPos.y) <= toruHeightHit;
                 break;
 
             case 'torutsumeStamp':
@@ -580,8 +882,8 @@ window.MojiQDrawingRenderer = (function() {
                 const torutsumeSizeHit = obj.size || 28;
                 const torutsumeWidthHit = torutsumeSizeHit * 2.5 / 2 + tolerance;
                 const torutsumeHeightHit = torutsumeSizeHit * 0.9 / 2 + tolerance;
-                hitOnObject = Math.abs(pos.x - obj.startPos.x) <= torutsumeWidthHit &&
-                              Math.abs(pos.y - obj.startPos.y) <= torutsumeHeightHit;
+                hitOnObject = Math.abs(testPos.x - obj.startPos.x) <= torutsumeWidthHit &&
+                              Math.abs(testPos.y - obj.startPos.y) <= torutsumeHeightHit;
                 break;
 
             case 'torumamaStamp':
@@ -589,8 +891,8 @@ window.MojiQDrawingRenderer = (function() {
                 const torumamaSizeHit = obj.size || 28;
                 const torumamaWidthHit = torumamaSizeHit * 2.5 / 2 + tolerance;
                 const torumamaHeightHit = torumamaSizeHit * 0.9 / 2 + tolerance;
-                hitOnObject = Math.abs(pos.x - obj.startPos.x) <= torumamaWidthHit &&
-                              Math.abs(pos.y - obj.startPos.y) <= torumamaHeightHit;
+                hitOnObject = Math.abs(testPos.x - obj.startPos.x) <= torumamaWidthHit &&
+                              Math.abs(testPos.y - obj.startPos.y) <= torumamaHeightHit;
                 break;
 
             case 'zenkakuakiStamp':
@@ -598,8 +900,8 @@ window.MojiQDrawingRenderer = (function() {
                 const zenkakuakiSizeHit = obj.size || 28;
                 const zenkakuakiWidthHit = zenkakuakiSizeHit * 3.0 / 2 + tolerance;
                 const zenkakuakiHeightHit = zenkakuakiSizeHit * 0.9 / 2 + tolerance;
-                hitOnObject = Math.abs(pos.x - obj.startPos.x) <= zenkakuakiWidthHit &&
-                              Math.abs(pos.y - obj.startPos.y) <= zenkakuakiHeightHit;
+                hitOnObject = Math.abs(testPos.x - obj.startPos.x) <= zenkakuakiWidthHit &&
+                              Math.abs(testPos.y - obj.startPos.y) <= zenkakuakiHeightHit;
                 break;
 
             case 'nibunakiStamp':
@@ -607,8 +909,8 @@ window.MojiQDrawingRenderer = (function() {
                 const nibunakiSizeHit = obj.size || 28;
                 const nibunakiWidthHit = nibunakiSizeHit * 3.0 / 2 + tolerance;
                 const nibunakiHeightHit = nibunakiSizeHit * 0.9 / 2 + tolerance;
-                hitOnObject = Math.abs(pos.x - obj.startPos.x) <= nibunakiWidthHit &&
-                              Math.abs(pos.y - obj.startPos.y) <= nibunakiHeightHit;
+                hitOnObject = Math.abs(testPos.x - obj.startPos.x) <= nibunakiWidthHit &&
+                              Math.abs(testPos.y - obj.startPos.y) <= nibunakiHeightHit;
                 break;
 
             case 'shibunakiStamp':
@@ -616,8 +918,8 @@ window.MojiQDrawingRenderer = (function() {
                 const shibunakiSizeHit = obj.size || 28;
                 const shibunakiWidthHit = shibunakiSizeHit * 3.0 / 2 + tolerance;
                 const shibunakiHeightHit = shibunakiSizeHit * 0.9 / 2 + tolerance;
-                hitOnObject = Math.abs(pos.x - obj.startPos.x) <= shibunakiWidthHit &&
-                              Math.abs(pos.y - obj.startPos.y) <= shibunakiHeightHit;
+                hitOnObject = Math.abs(testPos.x - obj.startPos.x) <= shibunakiWidthHit &&
+                              Math.abs(testPos.y - obj.startPos.y) <= shibunakiHeightHit;
                 break;
 
             case 'kaigyouStamp':
@@ -625,8 +927,8 @@ window.MojiQDrawingRenderer = (function() {
                 const kaigyouSizeHit = obj.size || 28;
                 const kaigyouWidthHit = kaigyouSizeHit * 1.5 / 2 + tolerance;
                 const kaigyouHeightHit = kaigyouSizeHit * 0.9 / 2 + tolerance;
-                hitOnObject = Math.abs(pos.x - obj.startPos.x) <= kaigyouWidthHit &&
-                              Math.abs(pos.y - obj.startPos.y) <= kaigyouHeightHit;
+                hitOnObject = Math.abs(testPos.x - obj.startPos.x) <= kaigyouWidthHit &&
+                              Math.abs(testPos.y - obj.startPos.y) <= kaigyouHeightHit;
                 break;
 
             default:
@@ -636,22 +938,16 @@ window.MojiQDrawingRenderer = (function() {
         // オブジェクト本体にヒットした場合
         if (hitOnObject) return true;
 
-        // アノテーション部分のヒットテスト（テキスト領域）
+        // アノテーション部分のヒットテスト（テキスト領域と引出線を含む）
+        // hitTestAnnotationは内部で回転を考慮するので元のposを渡す
         if (obj.annotation && hitTestAnnotation(pos, obj, tolerance)) {
             return true;
         }
 
-        // アノテーションの引出線のヒットテスト
-        if (obj.annotation && obj.annotation.leaderLine) {
-            const ll = obj.annotation.leaderLine;
-            if (hitTestLine(pos, ll.start, ll.end, tolerance + 2)) {
-                return true;
-            }
-        }
-
         // 指示スタンプなどの引出線（obj.leaderLine）のヒットテスト
+        // 回転を考慮してtestPosを使用
         if (obj.leaderLine && obj.leaderLine.start && obj.leaderLine.end) {
-            if (hitTestLine(pos, obj.leaderLine.start, obj.leaderLine.end, tolerance + 2)) {
+            if (hitTestLine(testPos, obj.leaderLine.start, obj.leaderLine.end, tolerance + 2)) {
                 return true;
             }
         }
@@ -1034,16 +1330,138 @@ window.MojiQDrawingRenderer = (function() {
     /**
      * ハンドルのヒットテスト
      */
-    function hitTestHandle(pos, bounds) {
+    function hitTestHandle(pos, bounds, rotation) {
+        // 回転がある場合は座標を逆回転
+        const testPos = rotation ? transformPointForHitTest(pos, bounds, rotation) : pos;
         const handles = getHandlePositions(bounds);
         const hs = HANDLE_SIZE / 2 + 2;
 
         for (const [key, hp] of Object.entries(handles)) {
-            if (Math.abs(pos.x - hp.x) <= hs && Math.abs(pos.y - hp.y) <= hs) {
+            if (Math.abs(testPos.x - hp.x) <= hs && Math.abs(testPos.y - hp.y) <= hs) {
                 return key;
             }
         }
         return null;
+    }
+
+    /**
+     * 回転ハンドルの位置を取得
+     */
+    function getRotationHandlePosition(bounds) {
+        const ROTATION = Constants ? Constants.ROTATION : { HANDLE_DISTANCE: 25 };
+        return {
+            x: bounds.x + bounds.width / 2,
+            y: bounds.y - ROTATION.HANDLE_DISTANCE
+        };
+    }
+
+    /**
+     * 回転ハンドルのヒットテスト
+     */
+    function hitTestRotationHandle(pos, bounds, rotation) {
+        const ROTATION = Constants ? Constants.ROTATION : { HANDLE_DISTANCE: 25, HANDLE_RADIUS: 6 };
+        const rotHandle = getRotationHandlePosition(bounds);
+
+        // 回転がある場合はハンドル位置を回転、または座標を逆回転
+        let testX, testY;
+        if (rotation) {
+            // ハンドル位置を回転して画面座標に変換
+            const cx = bounds.x + bounds.width / 2;
+            const cy = bounds.y + bounds.height / 2;
+            const rotatedHandle = rotatePoint(rotHandle, { x: cx, y: cy }, rotation);
+            testX = pos.x - rotatedHandle.x;
+            testY = pos.y - rotatedHandle.y;
+        } else {
+            testX = pos.x - rotHandle.x;
+            testY = pos.y - rotHandle.y;
+        }
+
+        const dist = Math.sqrt(testX * testX + testY * testY);
+        return dist <= ROTATION.HANDLE_RADIUS + 3;
+    }
+
+    /**
+     * 点を指定した中心点周りに回転
+     * @param {Object} point - 回転する点 { x, y }
+     * @param {Object} center - 回転中心 { x, y }
+     * @param {number} angle - 回転角度（ラジアン）
+     * @returns {Object} 回転後の点 { x, y }
+     */
+    function rotatePoint(point, center, angle) {
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        const dx = point.x - center.x;
+        const dy = point.y - center.y;
+        return {
+            x: center.x + dx * cos - dy * sin,
+            y: center.y + dx * sin + dy * cos
+        };
+    }
+
+    /**
+     * ヒットテスト用に座標を逆回転（オブジェクトのローカル座標系に変換）
+     * @param {Object} pos - クリック座標 { x, y }
+     * @param {Object} bounds - バウンディングボックス
+     * @param {number} rotation - 回転角度（ラジアン）
+     * @returns {Object} 逆回転後の座標 { x, y }
+     */
+    function transformPointForHitTest(pos, bounds, rotation) {
+        const cx = bounds.x + bounds.width / 2;
+        const cy = bounds.y + bounds.height / 2;
+        return rotatePoint(pos, { x: cx, y: cy }, -rotation);
+    }
+
+    /**
+     * 回転を適用したバウンディングボックス（AABB）を計算
+     * @param {Object} obj - 描画オブジェクト
+     * @returns {Object} 回転後のAABB { x, y, width, height }
+     */
+    function getRotatedBounds(obj) {
+        const rawBounds = getBounds(obj);
+
+        if (!obj.rotation || obj.rotation === 0) {
+            return rawBounds;
+        }
+
+        // 4つの角の座標を計算
+        const cx = rawBounds.x + rawBounds.width / 2;
+        const cy = rawBounds.y + rawBounds.height / 2;
+        const corners = [
+            { x: rawBounds.x, y: rawBounds.y },
+            { x: rawBounds.x + rawBounds.width, y: rawBounds.y },
+            { x: rawBounds.x + rawBounds.width, y: rawBounds.y + rawBounds.height },
+            { x: rawBounds.x, y: rawBounds.y + rawBounds.height }
+        ];
+
+        // 各角を回転
+        const rotatedCorners = corners.map(corner =>
+            rotatePoint(corner, { x: cx, y: cy }, obj.rotation)
+        );
+
+        // 回転後のAABBを計算
+        const xs = rotatedCorners.map(c => c.x);
+        const ys = rotatedCorners.map(c => c.y);
+        return {
+            x: Math.min(...xs),
+            y: Math.min(...ys),
+            width: Math.max(...xs) - Math.min(...xs),
+            height: Math.max(...ys) - Math.min(...ys)
+        };
+    }
+
+    /**
+     * 描画コンテキストに回転変換を適用
+     * @param {CanvasRenderingContext2D} ctx - 描画コンテキスト
+     * @param {Object} obj - 描画オブジェクト
+     * @param {Object} bounds - バウンディングボックス
+     */
+    function applyRotationTransform(ctx, obj, bounds) {
+        if (!obj.rotation || obj.rotation === 0) return;
+        const cx = bounds.x + bounds.width / 2;
+        const cy = bounds.y + bounds.height / 2;
+        ctx.translate(cx, cy);
+        ctx.rotate(obj.rotation);
+        ctx.translate(-cx, -cy);
     }
 
     // --- 描画関数 ---
@@ -1053,6 +1471,17 @@ window.MojiQDrawingRenderer = (function() {
      */
     function renderLine(ctx, obj) {
         ctx.save();
+
+        // 回転を適用
+        if (obj.rotation) {
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-centerX, -centerY);
+        }
+
         ctx.beginPath();
         ctx.moveTo(obj.startPos.x, obj.startPos.y);
         ctx.lineTo(obj.endPos.x, obj.endPos.y);
@@ -1086,6 +1515,17 @@ window.MojiQDrawingRenderer = (function() {
      */
     function renderArrow(ctx, obj) {
         ctx.save();
+
+        // 回転を適用
+        if (obj.rotation) {
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-centerX, -centerY);
+        }
+
         ctx.strokeStyle = obj.color || '#000000';
         ctx.lineWidth = obj.lineWidth || 2;
         ctx.lineCap = 'round';
@@ -1114,6 +1554,17 @@ window.MojiQDrawingRenderer = (function() {
      */
     function renderDoubleArrow(ctx, obj) {
         ctx.save();
+
+        // 回転を適用
+        if (obj.rotation) {
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-centerX, -centerY);
+        }
+
         ctx.strokeStyle = obj.color || '#000000';
         ctx.lineWidth = obj.lineWidth || 2;
         ctx.lineCap = 'round';
@@ -1162,6 +1613,17 @@ window.MojiQDrawingRenderer = (function() {
      */
     function renderDoubleArrowAnnotated(ctx, obj) {
         ctx.save();
+
+        // 回転を適用
+        if (obj.rotation) {
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-centerX, -centerY);
+        }
+
         ctx.strokeStyle = obj.color || '#000000';
         ctx.lineWidth = obj.lineWidth || 2;
         ctx.lineCap = 'round';
@@ -1192,6 +1654,17 @@ window.MojiQDrawingRenderer = (function() {
      */
     function renderRect(ctx, obj) {
         ctx.save();
+
+        // 回転を適用
+        if (obj.rotation) {
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-centerX, -centerY);
+        }
+
         ctx.beginPath();
         const w = obj.endPos.x - obj.startPos.x;
         const h = obj.endPos.y - obj.startPos.y;
@@ -1275,6 +1748,17 @@ window.MojiQDrawingRenderer = (function() {
      */
     function renderEllipse(ctx, obj) {
         ctx.save();
+
+        // 回転を適用
+        if (obj.rotation) {
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-centerX, -centerY);
+        }
+
         ctx.beginPath();
         const w = Math.abs(obj.endPos.x - obj.startPos.x);
         const h = Math.abs(obj.endPos.y - obj.startPos.y);
@@ -1292,6 +1776,17 @@ window.MojiQDrawingRenderer = (function() {
      */
     function renderSemicircle(ctx, obj) {
         ctx.save();
+
+        // 回転を適用
+        if (obj.rotation) {
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-centerX, -centerY);
+        }
+
         ctx.beginPath();
         const w = Math.abs(obj.endPos.x - obj.startPos.x);
         const h = Math.abs(obj.endPos.y - obj.startPos.y);
@@ -1317,6 +1812,17 @@ window.MojiQDrawingRenderer = (function() {
      */
     function renderChevron(ctx, obj) {
         ctx.save();
+
+        // 回転を適用
+        if (obj.rotation) {
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-centerX, -centerY);
+        }
+
         ctx.beginPath();
 
         const w = Math.abs(obj.endPos.x - obj.startPos.x);
@@ -1362,6 +1868,17 @@ window.MojiQDrawingRenderer = (function() {
      */
     function renderLshape(ctx, obj) {
         ctx.save();
+
+        // 回転を適用
+        if (obj.rotation) {
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-centerX, -centerY);
+        }
+
         ctx.beginPath();
 
         const topY = Math.min(obj.startPos.y, obj.endPos.y);
@@ -1408,6 +1925,17 @@ window.MojiQDrawingRenderer = (function() {
      */
     function renderZshape(ctx, obj) {
         ctx.save();
+
+        // 回転を適用
+        if (obj.rotation) {
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-centerX, -centerY);
+        }
+
         ctx.beginPath();
 
         if (obj.rotated) {
@@ -1449,6 +1977,16 @@ window.MojiQDrawingRenderer = (function() {
      */
     function renderBracket(ctx, obj) {
         ctx.save();
+
+        // 回転を適用
+        if (obj.rotation) {
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-centerX, -centerY);
+        }
 
         const w = Math.abs(obj.endPos.x - obj.startPos.x);
         const h = Math.abs(obj.endPos.y - obj.startPos.y);
@@ -1564,6 +2102,17 @@ window.MojiQDrawingRenderer = (function() {
      */
     function renderRectSymbolStamp(ctx, obj) {
         ctx.save();
+
+        // 回転を適用
+        if (obj.rotation) {
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-centerX, -centerY);
+        }
+
         ctx.beginPath();
         const w = obj.endPos.x - obj.startPos.x;
         const h = obj.endPos.y - obj.startPos.y;
@@ -1579,6 +2128,17 @@ window.MojiQDrawingRenderer = (function() {
      */
     function renderTriangleSymbolStamp(ctx, obj) {
         ctx.save();
+
+        // 回転を適用
+        if (obj.rotation) {
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-centerX, -centerY);
+        }
+
         ctx.beginPath();
 
         const topY = Math.min(obj.startPos.y, obj.endPos.y);
@@ -1726,6 +2286,15 @@ window.MojiQDrawingRenderer = (function() {
         const rectW = Math.abs(obj.endPos.x - obj.startPos.x);
         const rectH = Math.abs(obj.endPos.y - obj.startPos.y);
 
+        // 回転を適用
+        if (obj.rotation) {
+            const centerX = rectX + rectW / 2;
+            const centerY = rectY + rectH / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-centerX, -centerY);
+        }
+
         ctx.strokeStyle = obj.color || '#000000';
         ctx.lineWidth = obj.lineWidth || 2;
         ctx.strokeRect(rectX, rectY, rectW, rectH);
@@ -1763,6 +2332,17 @@ window.MojiQDrawingRenderer = (function() {
      */
     function renderText(ctx, obj) {
         ctx.save();
+
+        // 回転を適用
+        if (obj.rotation) {
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-centerX, -centerY);
+        }
+
         const fontSize = obj.fontSize || 16;
         ctx.font = `${fontSize}px ${obj.fontFamily || 'sans-serif'}`;
         ctx.fillStyle = obj.color || '#000000';
@@ -1915,6 +2495,17 @@ window.MojiQDrawingRenderer = (function() {
         if (!obj.imageData) return;
 
         ctx.save();
+
+        // 回転を適用
+        if (obj.rotation) {
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-centerX, -centerY);
+        }
+
         // 高品質スムージングを明示的に設定
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
@@ -1936,6 +2527,13 @@ window.MojiQDrawingRenderer = (function() {
         const size = obj.size || 28;
         const color = obj.color || '#ff0000';
         const radius = size / 2;
+
+        // 回転を適用
+        if (obj.rotation) {
+            ctx.translate(x, y);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-x, -y);
+        }
 
         // 円の内側を白で塗りつぶし
         ctx.beginPath();
@@ -1987,6 +2585,13 @@ window.MojiQDrawingRenderer = (function() {
         const size = obj.size || 28;
         const color = obj.color || '#ff0000';
         const radius = size / 2;
+
+        // 回転を適用
+        if (obj.rotation) {
+            ctx.translate(x, y);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-x, -y);
+        }
 
         // 外側の円（白フチ）- 複数回描画+shadowBlurでアンチエイリアスの黒シミ対策
         ctx.strokeStyle = '#ffffff';
@@ -2045,6 +2650,13 @@ window.MojiQDrawingRenderer = (function() {
         const y = obj.startPos.y;
         const size = obj.size || 28;
         const color = obj.color || '#ff0000';
+
+        // 回転を適用
+        if (obj.rotation) {
+            ctx.translate(x, y);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-x, -y);
+        }
 
         // 角丸長方形のサイズ
         const width = size * 1.8;
@@ -2117,6 +2729,13 @@ window.MojiQDrawingRenderer = (function() {
         const size = obj.size || 28;
         const color = obj.color || '#ff0000';
 
+        // 回転を適用
+        if (obj.rotation) {
+            ctx.translate(x, y);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-x, -y);
+        }
+
         // 角丸長方形のサイズ
         const width = size * 1.8;
         const height = size * 0.9;
@@ -2176,6 +2795,13 @@ window.MojiQDrawingRenderer = (function() {
         const size = obj.size || 28;
         const color = obj.color || '#ff0000';
 
+        // 回転を適用
+        if (obj.rotation) {
+            ctx.translate(x, y);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-x, -y);
+        }
+
         // 「トルツメ」の文字（白フチ）- 複数回描画+shadowBlurでアンチエイリアスの黒シミ対策
         ctx.font = `bold ${size * 0.9}px sans-serif`;
         ctx.textAlign = 'center';
@@ -2210,6 +2836,13 @@ window.MojiQDrawingRenderer = (function() {
         const y = obj.startPos.y;
         const size = obj.size || 28;
         const color = obj.color || '#ff0000';
+
+        // 回転を適用
+        if (obj.rotation) {
+            ctx.translate(x, y);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-x, -y);
+        }
 
         // 「トルママ」の文字（白フチ）- 複数回描画でアンチエイリアスの黒シミ対策
         ctx.font = `bold ${size * 0.9}px sans-serif`;
@@ -2247,6 +2880,13 @@ window.MojiQDrawingRenderer = (function() {
         const size = obj.size || 28;
         const color = obj.color || '#ff0000';
 
+        // 回転を適用
+        if (obj.rotation) {
+            ctx.translate(x, y);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-x, -y);
+        }
+
         // 「全角アキ」の文字（白フチ）- 複数回描画でアンチエイリアスの黒シミ対策
         ctx.font = `bold ${size * 0.9}px sans-serif`;
         ctx.textAlign = 'center';
@@ -2282,6 +2922,13 @@ window.MojiQDrawingRenderer = (function() {
         const y = obj.startPos.y;
         const size = obj.size || 28;
         const color = obj.color || '#ff0000';
+
+        // 回転を適用
+        if (obj.rotation) {
+            ctx.translate(x, y);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-x, -y);
+        }
 
         // 「半角アキ」の文字（白フチ）- 複数回描画でアンチエイリアスの黒シミ対策
         ctx.font = `bold ${size * 0.9}px sans-serif`;
@@ -2319,6 +2966,13 @@ window.MojiQDrawingRenderer = (function() {
         const size = obj.size || 28;
         const color = obj.color || '#ff0000';
 
+        // 回転を適用
+        if (obj.rotation) {
+            ctx.translate(x, y);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-x, -y);
+        }
+
         // 「四分アキ」の文字（白フチ）- 複数回描画でアンチエイリアスの黒シミ対策
         ctx.font = `bold ${size * 0.9}px sans-serif`;
         ctx.textAlign = 'center';
@@ -2355,6 +3009,13 @@ window.MojiQDrawingRenderer = (function() {
         const size = obj.size || 28;
         const color = obj.color || '#ff0000';
 
+        // 回転を適用
+        if (obj.rotation) {
+            ctx.translate(x, y);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-x, -y);
+        }
+
         // 「改行」の文字（白フチ）- 複数回描画でアンチエイリアスの黒シミ対策
         ctx.font = `bold ${size * 0.9}px sans-serif`;
         ctx.textAlign = 'center';
@@ -2390,10 +3051,16 @@ window.MojiQDrawingRenderer = (function() {
         const color = obj.color || '#000000';
         const lineWidth = obj.lineWidth || 2;
 
+        // 引出線の起点と終点（回転は適用しない、座標をそのまま使用）
+        const startX = obj.leaderLine.start.x;
+        const startY = obj.leaderLine.start.y;
+        const endX = obj.leaderLine.end.x;
+        const endY = obj.leaderLine.end.y;
+
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(obj.leaderLine.start.x, obj.leaderLine.start.y);
-        ctx.lineTo(obj.leaderLine.end.x, obj.leaderLine.end.y);
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
         ctx.strokeStyle = color;
         ctx.lineWidth = lineWidth;
         ctx.stroke();
@@ -2405,7 +3072,7 @@ window.MojiQDrawingRenderer = (function() {
             const dotRadius = Math.max(lineWidth, 2); // 線幅に比例した小さめの●
 
             ctx.beginPath();
-            ctx.arc(obj.leaderLine.start.x, obj.leaderLine.start.y, dotRadius, 0, 2 * Math.PI);
+            ctx.arc(startX, startY, dotRadius, 0, 2 * Math.PI);
             ctx.fillStyle = color;
             ctx.fill();
         }
@@ -2588,6 +3255,17 @@ window.MojiQDrawingRenderer = (function() {
 
         const ann = obj.annotation;
 
+        // 親オブジェクトの回転を適用（図形のみのバウンディングボックスから回転中心を計算）
+        if (obj.rotation) {
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-centerX, -centerY);
+        }
+
         // 引出線を描画
         if (ann.leaderLine) {
             ctx.save();
@@ -2744,24 +3422,41 @@ window.MojiQDrawingRenderer = (function() {
 
             ctx.restore();
         }
+
+        // 親オブジェクトの回転を復元
+        if (obj.rotation) {
+            ctx.restore();
+        }
     }
 
     /**
      * 選択ハンドルを描画
      */
     function renderSelectionHandles(ctx, obj) {
-        const bounds = getBounds(obj);
+        // 図形のみのバウンディングボックス（回転中心と選択枠用）
+        const shapeBounds = getShapeBoundsOnly(obj);
+        const rotation = obj.rotation || 0;
+        const centerX = shapeBounds.x + shapeBounds.width / 2;
+        const centerY = shapeBounds.y + shapeBounds.height / 2;
 
-        // 選択枠
         ctx.save();
+
+        // 回転がある場合、中心を基準に回転を適用
+        if (rotation !== 0) {
+            ctx.translate(centerX, centerY);
+            ctx.rotate(rotation);
+            ctx.translate(-centerX, -centerY);
+        }
+
+        // 選択枠（図形のみ）
         ctx.strokeStyle = SELECTION_COLOR;
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
-        ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+        ctx.strokeRect(shapeBounds.x, shapeBounds.y, shapeBounds.width, shapeBounds.height);
 
         // ハンドル
         ctx.setLineDash([]);
-        const handles = getHandlePositions(bounds);
+        const handles = getHandlePositions(shapeBounds);
         const hs = HANDLE_SIZE / 2;
 
         for (const hp of Object.values(handles)) {
@@ -2769,6 +3464,16 @@ window.MojiQDrawingRenderer = (function() {
             ctx.fillRect(hp.x - hs, hp.y - hs, HANDLE_SIZE, HANDLE_SIZE);
             ctx.strokeStyle = SELECTION_COLOR;
             ctx.strokeRect(hp.x - hs, hp.y - hs, HANDLE_SIZE, HANDLE_SIZE);
+        }
+
+        ctx.restore();
+        ctx.save();
+
+        // 回転がある場合、アノテーションと引出線ハンドルにも回転を適用
+        if (rotation !== 0) {
+            ctx.translate(centerX, centerY);
+            ctx.rotate(rotation);
+            ctx.translate(-centerX, -centerY);
         }
 
         // アノテーションの選択枠を描画（オレンジ色）
@@ -2887,8 +3592,82 @@ window.MojiQDrawingRenderer = (function() {
             );
         }
 
+        // アノテーションと引出線ハンドルの回転コンテキストを復元
+        ctx.restore();
+        ctx.save();
+
+        // オブジェクトの回転がある場合、削除ボタンにも回転を適用
+        if (rotation !== 0) {
+            ctx.translate(centerX, centerY);
+            ctx.rotate(rotation);
+            ctx.translate(-centerX, -centerY);
+        }
+
+        // 回転ハンドルを描画（画像オブジェクトのみ回転可能）
+        if (obj.type === 'image') {
+            const rotAngle = obj.rotation || 0;
+            const rotCenterX = shapeBounds.x + shapeBounds.width / 2;
+            const rotCenterY = shapeBounds.y + shapeBounds.height / 2;
+
+            // 上部中央ハンドル（tm）の位置
+            const tmX = shapeBounds.x + shapeBounds.width / 2;
+            const tmY = shapeBounds.y;
+
+            // 回転ハンドルの位置（tmから上に伸びる）
+            // 回転を考慮した位置を計算
+            let rotHandleX, rotHandleY;
+            if (rotAngle !== 0) {
+                // 回転がある場合、回転ハンドル位置も回転させる
+                const cos = Math.cos(rotAngle);
+                const sin = Math.sin(rotAngle);
+                // tm相対位置（中心からの相対）
+                const tmRelX = 0;
+                const tmRelY = -shapeBounds.height / 2;
+                // 回転ハンドルの相対位置（tmからさらに上）
+                const rotRelX = 0;
+                const rotRelY = -shapeBounds.height / 2 - ROTATION_HANDLE_DISTANCE;
+                // 回転を適用
+                rotHandleX = rotCenterX + rotRelX * cos - rotRelY * sin;
+                rotHandleY = rotCenterY + rotRelX * sin + rotRelY * cos;
+                // tmも回転
+                const rotatedTmX = rotCenterX + tmRelX * cos - tmRelY * sin;
+                const rotatedTmY = rotCenterY + tmRelX * sin + tmRelY * cos;
+
+                // 接続線を描画
+                ctx.strokeStyle = ROTATION_HANDLE_COLOR;
+                ctx.lineWidth = 1;
+                ctx.setLineDash([]);
+                ctx.beginPath();
+                ctx.moveTo(rotatedTmX, rotatedTmY);
+                ctx.lineTo(rotHandleX, rotHandleY);
+                ctx.stroke();
+            } else {
+                // 回転なしの場合
+                rotHandleX = tmX;
+                rotHandleY = tmY - ROTATION_HANDLE_DISTANCE;
+
+                // 接続線を描画
+                ctx.strokeStyle = ROTATION_HANDLE_COLOR;
+                ctx.lineWidth = 1;
+                ctx.setLineDash([]);
+                ctx.beginPath();
+                ctx.moveTo(tmX, tmY);
+                ctx.lineTo(rotHandleX, rotHandleY);
+                ctx.stroke();
+            }
+
+            // 回転ハンドル（緑色の円）を描画
+            ctx.fillStyle = ROTATION_HANDLE_COLOR;
+            ctx.strokeStyle = '#2E7D32'; // 濃い緑
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(rotHandleX, rotHandleY, ROTATION_HANDLE_RADIUS, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.stroke();
+        }
+
         // 削除ボタンを右下に描画
-        renderDeleteButton(ctx, bounds);
+        renderDeleteButton(ctx, shapeBounds);
 
         ctx.restore();
     }
@@ -2987,14 +3766,30 @@ window.MojiQDrawingRenderer = (function() {
      * @returns {boolean} 削除ボタンがクリックされたかどうか
      */
     function hitTestDeleteButton(pos, obj) {
-        const bounds = getBounds(obj);
-        const btn = getDeleteButtonPosition(bounds);
+        const shapeBounds = getShapeBoundsOnly(obj);
+        const btn = getDeleteButtonPosition(shapeBounds);
         const cx = btn.x + btn.size / 2;
         const cy = btn.y + btn.size / 2;
         const radius = btn.size / 2 + 4;  // 少し大きめの判定領域
 
-        const dx = pos.x - cx;
-        const dy = pos.y - cy;
+        // オブジェクトの回転がある場合、クリック位置を逆回転して判定
+        const rotation = obj.rotation || 0;
+        let testX = pos.x;
+        let testY = pos.y;
+
+        if (rotation !== 0) {
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            const cos = Math.cos(-rotation);
+            const sin = Math.sin(-rotation);
+            const relX = pos.x - centerX;
+            const relY = pos.y - centerY;
+            testX = centerX + relX * cos - relY * sin;
+            testY = centerY + relX * sin + relY * cos;
+        }
+
+        const dx = testX - cx;
+        const dy = testY - cy;
         return (dx * dx + dy * dy) <= (radius * radius);
     }
 
@@ -3466,6 +4261,23 @@ window.MojiQDrawingRenderer = (function() {
         tolerance = tolerance || 5;
         const ann = obj.annotation;
 
+        // 親オブジェクトが回転している場合、クリック座標を逆回転
+        let testPos = pos;
+        if (obj.rotation) {
+            // 図形のみのバウンディングボックスから回転中心を計算
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            const cos = Math.cos(-obj.rotation);
+            const sin = Math.sin(-obj.rotation);
+            const dx = pos.x - centerX;
+            const dy = pos.y - centerY;
+            testPos = {
+                x: centerX + dx * cos - dy * sin,
+                y: centerY + dx * sin + dy * cos
+            };
+        }
+
         // アノテーションテキストの領域をチェック
         if (ann.text && ann.x !== undefined && ann.y !== undefined) {
             const fontSize = ann.fontSize || 16;
@@ -3485,8 +4297,8 @@ window.MojiQDrawingRenderer = (function() {
                 const minY = ann.y - fontSize / 2;
                 const maxY = ann.y + textHeight - fontSize / 2;
 
-                if (pos.x >= minX - tolerance && pos.x <= maxX + tolerance &&
-                    pos.y >= minY - tolerance && pos.y <= maxY + tolerance) {
+                if (testPos.x >= minX - tolerance && testPos.x <= maxX + tolerance &&
+                    testPos.y >= minY - tolerance && testPos.y <= maxY + tolerance) {
                     return true;
                 }
             } else {
@@ -3518,8 +4330,8 @@ window.MojiQDrawingRenderer = (function() {
                 const minY = ann.y;
                 const maxY = ann.y + textHeight - (lineHeight - fontSize);
 
-                if (pos.x >= minX - tolerance && pos.x <= maxX + tolerance &&
-                    pos.y >= minY - tolerance && pos.y <= maxY + tolerance) {
+                if (testPos.x >= minX - tolerance && testPos.x <= maxX + tolerance &&
+                    testPos.y >= minY - tolerance && testPos.y <= maxY + tolerance) {
                     return true;
                 }
             }
@@ -3527,7 +4339,7 @@ window.MojiQDrawingRenderer = (function() {
 
         // アノテーションの引出線のヒットテスト
         if (ann.leaderLine) {
-            if (hitTestLine(pos, ann.leaderLine.start, ann.leaderLine.end, tolerance + 2)) {
+            if (hitTestLine(testPos, ann.leaderLine.start, ann.leaderLine.end, tolerance + 2)) {
                 return true;
             }
         }
@@ -3574,11 +4386,28 @@ window.MojiQDrawingRenderer = (function() {
             return false;
         }
 
+        // 親オブジェクトが回転している場合、クリック座標を逆回転
+        let testPos = pos;
+        if (obj.rotation) {
+            // 図形のみのバウンディングボックスから回転中心を計算
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            const cos = Math.cos(-obj.rotation);
+            const sin = Math.sin(-obj.rotation);
+            const dx = pos.x - centerX;
+            const dy = pos.y - centerY;
+            testPos = {
+                x: centerX + dx * cos - dy * sin,
+                y: centerY + dx * sin + dy * cos
+            };
+        }
+
         const leaderEnd = obj.annotation.leaderLine.end;
         const handleRadius = HANDLE_SIZE / 2 + 3;  // 少し大きめの判定領域
 
-        const dx = pos.x - leaderEnd.x;
-        const dy = pos.y - leaderEnd.y;
+        const dx = testPos.x - leaderEnd.x;
+        const dy = testPos.y - leaderEnd.y;
         return (dx * dx + dy * dy) <= (handleRadius * handleRadius);
     }
 
@@ -3593,11 +4422,28 @@ window.MojiQDrawingRenderer = (function() {
             return false;
         }
 
+        // 親オブジェクトが回転している場合、クリック座標を逆回転
+        let testPos = pos;
+        if (obj.rotation) {
+            // 図形のみのバウンディングボックスから回転中心を計算
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            const cos = Math.cos(-obj.rotation);
+            const sin = Math.sin(-obj.rotation);
+            const dx = pos.x - centerX;
+            const dy = pos.y - centerY;
+            testPos = {
+                x: centerX + dx * cos - dy * sin,
+                y: centerY + dx * sin + dy * cos
+            };
+        }
+
         const leaderEnd = obj.leaderLine.end;
         const handleRadius = HANDLE_SIZE / 2 + 3;  // 少し大きめの判定領域
 
-        const dx = pos.x - leaderEnd.x;
-        const dy = pos.y - leaderEnd.y;
+        const dx = testPos.x - leaderEnd.x;
+        const dy = testPos.y - leaderEnd.y;
         return (dx * dx + dy * dy) <= (handleRadius * handleRadius);
     }
 
@@ -3612,11 +4458,28 @@ window.MojiQDrawingRenderer = (function() {
             return false;
         }
 
+        // 親オブジェクトが回転している場合、クリック座標を逆回転
+        let testPos = pos;
+        if (obj.rotation) {
+            // 図形のみのバウンディングボックスから回転中心を計算
+            const shapeBounds = getShapeBoundsOnly(obj);
+            const centerX = shapeBounds.x + shapeBounds.width / 2;
+            const centerY = shapeBounds.y + shapeBounds.height / 2;
+            const cos = Math.cos(-obj.rotation);
+            const sin = Math.sin(-obj.rotation);
+            const dx = pos.x - centerX;
+            const dy = pos.y - centerY;
+            testPos = {
+                x: centerX + dx * cos - dy * sin,
+                y: centerY + dx * sin + dy * cos
+            };
+        }
+
         const leaderStart = obj.leaderLine.start;
         const handleRadius = HANDLE_SIZE / 2 + 3;  // 少し大きめの判定領域
 
-        const dx = pos.x - leaderStart.x;
-        const dy = pos.y - leaderStart.y;
+        const dx = testPos.x - leaderStart.x;
+        const dy = testPos.y - leaderStart.y;
         return (dx * dx + dy * dy) <= (handleRadius * handleRadius);
     }
 
@@ -3681,6 +4544,7 @@ window.MojiQDrawingRenderer = (function() {
         renderSelectionHandles: renderSelectionHandles,
         renderMarqueeRect: renderMarqueeRect,
         getBounds: getBounds,
+        getShapeBoundsOnly: getShapeBoundsOnly,
         getMultiSelectBounds: getMultiSelectBounds,
         hitTest: hitTest,
         hitTestAll: hitTestAll,
@@ -3696,6 +4560,13 @@ window.MojiQDrawingRenderer = (function() {
         getDeleteButtonPosition: getDeleteButtonPosition,
         HANDLE_SIZE: HANDLE_SIZE,
         DELETE_BUTTON_SIZE: DELETE_BUTTON_SIZE,
+
+        // 回転ハンドル関連
+        getRotationHandlePosition: getRotationHandlePosition,
+        hitTestRotationHandle: hitTestRotationHandle,
+        transformPointForHitTest: transformPointForHitTest,
+        ROTATION_HANDLE_DISTANCE: ROTATION_HANDLE_DISTANCE,
+        ROTATION_HANDLE_RADIUS: ROTATION_HANDLE_RADIUS,
 
         // ビューポートカリング関連
         configureCulling: configureCulling,

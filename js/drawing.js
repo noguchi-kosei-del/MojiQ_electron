@@ -33,6 +33,10 @@ window.MojiQDrawing = (function() {
     let shapeEndPosCanvas = { x: 0, y: 0 };  // アノテーション用
     let currentStrokePointsCanvas = [];
 
+    // 画面座標（向き判定用 - ページ回転に影響されない）
+    let startPosScreen = { x: 0, y: 0 };
+    let currentPosScreen = { x: 0, y: 0 };
+
     // 折れ線ツール用変数
     let polylinePoints = [];          // 確定した頂点（ローカル座標 - 保存用）
     let polylinePointsCanvas = [];    // 確定した頂点（キャンバス座標 - プレビュー用）
@@ -213,7 +217,6 @@ window.MojiQDrawing = (function() {
         }
 
         // フォールバック
-        const rect = mojiqCanvas.getBoundingClientRect();
         // タッチイベントの安全なアクセス（changedTouchesが空の場合に対応）
         let clientX, clientY;
         if (e.clientX !== undefined) {
@@ -227,12 +230,64 @@ window.MojiQDrawing = (function() {
             return { x: 0, y: 0 };
         }
 
-        const scaleX = mojiqCanvas.width / rect.width;
-        const scaleY = mojiqCanvas.height / rect.height;
+        const canvasWrapper = mojiqCanvas.parentElement;
+
+        // キャンバスの論理サイズ（dpr適用前）
+        const canvasWidth = mojiqCanvas.width / dpr;
+        const canvasHeight = mojiqCanvas.height / dpr;
+
+        if (!canvasWrapper) {
+            // フォールバック
+            const rect = mojiqCanvas.getBoundingClientRect();
+            const scaleX = mojiqCanvas.width / rect.width;
+            const scaleY = mojiqCanvas.height / rect.height;
+            return {
+                x: (clientX - rect.left) * scaleX / dpr,
+                y: (clientY - rect.top) * scaleY / dpr
+            };
+        }
+
+        // CSS変換を取得
+        const style = window.getComputedStyle(canvasWrapper);
+        const transform = style.transform;
+
+        if (transform === 'none' || transform === '') {
+            // 変換なし: 通常の計算
+            const rect = mojiqCanvas.getBoundingClientRect();
+            const scaleX = mojiqCanvas.width / rect.width;
+            const scaleY = mojiqCanvas.height / rect.height;
+            return {
+                x: (clientX - rect.left) * scaleX / dpr,
+                y: (clientY - rect.top) * scaleY / dpr
+            };
+        }
+
+        // DOMMatrixで逆変換を計算
+        const matrix = new DOMMatrix(transform);
+        const inverseMatrix = matrix.inverse();
+
+        // canvasWrapperの変換前のサイズ
+        const cssWidth = canvasWrapper.offsetWidth;
+        const cssHeight = canvasWrapper.offsetHeight;
+
+        // 変換後のバウンディングボックスの中心
+        const rect = canvasWrapper.getBoundingClientRect();
+        const rectCenterX = rect.left + rect.width / 2;
+        const rectCenterY = rect.top + rect.height / 2;
+
+        // クリック位置を中心からの相対座標に変換
+        const relPoint = new DOMPoint(clientX - rectCenterX, clientY - rectCenterY);
+
+        // 逆変換を適用
+        const unrotatedPoint = relPoint.matrixTransform(inverseMatrix);
+
+        // 中心からの相対座標をキャンバス座標に変換
+        const scaleX = canvasWidth / cssWidth;
+        const scaleY = canvasHeight / cssHeight;
 
         return {
-            x: (clientX - rect.left) * scaleX / dpr,
-            y: (clientY - rect.top) * scaleY / dpr
+            x: unrotatedPoint.x * scaleX + canvasWidth / 2,
+            y: unrotatedPoint.y * scaleY + canvasHeight / 2
         };
     }
 
@@ -405,6 +460,39 @@ window.MojiQDrawing = (function() {
     }
 
     /**
+     * 現在のPDFページ回転角度を取得（ラジアン）
+     * @returns {number} 回転角度（ラジアン）、回転なしの場合は0
+     */
+    function getCurrentPageRotation() {
+        const PdfManager = window.MojiQPdfManager;
+        if (PdfManager && PdfManager.getPageRotation) {
+            const degrees = PdfManager.getPageRotation();
+            // 度数をラジアンに変換（テキスト等をページコンテンツに合わせる）
+            return -degrees * Math.PI / 180;
+        }
+        return 0;
+    }
+
+    /**
+     * プレビュー描画時にページ回転を適用する
+     * @param {CanvasRenderingContext2D} context - 描画コンテキスト
+     * @param {number} centerX - 回転中心X
+     * @param {number} centerY - 回転中心Y
+     * @param {function} drawFunc - 描画関数
+     */
+    function drawWithPageRotation(context, centerX, centerY, drawFunc) {
+        const rotation = getCurrentPageRotation();
+        context.save();
+        if (rotation !== 0) {
+            context.translate(centerX, centerY);
+            context.rotate(rotation);
+            context.translate(-centerX, -centerY);
+        }
+        drawFunc();
+        context.restore();
+    }
+
+    /**
      * オブジェクトを保存（描画完了時に呼び出し）
      * @param {object} objData - オブジェクトデータ
      * @param {number|null} targetPageNum - 保存先ページ番号（見開きモード用、省略時は現在のページ）
@@ -425,6 +513,15 @@ window.MojiQDrawing = (function() {
         // ページ番号が無効な場合は保存しない（安全策）
         if (pageNum === null || pageNum === undefined) {
             return null;
+        }
+
+        // 画像以外のオブジェクトはPDFページの回転角度に応じて回転
+        // 初回起動時（0度）を基準として、回転ボタンで回転させた角度分だけ描画を回転
+        if (objData.type !== 'image') {
+            const pageRotation = getCurrentPageRotation();
+            if (pageRotation !== 0) {
+                objData.rotation = pageRotation;
+            }
         }
 
         const objectId = DrawingObjects.addObject(pageNum, objData);
@@ -751,6 +848,9 @@ window.MojiQDrawing = (function() {
         currentPos = pos;
         startPosCanvas = canvasPos;  // キャンバス座標（プレビュー用）
         currentPosCanvas = canvasPos;
+        // 画面座標を記録（向き判定用 - ページ回転に影響されない）
+        startPosScreen = { x: clientX, y: clientY };
+        currentPosScreen = { x: clientX, y: clientY };
         snapshot = ctx.getImageData(0, 0, mojiqCanvas.width, mojiqCanvas.height);
 
         // 描画コンテキストを確実に初期化（色が黒になる不具合を防ぐ）
@@ -831,6 +931,12 @@ window.MojiQDrawing = (function() {
         const pos = localPos;  // 後方互換性
         currentPos = pos;
         currentPosCanvas = canvasPos;
+        // 画面座標を更新（向き判定用）
+        if (e.clientX !== undefined) {
+            currentPosScreen = { x: e.clientX, y: e.clientY };
+        } else if (e.touches && e.touches.length > 0) {
+            currentPosScreen = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }
 
         // 選択モードの処理
         if (state.currentMode === 'select') {
@@ -1123,212 +1229,240 @@ window.MojiQDrawing = (function() {
                     ctx.ellipse(cx, cy, Math.abs(w) / 2, Math.abs(h) / 2, 0, 0, 2 * Math.PI);
                     ctx.stroke();
                 } else if (state.currentMode === 'semicircle') {
-                    // プレビューはキャンバス座標で描画
+                    // プレビューはキャンバス座標で描画（ページ回転を適用）
                     const w = Math.abs(canvasPos.x - startPosCanvas.x);
                     const h = Math.abs(canvasPos.y - startPosCanvas.y);
                     const cx = startPosCanvas.x + (canvasPos.x - startPosCanvas.x) / 2;
                     const cy = startPosCanvas.y + (canvasPos.y - startPosCanvas.y) / 2;
-                    // 縦横の比率で弧の向きを決定
-                    if (h > w) {
-                        // 縦に長い場合: 縦向きの弧（右側の弧）
-                        ctx.ellipse(cx, cy, w / 2, h / 2, 0, -0.5 * Math.PI, 0.5 * Math.PI);
-                    } else {
-                        // 横に長い場合: 横向きの弧（上側の弧）
-                        ctx.ellipse(cx, cy, w / 2, h / 2, 0, Math.PI, 2 * Math.PI);
-                    }
-                    ctx.stroke();
+                    // 画面座標で縦横の比率を判定
+                    const screenW = Math.abs(currentPosScreen.x - startPosScreen.x);
+                    const screenH = Math.abs(currentPosScreen.y - startPosScreen.y);
+                    drawWithPageRotation(ctx, cx, cy, () => {
+                        ctx.beginPath();
+                        if (screenH > screenW) {
+                            // 縦に長い場合: 縦向きの弧（右側の弧）
+                            ctx.ellipse(cx, cy, w / 2, h / 2, 0, -0.5 * Math.PI, 0.5 * Math.PI);
+                        } else {
+                            // 横に長い場合: 横向きの弧（上側の弧）
+                            ctx.ellipse(cx, cy, w / 2, h / 2, 0, Math.PI, 2 * Math.PI);
+                        }
+                        ctx.stroke();
+                    });
                 } else if (state.currentMode === 'chevron') {
-                    // プレビューはキャンバス座標で描画
+                    // プレビューはキャンバス座標で描画（ページ回転を適用）
                     const topY = Math.min(startPosCanvas.y, canvasPos.y);
                     const bottomY = Math.max(startPosCanvas.y, canvasPos.y);
                     const leftX = Math.min(startPosCanvas.x, canvasPos.x);
                     const rightX = Math.max(startPosCanvas.x, canvasPos.x);
                     const midY = (topY + bottomY) / 2;
                     const midX = (leftX + rightX) / 2;
+                    const centerX = (leftX + rightX) / 2;
+                    const centerY = (topY + bottomY) / 2;
 
-                    // Ctrlキーで頂点位置を下に変更
-                    if (e.ctrlKey || e.metaKey) {
-                        // Ctrl押下時: 常に ∨の形（頂点が下側）
-                        ctx.moveTo(leftX, topY);
-                        ctx.lineTo(midX, bottomY);
-                        ctx.lineTo(rightX, topY);
-                    } else {
-                        // 通常時: 常に ＜の形（頂点が左側）
-                        ctx.moveTo(rightX, topY);
-                        ctx.lineTo(leftX, midY);
-                        ctx.lineTo(rightX, bottomY);
-                    }
-                    ctx.stroke();
+                    drawWithPageRotation(ctx, centerX, centerY, () => {
+                        ctx.beginPath();
+                        // Ctrlキーで頂点位置を下に変更
+                        if (e.ctrlKey || e.metaKey) {
+                            // Ctrl押下時: 常に ∨の形（頂点が下側）
+                            ctx.moveTo(leftX, topY);
+                            ctx.lineTo(midX, bottomY);
+                            ctx.lineTo(rightX, topY);
+                        } else {
+                            // 通常時: 常に ＜の形（頂点が左側）
+                            ctx.moveTo(rightX, topY);
+                            ctx.lineTo(leftX, midY);
+                            ctx.lineTo(rightX, bottomY);
+                        }
+                        ctx.stroke();
+                    });
                 } else if (state.currentMode === 'lshape') {
-                    // プレビューはキャンバス座標で描画
-                    const dx = canvasPos.x - startPosCanvas.x;
-                    const dy = canvasPos.y - startPosCanvas.y;
+                    // プレビューはキャンバス座標で描画（ページ回転を適用）
                     const topY = Math.min(startPosCanvas.y, canvasPos.y);
                     const bottomY = Math.max(startPosCanvas.y, canvasPos.y);
                     const leftX = Math.min(startPosCanvas.x, canvasPos.x);
                     const rightX = Math.max(startPosCanvas.x, canvasPos.x);
+                    const centerX = (leftX + rightX) / 2;
+                    const centerY = (topY + bottomY) / 2;
+                    // 画面座標でドラッグ方向を判定
+                    const screenDx = currentPosScreen.x - startPosScreen.x;
+                    const screenDy = currentPosScreen.y - startPosScreen.y;
 
-                    // ドラッグ方向で4つの向きを決定
-                    if (dx >= 0 && dy >= 0) {
-                        // 右下にドラッグ: L（標準形、左上が角）
-                        ctx.moveTo(leftX, bottomY);
-                        ctx.lineTo(leftX, topY);
-                        ctx.lineTo(rightX, topY);
-                    } else if (dx < 0 && dy >= 0) {
-                        // 左下にドラッグ: ⌐（右上が角）
-                        ctx.moveTo(rightX, bottomY);
-                        ctx.lineTo(rightX, topY);
-                        ctx.lineTo(leftX, topY);
-                    } else if (dx >= 0 && dy < 0) {
-                        // 右上にドラッグ: Γ（左下が角）
-                        ctx.moveTo(leftX, topY);
-                        ctx.lineTo(leftX, bottomY);
-                        ctx.lineTo(rightX, bottomY);
-                    } else {
-                        // 左上にドラッグ: ⌝（右下が角）
-                        ctx.moveTo(rightX, topY);
-                        ctx.lineTo(rightX, bottomY);
-                        ctx.lineTo(leftX, bottomY);
-                    }
-                    ctx.stroke();
+                    drawWithPageRotation(ctx, centerX, centerY, () => {
+                        ctx.beginPath();
+                        // ドラッグ方向で4つの向きを決定（画面座標で判定）
+                        if (screenDx >= 0 && screenDy >= 0) {
+                            // 右下にドラッグ: L（標準形、左上が角）
+                            ctx.moveTo(leftX, bottomY);
+                            ctx.lineTo(leftX, topY);
+                            ctx.lineTo(rightX, topY);
+                        } else if (screenDx < 0 && screenDy >= 0) {
+                            // 左下にドラッグ: ⌐（右上が角）
+                            ctx.moveTo(rightX, bottomY);
+                            ctx.lineTo(rightX, topY);
+                            ctx.lineTo(leftX, topY);
+                        } else if (screenDx >= 0 && screenDy < 0) {
+                            // 右上にドラッグ: Γ（左下が角）
+                            ctx.moveTo(leftX, topY);
+                            ctx.lineTo(leftX, bottomY);
+                            ctx.lineTo(rightX, bottomY);
+                        } else {
+                            // 左上にドラッグ: ⌝（右下が角）
+                            ctx.moveTo(rightX, topY);
+                            ctx.lineTo(rightX, bottomY);
+                            ctx.lineTo(leftX, bottomY);
+                        }
+                        ctx.stroke();
+                    });
                 } else if (state.currentMode === 'zshape') {
-                    // プレビューはキャンバス座標で描画
-                    // Ctrlキーで90度回転したクランク形状
-                    if (e.ctrlKey || e.metaKey) {
-                        // Ctrl押下時: 横→縦→横の形状
-                        const dx = canvasPos.x - startPosCanvas.x;
-                        const midX = startPosCanvas.x + dx / 2;
+                    // プレビューはキャンバス座標で描画（ページ回転を適用）
+                    const centerX = (startPosCanvas.x + canvasPos.x) / 2;
+                    const centerY = (startPosCanvas.y + canvasPos.y) / 2;
 
-                        ctx.moveTo(startPosCanvas.x, startPosCanvas.y);
-                        ctx.lineTo(midX, startPosCanvas.y);
-                        ctx.lineTo(midX, canvasPos.y);
-                        ctx.lineTo(canvasPos.x, canvasPos.y);
-                    } else {
-                        // 通常時: 縦→横→縦の形状
-                        const dy = canvasPos.y - startPosCanvas.y;
-                        const midY = startPosCanvas.y + dy / 2;
+                    drawWithPageRotation(ctx, centerX, centerY, () => {
+                        ctx.beginPath();
+                        // Ctrlキーで90度回転したクランク形状
+                        if (e.ctrlKey || e.metaKey) {
+                            // Ctrl押下時: 横→縦→横の形状
+                            const dx = canvasPos.x - startPosCanvas.x;
+                            const midX = startPosCanvas.x + dx / 2;
 
-                        ctx.moveTo(startPosCanvas.x, startPosCanvas.y);
-                        ctx.lineTo(startPosCanvas.x, midY);
-                        ctx.lineTo(canvasPos.x, midY);
-                        ctx.lineTo(canvasPos.x, canvasPos.y);
-                    }
-                    ctx.stroke();
+                            ctx.moveTo(startPosCanvas.x, startPosCanvas.y);
+                            ctx.lineTo(midX, startPosCanvas.y);
+                            ctx.lineTo(midX, canvasPos.y);
+                            ctx.lineTo(canvasPos.x, canvasPos.y);
+                        } else {
+                            // 通常時: 縦→横→縦の形状
+                            const dy = canvasPos.y - startPosCanvas.y;
+                            const midY = startPosCanvas.y + dy / 2;
+
+                            ctx.moveTo(startPosCanvas.x, startPosCanvas.y);
+                            ctx.lineTo(startPosCanvas.x, midY);
+                            ctx.lineTo(canvasPos.x, midY);
+                            ctx.lineTo(canvasPos.x, canvasPos.y);
+                        }
+                        ctx.stroke();
+                    });
                 } else if (state.currentMode === 'bracket') {
-                    // プレビューはキャンバス座標で描画
+                    // プレビューはキャンバス座標で描画（ページ回転を適用）
                     const w = Math.abs(canvasPos.x - startPosCanvas.x);
                     const h = Math.abs(canvasPos.y - startPosCanvas.y);
-                    const dx = canvasPos.x - startPosCanvas.x;
-                    const dy = canvasPos.y - startPosCanvas.y;
                     // セリフ（はみ出し部分）のサイズ
                     const serifSize = Math.min(w, h) * 0.15;
-                    // 縦横の比率で向きを決定
-                    if (h > w) {
-                        // 縦に長い場合: 縦向きのコの字
-                        const topY = Math.min(startPosCanvas.y, canvasPos.y);
-                        const bottomY = Math.max(startPosCanvas.y, canvasPos.y);
-                        const leftX = Math.min(startPosCanvas.x, canvasPos.x);
-                        const rightX = Math.max(startPosCanvas.x, canvasPos.x);
-                        if (dx >= 0) {
-                            // 右にドラッグ: ⊐の形（開口部が左側）
-                            // メインのコの字
-                            ctx.moveTo(leftX, topY);
-                            ctx.lineTo(rightX, topY);
-                            ctx.lineTo(rightX, bottomY);
-                            ctx.lineTo(leftX, bottomY);
-                            ctx.stroke();
-                            // 上端のセリフ（90度外側）
-                            ctx.beginPath();
-                            ctx.moveTo(leftX, topY);
-                            ctx.lineTo(leftX, topY - serifSize);
-                            ctx.stroke();
-                            // 下端のセリフ（90度外側）
-                            ctx.beginPath();
-                            ctx.moveTo(leftX, bottomY);
-                            ctx.lineTo(leftX, bottomY + serifSize);
-                            ctx.stroke();
+                    const topY = Math.min(startPosCanvas.y, canvasPos.y);
+                    const bottomY = Math.max(startPosCanvas.y, canvasPos.y);
+                    const leftX = Math.min(startPosCanvas.x, canvasPos.x);
+                    const rightX = Math.max(startPosCanvas.x, canvasPos.x);
+                    const centerX = (leftX + rightX) / 2;
+                    const centerY = (topY + bottomY) / 2;
+                    // 画面座標で判定
+                    const screenW = Math.abs(currentPosScreen.x - startPosScreen.x);
+                    const screenH = Math.abs(currentPosScreen.y - startPosScreen.y);
+                    const screenDx = currentPosScreen.x - startPosScreen.x;
+                    const screenDy = currentPosScreen.y - startPosScreen.y;
+
+                    drawWithPageRotation(ctx, centerX, centerY, () => {
+                        // 縦横の比率で向きを決定（画面座標で判定）
+                        if (screenH > screenW) {
+                            // 縦に長い場合: 縦向きのコの字
+                            if (screenDx >= 0) {
+                                // 右にドラッグ: ⊐の形（開口部が左側）
+                                ctx.beginPath();
+                                ctx.moveTo(leftX, topY);
+                                ctx.lineTo(rightX, topY);
+                                ctx.lineTo(rightX, bottomY);
+                                ctx.lineTo(leftX, bottomY);
+                                ctx.stroke();
+                                ctx.beginPath();
+                                ctx.moveTo(leftX, topY);
+                                ctx.lineTo(leftX, topY - serifSize);
+                                ctx.stroke();
+                                ctx.beginPath();
+                                ctx.moveTo(leftX, bottomY);
+                                ctx.lineTo(leftX, bottomY + serifSize);
+                                ctx.stroke();
+                            } else {
+                                // 左にドラッグ: ⊏の形（開口部が右側）
+                                ctx.beginPath();
+                                ctx.moveTo(rightX, topY);
+                                ctx.lineTo(leftX, topY);
+                                ctx.lineTo(leftX, bottomY);
+                                ctx.lineTo(rightX, bottomY);
+                                ctx.stroke();
+                                ctx.beginPath();
+                                ctx.moveTo(rightX, topY);
+                                ctx.lineTo(rightX, topY - serifSize);
+                                ctx.stroke();
+                                ctx.beginPath();
+                                ctx.moveTo(rightX, bottomY);
+                                ctx.lineTo(rightX, bottomY + serifSize);
+                                ctx.stroke();
+                            }
                         } else {
-                            // 左にドラッグ: ⊏の形（開口部が右側）
-                            // メインのコの字
-                            ctx.moveTo(rightX, topY);
-                            ctx.lineTo(leftX, topY);
-                            ctx.lineTo(leftX, bottomY);
-                            ctx.lineTo(rightX, bottomY);
-                            ctx.stroke();
-                            // 上端のセリフ（90度外側）
-                            ctx.beginPath();
-                            ctx.moveTo(rightX, topY);
-                            ctx.lineTo(rightX, topY - serifSize);
-                            ctx.stroke();
-                            // 下端のセリフ（90度外側）
-                            ctx.beginPath();
-                            ctx.moveTo(rightX, bottomY);
-                            ctx.lineTo(rightX, bottomY + serifSize);
-                            ctx.stroke();
+                            // 横に長い場合: 横向きのコの字
+                            if (screenDy >= 0) {
+                                // 下にドラッグ: ⊔の形（開口部が上側）
+                                ctx.beginPath();
+                                ctx.moveTo(leftX, topY);
+                                ctx.lineTo(leftX, bottomY);
+                                ctx.lineTo(rightX, bottomY);
+                                ctx.lineTo(rightX, topY);
+                                ctx.stroke();
+                                ctx.beginPath();
+                                ctx.moveTo(leftX, topY);
+                                ctx.lineTo(leftX - serifSize, topY);
+                                ctx.stroke();
+                                ctx.beginPath();
+                                ctx.moveTo(rightX, topY);
+                                ctx.lineTo(rightX + serifSize, topY);
+                                ctx.stroke();
+                            } else {
+                                // 上にドラッグ: ⊓の形（開口部が下側）
+                                ctx.beginPath();
+                                ctx.moveTo(leftX, bottomY);
+                                ctx.lineTo(leftX, topY);
+                                ctx.lineTo(rightX, topY);
+                                ctx.lineTo(rightX, bottomY);
+                                ctx.stroke();
+                                ctx.beginPath();
+                                ctx.moveTo(leftX, bottomY);
+                                ctx.lineTo(leftX - serifSize, bottomY);
+                                ctx.stroke();
+                                ctx.beginPath();
+                                ctx.moveTo(rightX, bottomY);
+                                ctx.lineTo(rightX + serifSize, bottomY);
+                                ctx.stroke();
+                            }
                         }
-                    } else {
-                        // 横に長い場合: 横向きのコの字
-                        const leftX = Math.min(startPosCanvas.x, canvasPos.x);
-                        const rightX = Math.max(startPosCanvas.x, canvasPos.x);
-                        const topY = Math.min(startPosCanvas.y, canvasPos.y);
-                        const bottomY = Math.max(startPosCanvas.y, canvasPos.y);
-                        if (dy >= 0) {
-                            // 下にドラッグ: ⊔の形（開口部が上側）
-                            // メインのコの字
-                            ctx.moveTo(leftX, topY);
-                            ctx.lineTo(leftX, bottomY);
-                            ctx.lineTo(rightX, bottomY);
-                            ctx.lineTo(rightX, topY);
-                            ctx.stroke();
-                            // 左端のセリフ（90度外側）
-                            ctx.beginPath();
-                            ctx.moveTo(leftX, topY);
-                            ctx.lineTo(leftX - serifSize, topY);
-                            ctx.stroke();
-                            // 右端のセリフ（90度外側）
-                            ctx.beginPath();
-                            ctx.moveTo(rightX, topY);
-                            ctx.lineTo(rightX + serifSize, topY);
-                            ctx.stroke();
-                        } else {
-                            // 上にドラッグ: ⊓の形（開口部が下側）
-                            // メインのコの字
-                            ctx.moveTo(leftX, bottomY);
-                            ctx.lineTo(leftX, topY);
-                            ctx.lineTo(rightX, topY);
-                            ctx.lineTo(rightX, bottomY);
-                            ctx.stroke();
-                            // 左端のセリフ（90度外側）
-                            ctx.beginPath();
-                            ctx.moveTo(leftX, bottomY);
-                            ctx.lineTo(leftX - serifSize, bottomY);
-                            ctx.stroke();
-                            // 右端のセリフ（90度外側）
-                            ctx.beginPath();
-                            ctx.moveTo(rightX, bottomY);
-                            ctx.lineTo(rightX + serifSize, bottomY);
-                            ctx.stroke();
-                        }
-                    }
+                    });
                 } else if (state.currentMode === 'rectSymbolStamp') {
-                    // 全角アキ（□）のドラッグ中プレビュー - キャンバス座標
+                    // 全角アキ（□）のドラッグ中プレビュー（ページ回転を適用）
                     const w = canvasPos.x - startPosCanvas.x;
                     const h = canvasPos.y - startPosCanvas.y;
-                    ctx.rect(startPosCanvas.x, startPosCanvas.y, w, h);
-                    ctx.stroke();
+                    const centerX = startPosCanvas.x + w / 2;
+                    const centerY = startPosCanvas.y + h / 2;
+                    drawWithPageRotation(ctx, centerX, centerY, () => {
+                        ctx.beginPath();
+                        ctx.rect(startPosCanvas.x, startPosCanvas.y, w, h);
+                        ctx.stroke();
+                    });
                 } else if (state.currentMode === 'triangleSymbolStamp') {
-                    // 半角アキ（△）のドラッグ中プレビュー - キャンバス座標
+                    // 半角アキ（△）のドラッグ中プレビュー（ページ回転を適用）
                     const topY = Math.min(startPosCanvas.y, canvasPos.y);
                     const bottomY = Math.max(startPosCanvas.y, canvasPos.y);
                     const leftX = Math.min(startPosCanvas.x, canvasPos.x);
                     const rightX = Math.max(startPosCanvas.x, canvasPos.x);
                     const midX = (leftX + rightX) / 2;
-                    // 上向きの三角形
-                    ctx.moveTo(midX, topY);
-                    ctx.lineTo(leftX, bottomY);
-                    ctx.lineTo(rightX, bottomY);
-                    ctx.closePath();
-                    ctx.stroke();
+                    const centerX = midX;
+                    const centerY = (topY + bottomY) / 2;
+                    drawWithPageRotation(ctx, centerX, centerY, () => {
+                        ctx.beginPath();
+                        // 上向きの三角形
+                        ctx.moveTo(midX, topY);
+                        ctx.lineTo(leftX, bottomY);
+                        ctx.lineTo(rightX, bottomY);
+                        ctx.closePath();
+                        ctx.stroke();
+                    });
                 } else if (normalizedModeForDraw === 'line') {
                     // Shiftキーで水平・垂直の直線に制限（縮尺合わせと同様の挙動）
                     // プレビューはキャンバス座標で描画
@@ -1781,8 +1915,10 @@ window.MojiQDrawing = (function() {
                 const w = Math.abs(currentPos.x - startPos.x);
                 const h = Math.abs(currentPos.y - startPos.y);
                 if (w > 5 || h > 5) {
-                    // 縦横の比率で弧の向きを決定して保存
-                    const orientation = h > w ? 'vertical' : 'horizontal';
+                    // 画面座標で縦横の比率を計算（ページ回転に影響されない向き判定）
+                    const screenW = Math.abs(currentPosScreen.x - startPosScreen.x);
+                    const screenH = Math.abs(currentPosScreen.y - startPosScreen.y);
+                    const orientation = screenH > screenW ? 'vertical' : 'horizontal';
                     saveObjectToPage({
                         type: 'semicircle',
                         startPos: { ...startPos },
@@ -1829,15 +1965,16 @@ window.MojiQDrawing = (function() {
                 const w = Math.abs(currentPos.x - startPos.x);
                 const h = Math.abs(currentPos.y - startPos.y);
                 if (w > 5 || h > 5) {
-                    const dx = currentPos.x - startPos.x;
-                    const dy = currentPos.y - startPos.y;
+                    // 画面座標でドラッグ方向を判定（ページ回転に影響されない向き判定）
+                    const screenDx = currentPosScreen.x - startPosScreen.x;
+                    const screenDy = currentPosScreen.y - startPosScreen.y;
                     // direction: 0=右下(L), 1=左下(⌐), 2=右上(Γ), 3=左上(⌝)
                     let direction;
-                    if (dx >= 0 && dy >= 0) {
+                    if (screenDx >= 0 && screenDy >= 0) {
                         direction = 0;
-                    } else if (dx < 0 && dy >= 0) {
+                    } else if (screenDx < 0 && screenDy >= 0) {
                         direction = 1;
-                    } else if (dx >= 0 && dy < 0) {
+                    } else if (screenDx >= 0 && screenDy < 0) {
                         direction = 2;
                     } else {
                         direction = 3;
@@ -1884,12 +2021,15 @@ window.MojiQDrawing = (function() {
                 const w = Math.abs(currentPos.x - startPos.x);
                 const h = Math.abs(currentPos.y - startPos.y);
                 if (w > 5 || h > 5) {
-                    // 縦横の比率で向きを決定して保存
-                    const orientation = h > w ? 'vertical' : 'horizontal';
-                    const dx = currentPos.x - startPos.x;
-                    const dy = currentPos.y - startPos.y;
+                    // 画面座標で縦横の比率を計算（ページ回転に影響されない向き判定）
+                    const screenW = Math.abs(currentPosScreen.x - startPosScreen.x);
+                    const screenH = Math.abs(currentPosScreen.y - startPosScreen.y);
+                    const orientation = screenH > screenW ? 'vertical' : 'horizontal';
+                    // 画面座標でドラッグ方向を判定
+                    const screenDx = currentPosScreen.x - startPosScreen.x;
+                    const screenDy = currentPosScreen.y - startPosScreen.y;
                     // 縦向きの場合は左にドラッグで反転、横向きの場合は下にドラッグで反転
-                    const flipped = (orientation === 'vertical') ? (dx < 0) : (dy >= 0);
+                    const flipped = (orientation === 'vertical') ? (screenDx < 0) : (screenDy >= 0);
                     saveObjectToPage({
                         type: 'bracket',
                         startPos: { ...startPos },

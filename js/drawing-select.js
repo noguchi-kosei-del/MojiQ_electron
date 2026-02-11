@@ -281,15 +281,41 @@ window.MojiQDrawingSelect = (function() {
                     }
                 }
 
-                // ハンドルのヒットテスト
-                const handle = DrawingRenderer.hitTestHandle(pos, bounds);
+                // 回転ハンドルのヒットテスト（画像オブジェクトのみ回転可能）
+                if (selectedObj.type === 'image' && DrawingRenderer.hitTestRotationHandle) {
+                    const rotation = selectedObj.rotation || 0;
+                    const shapeBounds = DrawingRenderer.getShapeBoundsOnly ? DrawingRenderer.getShapeBoundsOnly(selectedObj) : bounds;
+                    if (DrawingRenderer.hitTestRotationHandle(pos, shapeBounds, rotation)) {
+                        // 回転開始
+                        state.isRotating = true;
+                        state.dragStartPos = { ...pos };
+                        state.dragStartPosCanvas = canvasPos ? { ...canvasPos } : { ...pos };
+                        state.originalObject = MojiQClone.deep(selectedObj);
+                        state.originalBounds = { ...shapeBounds };
+                        state.rotationCenter = {
+                            x: shapeBounds.x + shapeBounds.width / 2,
+                            y: shapeBounds.y + shapeBounds.height / 2
+                        };
+                        state.rotationStartAngle = Math.atan2(
+                            pos.y - state.rotationCenter.y,
+                            pos.x - state.rotationCenter.x
+                        );
+                        state.originalRotation = rotation;
+                        return true;
+                    }
+                }
+
+                // ハンドルのヒットテスト（図形のみのバウンディングボックスを使用）
+                const rotation = selectedObj.rotation || 0;
+                const shapeBoundsForHandle = DrawingRenderer.getShapeBoundsOnly ? DrawingRenderer.getShapeBoundsOnly(selectedObj) : bounds;
+                const handle = DrawingRenderer.hitTestHandle(pos, shapeBoundsForHandle, rotation);
                 if (handle) {
                     // リサイズ開始
                     state.isResizing = true;
                     state.activeHandle = handle;
                     state.dragStartPos = { ...pos };
                     state.dragStartPosCanvas = canvasPos ? { ...canvasPos } : { ...pos };
-                    state.originalBounds = { ...bounds };
+                    state.originalBounds = { ...shapeBoundsForHandle };
                     state.originalObject = MojiQClone.deep(selectedObj);
                     return true;
                 }
@@ -554,6 +580,33 @@ window.MojiQDrawingSelect = (function() {
             return true;
         }
 
+        // 回転操作
+        if (state.isRotating && state.rotationCenter) {
+            const selectedIndex = DrawingObjects.getSelectedIndex(pageNum);
+            if (selectedIndex !== null && selectedIndex >= 0) {
+                // 現在の角度を計算（中心からマウス位置への角度）
+                const currentAngle = Math.atan2(
+                    pos.y - state.rotationCenter.y,
+                    pos.x - state.rotationCenter.x
+                );
+                // 角度の差分を計算
+                let deltaAngle = currentAngle - state.rotationStartAngle;
+                // 新しい回転角度
+                let newRotation = (state.originalRotation || 0) + deltaAngle;
+
+                // Shiftキーが押されている場合は15度スナップ
+                if (window.MojiQStore && window.MojiQStore.get('keyboard.shiftKey')) {
+                    const snapAngle = Math.PI / 12; // 15度
+                    newRotation = Math.round(newRotation / snapAngle) * snapAngle;
+                }
+
+                // オブジェクトの回転を更新
+                applyRotation(selectedIndex, newRotation);
+                if (redrawCallback) redrawCallback(false);
+            }
+            return true;
+        }
+
         if (state.isMoving && state.dragStartPos) {
             // 移動処理
             // 見開きモード時はキャンバス座標で移動量を計算
@@ -753,6 +806,23 @@ window.MojiQDrawingSelect = (function() {
             }
         }
 
+        // 回転操作の完了処理
+        if (state.isRotating && state.rotationCenter) {
+            const selectedIndex = DrawingObjects.getSelectedIndex(pageNum);
+            if (selectedIndex !== null && selectedIndex >= 0 && state.originalObject) {
+                const currentObj = DrawingObjects.getSelectedObject(pageNum);
+                // 回転角度が変わった場合のみUndo状態を保存
+                const originalRotation = state.originalRotation || 0;
+                const currentRotation = currentObj.rotation || 0;
+                if (Math.abs(currentRotation - originalRotation) > 0.001) {
+                    DrawingObjects.saveUndoState(pageNum, 'update', {
+                        old: state.originalObject,
+                        new: MojiQClone.deep(currentObj)
+                    });
+                }
+            }
+        }
+
         if ((state.isMoving || state.isResizing) && state.dragStartPos) {
             // 実際に移動/リサイズがあったかチェック
             // 見開きモード時はキャンバス座標で移動量を計算
@@ -798,6 +868,7 @@ window.MojiQDrawingSelect = (function() {
         state.isSelecting = false;
         state.isMoving = false;
         state.isResizing = false;
+        state.isRotating = false;          // 回転状態もリセット
         state.isMovingAnnotation = false;  // アノテーション移動状態もリセット
         state.isMovingLeaderEnd = false;   // 引出線終端移動状態もリセット
         state.isMovingStampLeaderStart = false;  // 指示スタンプ引出線起点移動状態もリセット
@@ -814,6 +885,9 @@ window.MojiQDrawingSelect = (function() {
         state.originalObject = null;
         state.originalObjects = null;  // 複数選択時の元オブジェクト群もリセット
         state.originalErasers = null;  // リンクされた消しゴムの元の状態もリセット
+        state.rotationCenter = null;       // 回転中心をリセット
+        state.rotationStartAngle = null;   // 回転開始角度をリセット
+        state.originalRotation = null;     // 元の回転角度をリセット
         state.wheelStartY = null;          // ホイール開始位置をリセット
         state.accumulatedWheelDelta = 0;   // 累積ホイールデルタをリセット
 
@@ -1067,6 +1141,70 @@ window.MojiQDrawingSelect = (function() {
     }
 
     /**
+     * オブジェクトに回転を適用
+     * @param {number} index - オブジェクトのインデックス
+     * @param {number} rotation - 回転角度（ラジアン）
+     */
+    function applyRotation(index, rotation) {
+        const pageNum = state.currentPageNum;
+        const objects = DrawingObjects.getPageObjects(pageNum);
+
+        if (index < 0 || index >= objects.length) return;
+
+        const obj = objects[index];
+        const originalObj = state.originalObject;
+        const originalRotation = state.originalRotation || 0;
+
+        // 回転角度の差分
+        const deltaRotation = rotation - originalRotation;
+
+        obj.rotation = rotation;
+
+        // 引出線がある場合、元の座標から回転を適用
+        if (obj.leaderLine && originalObj && originalObj.leaderLine) {
+            // 回転中心を計算
+            let cx, cy;
+            if (obj.type === 'fontLabel' || obj.type === 'text') {
+                // fontLabelとtextはバウンディングボックスの中心を回転中心とする
+                const DrawingRenderer = window.MojiQDrawingRenderer;
+                if (DrawingRenderer && DrawingRenderer.getShapeBoundsOnly) {
+                    const shapeBounds = DrawingRenderer.getShapeBoundsOnly(originalObj);
+                    cx = shapeBounds.x + shapeBounds.width / 2;
+                    cy = shapeBounds.y + shapeBounds.height / 2;
+                } else {
+                    cx = obj.startPos.x;
+                    cy = obj.startPos.y;
+                }
+            } else if (obj.startPos) {
+                // その他のスタンプはstartPosを回転中心とする
+                cx = obj.startPos.x;
+                cy = obj.startPos.y;
+            } else {
+                return;
+            }
+
+            const cos = Math.cos(deltaRotation);
+            const sin = Math.sin(deltaRotation);
+
+            // 引出線の起点を回転
+            const origStartX = originalObj.leaderLine.start.x;
+            const origStartY = originalObj.leaderLine.start.y;
+            const dxStart = origStartX - cx;
+            const dyStart = origStartY - cy;
+            obj.leaderLine.start.x = cx + dxStart * cos - dyStart * sin;
+            obj.leaderLine.start.y = cy + dxStart * sin + dyStart * cos;
+
+            // 引出線の終点を回転
+            const origEndX = originalObj.leaderLine.end.x;
+            const origEndY = originalObj.leaderLine.end.y;
+            const dxEnd = origEndX - cx;
+            const dyEnd = origEndY - cy;
+            obj.leaderLine.end.x = cx + dxEnd * cos - dyEnd * sin;
+            obj.leaderLine.end.y = cy + dxEnd * sin + dyEnd * cos;
+        }
+    }
+
+    /**
      * アノテーション引出線の開始点と終端を再計算するヘルパー関数
      * 図形の移動後、引出線の開始点（図形側）と終端（テキスト側）を最適な位置に再計算する
      * @param {object} obj - 移動後のオブジェクト
@@ -1160,11 +1298,21 @@ window.MojiQDrawingSelect = (function() {
 
         if (!orig || !orig.annotation) return;
 
+        // 回転がある場合、移動量を逆回転してローカル座標系に変換
+        let localDx = dx;
+        let localDy = dy;
+        if (obj.rotation) {
+            const cos = Math.cos(-obj.rotation);
+            const sin = Math.sin(-obj.rotation);
+            localDx = dx * cos - dy * sin;
+            localDy = dx * sin + dy * cos;
+        }
+
         if (!orig.annotation.leaderLine) {
             obj.annotation = {
                 ...orig.annotation,
-                x: orig.annotation.x + dx,
-                y: orig.annotation.y + dy,
+                x: orig.annotation.x + localDx,
+                y: orig.annotation.y + localDy,
                 leaderLine: null
             };
             return;
@@ -1175,14 +1323,14 @@ window.MojiQDrawingSelect = (function() {
         // 移動後のアノテーション（テキスト位置を更新）
         const movedAnnotation = {
             ...orig.annotation,
-            x: orig.annotation.x + dx,
-            y: orig.annotation.y + dy
+            x: orig.annotation.x + localDx,
+            y: orig.annotation.y + localDy
         };
 
         // 1. まず図形側の開始点を仮の終端位置から計算
         let tempEnd = {
-            x: orig.annotation.leaderLine.end.x + dx,
-            y: orig.annotation.leaderLine.end.y + dy
+            x: orig.annotation.leaderLine.end.x + localDx,
+            y: orig.annotation.leaderLine.end.y + localDy
         };
 
         let newStart = orig.annotation.leaderLine.start;
@@ -1237,9 +1385,19 @@ window.MojiQDrawingSelect = (function() {
 
         if (!orig || obj.type !== 'fontLabel') return;
 
+        // 回転がある場合、移動量を逆回転してローカル座標系に変換
+        let localDx = dx;
+        let localDy = dy;
+        if (obj.rotation) {
+            const cos = Math.cos(-obj.rotation);
+            const sin = Math.sin(-obj.rotation);
+            localDx = dx * cos - dy * sin;
+            localDy = dx * sin + dy * cos;
+        }
+
         // テキスト位置のみ移動（枠線は動かさない）
-        obj.textX = orig.textX + dx;
-        obj.textY = orig.textY + dy;
+        obj.textX = orig.textX + localDx;
+        obj.textY = orig.textY + localDy;
     }
 
     /**
@@ -1260,10 +1418,20 @@ window.MojiQDrawingSelect = (function() {
 
         if (!orig || !orig.annotation || !orig.annotation.leaderLine) return;
 
+        // 回転がある場合、移動量を逆回転してローカル座標系に変換
+        let localDx = dx;
+        let localDy = dy;
+        if (obj.rotation) {
+            const cos = Math.cos(-obj.rotation);
+            const sin = Math.sin(-obj.rotation);
+            localDx = dx * cos - dy * sin;
+            localDy = dx * sin + dy * cos;
+        }
+
         // 新しい終端位置（元の位置 + 移動量）
         const newEnd = {
-            x: orig.annotation.leaderLine.end.x + dx,
-            y: orig.annotation.leaderLine.end.y + dy
+            x: orig.annotation.leaderLine.end.x + localDx,
+            y: orig.annotation.leaderLine.end.y + localDy
         };
 
         // 図形タイプに応じて引出線の起点を再計算
@@ -1312,11 +1480,21 @@ window.MojiQDrawingSelect = (function() {
 
         if (!orig || !orig.leaderLine) return;
 
+        // 回転がある場合、移動量を逆回転してローカル座標系に変換
+        let localDx = dx;
+        let localDy = dy;
+        if (obj.rotation) {
+            const cos = Math.cos(-obj.rotation);
+            const sin = Math.sin(-obj.rotation);
+            localDx = dx * cos - dy * sin;
+            localDy = dx * sin + dy * cos;
+        }
+
         // 新しい起点位置（元の位置 + 移動量）
         obj.leaderLine = {
             start: {
-                x: orig.leaderLine.start.x + dx,
-                y: orig.leaderLine.start.y + dy
+                x: orig.leaderLine.start.x + localDx,
+                y: orig.leaderLine.start.y + localDy
             },
             end: orig.leaderLine.end
         };
@@ -1340,10 +1518,20 @@ window.MojiQDrawingSelect = (function() {
 
         if (!orig || !orig.leaderLine) return;
 
+        // 回転がある場合、移動量を逆回転してローカル座標系に変換
+        let localDx = dx;
+        let localDy = dy;
+        if (obj.rotation) {
+            const cos = Math.cos(-obj.rotation);
+            const sin = Math.sin(-obj.rotation);
+            localDx = dx * cos - dy * sin;
+            localDy = dx * sin + dy * cos;
+        }
+
         // 新しい終端位置（元の位置 + 移動量）
         const newEnd = {
-            x: orig.leaderLine.end.x + dx,
-            y: orig.leaderLine.end.y + dy
+            x: orig.leaderLine.end.x + localDx,
+            y: orig.leaderLine.end.y + localDy
         };
 
         // 終端からスタンプ位置へのオフセットを維持
@@ -1761,7 +1949,19 @@ window.MojiQDrawingSelect = (function() {
                 }
             }
 
-            const handle = DrawingRenderer.hitTestHandle(pos, bounds);
+            // 回転ハンドルのカーソル（画像オブジェクトのみ回転可能）
+            const rotation = selectedObj.rotation || 0;
+            if (selectedObj.type === 'image' && DrawingRenderer.hitTestRotationHandle) {
+                const shapeBoundsForRotation = DrawingRenderer.getShapeBoundsOnly ? DrawingRenderer.getShapeBoundsOnly(selectedObj) : bounds;
+                if (DrawingRenderer.hitTestRotationHandle(pos, shapeBoundsForRotation, rotation)) {
+                    state.canvas.style.cursor = ROTATION_CURSOR;
+                    return;
+                }
+            }
+
+            // リサイズハンドルのヒットテスト（図形のみのバウンディングボックスを使用）
+            const shapeBoundsForHandle = DrawingRenderer.getShapeBoundsOnly ? DrawingRenderer.getShapeBoundsOnly(selectedObj) : bounds;
+            const handle = DrawingRenderer.hitTestHandle(pos, shapeBoundsForHandle, rotation);
 
             if (handle) {
                 // リサイズカーソル
