@@ -232,14 +232,31 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, '..', 'index.html'));
 
-  // 新しいウィンドウを開く際の設定（window.openで開くウィンドウにアイコンを設定）
+  // デバッグモード: DevToolsを自動で開く
+  if (process.env.MOJIQ_DEBUG === '1') {
+    mainWindow.webContents.openDevTools();
+  }
+
+  // 新しいウィンドウを開く際の設定（window.openで開くウィンドウにアイコンとpreloadを設定）
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     return {
       action: 'allow',
       overrideBrowserWindowOptions: {
-        icon: path.join(__dirname, '..', 'logo', 'MojiQ_icon.ico')
+        icon: path.join(__dirname, '..', 'logo', 'MojiQ_icon.ico'),
+        webPreferences: {
+          preload: path.join(__dirname, 'preload.js'),
+          nodeIntegration: false,
+          contextIsolation: true
+        }
       }
     };
+  });
+
+  // デバッグモード: 新しいウィンドウでもDevToolsを開く
+  mainWindow.webContents.on('did-create-window', (childWindow) => {
+    if (process.env.MOJIQ_DEBUG === '1') {
+      childWindow.webContents.openDevTools();
+    }
   });
 
   // ウィンドウ終了時の確認

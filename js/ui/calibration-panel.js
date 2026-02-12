@@ -214,50 +214,28 @@ const CalibrationPanel = (() => {
   }
 
   /**
-   * JSONファイルを開いて結果表示
+   * JSONファイルを開いて別ウィンドウで表示
    */
   async function openFile(filePath) {
     try {
-      const result = await window.electronAPI.readCalibrationFile(filePath);
-      if (!result.success) {
-        alert('ファイルの読み込みに失敗しました: ' + result.error);
-        return;
-      }
+      // ファイルパスをエンコードしてクエリパラメータとして渡す
+      // Electron環境では新しいウィンドウでもelectronAPIを使えるため、
+      // 新しいウィンドウ側で直接JSONを読み込む
+      const encodedPath = encodeURIComponent(filePath);
 
-      currentData = result.data;
-      navigationStack.push(currentPath);
+      // 別ウィンドウを開く（560x720px）
+      const width = 560;
+      const height = 720;
+      const left = Math.round((screen.width - width) / 2);
+      const top = Math.round((screen.height - height) / 2);
+      window.open(
+        `calibration-viewer.html?file=${encodedPath}`,
+        '_blank',
+        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+      );
 
-      // タイトル設定
-      const fileName = filePath.replace(/\\/g, '/').split('/').pop().replace('.json', '');
-      const workName = currentData.work || '';
-      resultTitle.textContent = workName ? `${workName} ${fileName}` : fileName;
-
-      // タブの表示切り替え
-      const hasVariation = currentData.checks && currentData.checks.variation && currentData.checks.variation.items.length > 0;
-      const hasSimple = currentData.checks && currentData.checks.simple && currentData.checks.simple.items.length > 0;
-
-      tabs.querySelectorAll('.calibration-tab').forEach(tab => {
-        const type = tab.getAttribute('data-type');
-        tab.style.display = (type === 'variation' && hasVariation) || (type === 'simple' && hasSimple) ? '' : 'none';
-      });
-
-      // デフォルトタブ選択
-      if (hasVariation) {
-        currentTab = 'variation';
-      } else if (hasSimple) {
-        currentTab = 'simple';
-      }
-
-      // タブのactive状態
-      tabs.querySelectorAll('.calibration-tab').forEach(tab => {
-        tab.classList.toggle('active', tab.getAttribute('data-type') === currentTab);
-      });
-
-      // ブラウザを隠して結果を表示
-      if (browser) browser.style.display = 'none';
-      if (resultArea) resultArea.style.display = '';
-
-      renderTable();
+      // モーダルを閉じる
+      closeModal();
     } catch (error) {
       alert('ファイルの読み込みに失敗しました: ' + error.message);
     }

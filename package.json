@@ -54,6 +54,7 @@
     "files": [
       "electron/**/*",
       "index.html",
+      "calibration-viewer.html",
       "css/**/*",
       "js/**/*",
       "logo/**/*"

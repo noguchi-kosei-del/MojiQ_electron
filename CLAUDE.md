@@ -5,7 +5,7 @@ PDF/画像の校正・注釈ツール（デスクトップアプリケーショ�
 ## プロジェクト概要
 
 - **アプリ名**: MojiQ
-- **バージョン**: 2.0.4
+- **バージョン**: 2.0.5
 - **識別子**: com.mojiq.app
 - **目的**: PDF/JPEGファイルへの校正指示・注釈付け、写植サイズシミュレーション
 
@@ -424,6 +424,17 @@ G:\共有ドライブ\CLLENN\編集部フォルダ\編集企画部\編集企画_
 | Shift+ドラッグ | スナップ描画（ペン/マーカー→直線、直線→水平/垂直、枠線→正方形、楕円→正円） |
 
 ## 変更履歴
+
+### 2026-02-12
+#### 校正チェックポップアップのElectron対応
+- **問題**: 校正チェックのJSON内容を表示するポップアップがElectronアプリ化すると何も表示されない
+- **原因**: Electronの`contextIsolation: true`設定により、`window.open()`で開いた新しいウィンドウと親ウィンドウ間でJavaScript変数を直接共有できなかった
+- **修正内容**:
+  - `electron/main.js`: `setWindowOpenHandler`に`preload.js`を設定し、新しいウィンドウでも`electronAPI`を使えるようにした
+  - `js/ui/calibration-panel.js`: ファイルパスをクエリパラメータとして渡すように変更
+  - `js/calibration-viewer.js`: クエリパラメータからファイルパスを取得し、`electronAPI.readCalibrationFile()`で直接JSONを読み込むように変更
+  - `package.json`: ビルドに`calibration-viewer.html`を含めるよう追加
+- **修正ファイル**: `electron/main.js`, `js/ui/calibration-panel.js`, `js/calibration-viewer.js`, `package.json`
 
 ### 2026-02-11
 #### ページ回転機能の削除
