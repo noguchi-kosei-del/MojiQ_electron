@@ -37,121 +37,6 @@ window.MojiQDrawingRenderer = (function() {
         lastRenderTime: 0
     };
 
-    // --- ビュー回転座標変換関連関数 ---
-
-    /**
-     * オリジナル座標を回転後の座標に変換
-     * @param {number} x - オリジナルX座標
-     * @param {number} y - オリジナルY座標
-     * @param {number} originalW - オリジナル幅
-     * @param {number} originalH - オリジナル高さ
-     * @param {number} rotation - 回転角度（0, 90, 180, 270）
-     * @returns {{x: number, y: number}} 回転後の座標
-     */
-    function transformCoordinates(x, y, originalW, originalH, rotation) {
-        switch (rotation) {
-            case 90:
-                return { x: originalH - y, y: x };
-            case 180:
-                return { x: originalW - x, y: originalH - y };
-            case 270:
-                return { x: y, y: originalW - x };
-            default:
-                return { x, y };
-        }
-    }
-
-    /**
-     * オブジェクトの座標を回転変換した新しいオブジェクトを作成
-     * （元のオブジェクトは変更しない）
-     * @param {Object} obj - オリジナルオブジェクト
-     * @param {number} originalW - オリジナル幅
-     * @param {number} originalH - オリジナル高さ
-     * @param {number} rotation - 回転角度
-     * @returns {Object} 座標変換済みオブジェクト
-     */
-    function transformObjectCoordinates(obj, originalW, originalH, rotation) {
-        if (rotation === 0) return obj;
-
-        // オブジェクトをシャローコピー
-        const transformed = { ...obj };
-
-        // startPos, endPosの変換
-        if (obj.startPos && obj.endPos) {
-            const newStart = transformCoordinates(
-                obj.startPos.x, obj.startPos.y, originalW, originalH, rotation
-            );
-            const newEnd = transformCoordinates(
-                obj.endPos.x, obj.endPos.y, originalW, originalH, rotation
-            );
-            // 変換後、startPosが左上、endPosが右下になるよう正規化
-            transformed.startPos = {
-                x: Math.min(newStart.x, newEnd.x),
-                y: Math.min(newStart.y, newEnd.y)
-            };
-            transformed.endPos = {
-                x: Math.max(newStart.x, newEnd.x),
-                y: Math.max(newStart.y, newEnd.y)
-            };
-        } else {
-            if (obj.startPos) {
-                transformed.startPos = transformCoordinates(
-                    obj.startPos.x, obj.startPos.y, originalW, originalH, rotation
-                );
-            }
-            if (obj.endPos) {
-                transformed.endPos = transformCoordinates(
-                    obj.endPos.x, obj.endPos.y, originalW, originalH, rotation
-                );
-            }
-        }
-
-        // pointsの変換（polyline, pen, marker, eraser）
-        if (obj.points && Array.isArray(obj.points)) {
-            transformed.points = obj.points.map(p =>
-                transformCoordinates(p.x, p.y, originalW, originalH, rotation)
-            );
-        }
-
-        // leaderLineの変換
-        if (obj.leaderLine) {
-            transformed.leaderLine = {
-                start: transformCoordinates(
-                    obj.leaderLine.start.x, obj.leaderLine.start.y, originalW, originalH, rotation
-                ),
-                end: transformCoordinates(
-                    obj.leaderLine.end.x, obj.leaderLine.end.y, originalW, originalH, rotation
-                )
-            };
-        }
-
-        // annotationの変換
-        if (obj.annotation) {
-            transformed.annotation = { ...obj.annotation };
-            if (obj.annotation.x !== undefined && obj.annotation.y !== undefined) {
-                const pos = transformCoordinates(
-                    obj.annotation.x, obj.annotation.y, originalW, originalH, rotation
-                );
-                transformed.annotation.x = pos.x;
-                transformed.annotation.y = pos.y;
-            }
-            if (obj.annotation.leaderLine) {
-                transformed.annotation.leaderLine = {
-                    start: transformCoordinates(
-                        obj.annotation.leaderLine.start.x, obj.annotation.leaderLine.start.y,
-                        originalW, originalH, rotation
-                    ),
-                    end: transformCoordinates(
-                        obj.annotation.leaderLine.end.x, obj.annotation.leaderLine.end.y,
-                        originalW, originalH, rotation
-                    )
-                };
-            }
-        }
-
-        return transformed;
-    }
-
     // --- ビューポートカリング関連関数 ---
 
     /**
@@ -234,30 +119,33 @@ window.MojiQDrawingRenderer = (function() {
      */
     function getBounds(obj) {
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        const Utils = window.MojiQUtils;
+
+        // startPos/endPosからバウンディングボックスを計算するヘルパー
+        const getStartEndBounds = () => {
+            if (Utils && Utils.getBoundsFromStartEnd) {
+                const b = Utils.getBoundsFromStartEnd(obj.startPos, obj.endPos);
+                return { minX: b.minX, maxX: b.maxX, minY: b.minY, maxY: b.maxY };
+            }
+            return {
+                minX: Math.min(obj.startPos.x, obj.endPos.x),
+                maxX: Math.max(obj.startPos.x, obj.endPos.x),
+                minY: Math.min(obj.startPos.y, obj.endPos.y),
+                maxY: Math.max(obj.startPos.y, obj.endPos.y)
+            };
+        };
 
         switch (obj.type) {
             case 'line':
             case 'arrow':
             case 'doubleArrow':
             case 'doubleArrowAnnotated':
-                minX = Math.min(obj.startPos.x, obj.endPos.x);
-                maxX = Math.max(obj.startPos.x, obj.endPos.x);
-                minY = Math.min(obj.startPos.y, obj.endPos.y);
-                maxY = Math.max(obj.startPos.y, obj.endPos.y);
-                break;
-
             case 'rect':
-                minX = Math.min(obj.startPos.x, obj.endPos.x);
-                maxX = Math.max(obj.startPos.x, obj.endPos.x);
-                minY = Math.min(obj.startPos.y, obj.endPos.y);
-                maxY = Math.max(obj.startPos.y, obj.endPos.y);
+                ({ minX, maxX, minY, maxY } = getStartEndBounds());
                 break;
 
             case 'labeledRect':
-                minX = Math.min(obj.startPos.x, obj.endPos.x);
-                maxX = Math.max(obj.startPos.x, obj.endPos.x);
-                minY = Math.min(obj.startPos.y, obj.endPos.y);
-                maxY = Math.max(obj.startPos.y, obj.endPos.y);
+                ({ minX, maxX, minY, maxY } = getStartEndBounds());
                 // 引出線がある場合はその範囲も含める
                 if (obj.leaderLine) {
                     minX = Math.min(minX, obj.leaderLine.start.x, obj.leaderLine.end.x);
@@ -269,10 +157,7 @@ window.MojiQDrawingRenderer = (function() {
 
             case 'fontLabel':
                 // 枠線部分
-                minX = Math.min(obj.startPos.x, obj.endPos.x);
-                maxX = Math.max(obj.startPos.x, obj.endPos.x);
-                minY = Math.min(obj.startPos.y, obj.endPos.y);
-                maxY = Math.max(obj.startPos.y, obj.endPos.y);
+                ({ minX, maxX, minY, maxY } = getStartEndBounds());
                 // フォント名ラベル部分も含める
                 if (obj.textX !== undefined && obj.textY !== undefined) {
                     const fontSize = obj.fontSize || 12;
@@ -296,14 +181,8 @@ window.MojiQDrawingRenderer = (function() {
             case 'bracket':
             case 'rectSymbolStamp':
             case 'triangleSymbolStamp':
-                const w = Math.abs(obj.endPos.x - obj.startPos.x);
-                const h = Math.abs(obj.endPos.y - obj.startPos.y);
-                const cx = obj.startPos.x + (obj.endPos.x - obj.startPos.x) / 2;
-                const cy = obj.startPos.y + (obj.endPos.y - obj.startPos.y) / 2;
-                minX = cx - w / 2;
-                maxX = cx + w / 2;
-                minY = cy - h / 2;
-                maxY = cy + h / 2;
+                // 中心ベースの図形: startPos/endPosから中心と幅高さを計算
+                ({ minX, maxX, minY, maxY } = getStartEndBounds());
                 break;
 
             case 'pen':
@@ -2632,10 +2511,20 @@ window.MojiQDrawingRenderer = (function() {
         ctx.restore();
     }
 
+    // ========================================
+    // 円形・角丸長方形スタンプ汎用描画関数（リファクタリング）
+    // ========================================
+
     /**
-     * 済スタンプを描画
+     * 円形スタンプを汎用的に描画
+     * @param {CanvasRenderingContext2D} ctx - キャンバスコンテキスト
+     * @param {Object} obj - 描画オブジェクト
+     * @param {Object} def - スタンプ定義（STAMP_PARAMS.CIRCLE_STAMPS から取得）
      */
-    function renderDoneStamp(ctx, obj) {
+    function renderCircleStamp(ctx, obj, def) {
+        const Utils = window.MojiQUtils;
+        const Outline = Constants ? Constants.OUTLINE : null;
+
         ctx.save();
 
         const x = obj.startPos.x;
@@ -2645,27 +2534,34 @@ window.MojiQDrawingRenderer = (function() {
         const radius = size / 2;
 
         // 回転を適用
-        if (obj.rotation) {
+        if (Utils && Utils.applyRotation) {
+            Utils.applyRotation(ctx, obj, x, y);
+        } else if (obj.rotation) {
             ctx.translate(x, y);
             ctx.rotate(obj.rotation);
             ctx.translate(-x, -y);
         }
 
-        // 円の内側を白で塗りつぶし
-        ctx.beginPath();
-        ctx.arc(x, y, radius + 2, 0, 2 * Math.PI);
-        ctx.fillStyle = '#ffffff';
-        ctx.fill();
+        // 内部白塗り（hasFill: trueの場合）
+        if (def.hasFill) {
+            ctx.beginPath();
+            ctx.arc(x, y, radius + 2, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+        }
 
-        // 外側の円（白フチ）- 複数回描画+shadowBlurでアンチエイリアスの黒シミ対策
+        // 外側の円（白フチ）
+        const shadowBlur = Outline ? Outline.SHADOW_BLUR : 5;
         ctx.strokeStyle = '#ffffff';
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
         ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = 5;
+        ctx.shadowBlur = shadowBlur;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 0;
-        for (let lw = 6; lw >= 2; lw--) {
+        const maxLw = def.hasFill ? 6 : 5;
+        const minLw = def.hasFill ? 2 : 1;
+        for (let lw = maxLw; lw >= minLw; lw--) {
             ctx.beginPath();
             ctx.arc(x, y, radius, 0, 2 * Math.PI);
             ctx.lineWidth = lw;
@@ -2677,89 +2573,57 @@ window.MojiQDrawingRenderer = (function() {
         ctx.beginPath();
         ctx.arc(x, y, radius, 0, 2 * Math.PI);
         ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = def.strokeWidth || 2;
         ctx.stroke();
 
-        // 「済」の文字（内側が白塗りつぶしなので白フチ不要）
-        ctx.font = `bold ${size * 0.6}px sans-serif`;
+        // テキスト描画
+        const fontSize = size * (def.fontSizeRatio || 0.6);
+        ctx.font = `bold ${fontSize}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = color;
-        ctx.fillText('済', x, y);
+
+        if (def.textOutline) {
+            // 白フチ付きテキスト
+            if (Utils && Utils.drawTextWithOutline) {
+                Utils.drawTextWithOutline(ctx, def.text, x, y, {
+                    fontSize: fontSize,
+                    color: color,
+                    shadowBlur: shadowBlur,
+                    outlineWidthMax: 5,
+                    outlineWidthMin: 1
+                });
+            } else {
+                ctx.strokeStyle = '#ffffff';
+                ctx.shadowColor = '#ffffff';
+                ctx.shadowBlur = shadowBlur;
+                for (let lw = 5; lw >= 1; lw--) {
+                    ctx.lineWidth = lw;
+                    ctx.strokeText(def.text, x, y);
+                }
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = color;
+                ctx.fillText(def.text, x, y);
+            }
+        } else {
+            // 白フチなしテキスト（内部白塗りの場合）
+            ctx.fillStyle = color;
+            ctx.fillText(def.text, x, y);
+        }
 
         ctx.restore();
     }
 
     /**
-     * 小文字スタンプを描画（○に小）
+     * 角丸長方形スタンプを汎用的に描画
+     * @param {CanvasRenderingContext2D} ctx - キャンバスコンテキスト
+     * @param {Object} obj - 描画オブジェクト
+     * @param {Object} def - スタンプ定義（STAMP_PARAMS.ROUNDED_RECT_STAMPS から取得）
      */
-    function renderKomojiStamp(ctx, obj) {
-        ctx.save();
+    function renderRoundedRectStamp(ctx, obj, def) {
+        const Utils = window.MojiQUtils;
+        const StampParams = Constants ? Constants.STAMP_PARAMS : null;
+        const Outline = Constants ? Constants.OUTLINE : null;
 
-        const x = obj.startPos.x;
-        const y = obj.startPos.y;
-        const size = obj.size || 28;
-        const color = obj.color || '#ff0000';
-        const radius = size / 2;
-
-        // 回転を適用
-        if (obj.rotation) {
-            ctx.translate(x, y);
-            ctx.rotate(obj.rotation);
-            ctx.translate(-x, -y);
-        }
-
-        // 外側の円（白フチ）- 複数回描画+shadowBlurでアンチエイリアスの黒シミ対策
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = 5;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        for (let lw = 5; lw >= 1; lw--) {
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, 2 * Math.PI);
-            ctx.lineWidth = lw;
-            ctx.stroke();
-        }
-        ctx.shadowBlur = 0;
-
-        // 外側の円（枠線）
-        ctx.beginPath();
-        ctx.arc(x, y, radius, 0, 2 * Math.PI);
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // 「小」の文字（白フチ）- 複数回描画+shadowBlur
-        ctx.font = `bold ${size * 0.6}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = 5;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        for (let lw = 5; lw >= 1; lw--) {
-            ctx.lineWidth = lw;
-            ctx.strokeText('小', x, y);
-        }
-        ctx.shadowBlur = 0;
-
-        // 「小」の文字
-        ctx.fillStyle = color;
-        ctx.fillText('小', x, y);
-
-        ctx.restore();
-    }
-
-    /**
-     * ルビスタンプを描画（角丸長方形内にルビ）
-     */
-    function renderRubyStamp(ctx, obj) {
         ctx.save();
 
         const x = obj.startPos.x;
@@ -2768,18 +2632,22 @@ window.MojiQDrawingRenderer = (function() {
         const color = obj.color || '#ff0000';
 
         // 回転を適用
-        if (obj.rotation) {
+        if (Utils && Utils.applyRotation) {
+            Utils.applyRotation(ctx, obj, x, y);
+        } else if (obj.rotation) {
             ctx.translate(x, y);
             ctx.rotate(obj.rotation);
             ctx.translate(-x, -y);
         }
 
         // 角丸長方形のサイズ
-        const width = size * 1.8;
-        const height = size * 0.9;
-        const cornerRadius = size * 0.15;
+        const widthRatio = StampParams ? StampParams.WIDTH_RATIO : 1.8;
+        const heightRatio = StampParams ? StampParams.HEIGHT_RATIO : 0.9;
+        const cornerRatio = StampParams ? StampParams.CORNER_RADIUS : 0.15;
+        const width = size * widthRatio;
+        const height = size * heightRatio;
+        const cornerRadius = size * cornerRatio;
 
-        // 中心位置から左上位置を計算
         const rectX = x - width / 2;
         const rectY = y - height / 2;
 
@@ -2798,17 +2666,20 @@ window.MojiQDrawingRenderer = (function() {
             ctx.closePath();
         };
 
-        // 角丸長方形の内側を白で塗りつぶし
-        drawRoundedRect(rectX - 2, rectY - 2, width + 4, height + 4, cornerRadius);
-        ctx.fillStyle = '#ffffff';
-        ctx.fill();
+        // 内部白塗り
+        if (def.hasFill) {
+            drawRoundedRect(rectX - 2, rectY - 2, width + 4, height + 4, cornerRadius);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+        }
 
-        // 外側の角丸長方形（白フチ）- 複数回描画+shadowBlurでアンチエイリアスの黒シミ対策
+        // 外側の角丸長方形（白フチ）
+        const shadowBlur = Outline ? Outline.SHADOW_BLUR : 5;
         ctx.strokeStyle = '#ffffff';
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
         ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = 5;
+        ctx.shadowBlur = shadowBlur;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 0;
         for (let lw = 5; lw >= 1; lw--) {
@@ -2821,340 +2692,187 @@ window.MojiQDrawingRenderer = (function() {
         // 外側の角丸長方形（枠線）
         drawRoundedRect(rectX, rectY, width, height, cornerRadius);
         ctx.strokeStyle = color;
-        ctx.lineWidth = 1;
+        ctx.lineWidth = def.strokeWidth || 1;
         ctx.stroke();
 
-        // 「ルビ」の文字（内側が白塗りつぶしなので白フチ不要）
-        ctx.font = `bold ${size * 0.45}px sans-serif`;
+        // テキスト描画
+        const fontSize = size * (def.fontSizeRatio || 0.45);
+        ctx.font = `bold ${fontSize}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = color;
-        ctx.fillText('ルビ', x, y);
+        ctx.fillText(def.text, x, y);
 
         ctx.restore();
     }
 
     /**
-     * トルスタンプを描画（角丸長方形内にトル）
+     * 済スタンプを描画（後方互換エイリアス）
+     */
+    function renderDoneStamp(ctx, obj) {
+        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.CIRCLE_STAMPS
+            ? Constants.STAMP_PARAMS.CIRCLE_STAMPS.doneStamp
+            : { text: '済', fontSizeRatio: 0.6, hasFill: true, textOutline: false, strokeWidth: 2 };
+        renderCircleStamp(ctx, obj, def);
+    }
+
+    /**
+     * 小文字スタンプを描画（後方互換エイリアス）
+     */
+    function renderKomojiStamp(ctx, obj) {
+        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.CIRCLE_STAMPS
+            ? Constants.STAMP_PARAMS.CIRCLE_STAMPS.komojiStamp
+            : { text: '小', fontSizeRatio: 0.6, hasFill: false, textOutline: true, strokeWidth: 1 };
+        renderCircleStamp(ctx, obj, def);
+    }
+
+    /**
+     * ルビスタンプを描画（後方互換エイリアス）
+     */
+    function renderRubyStamp(ctx, obj) {
+        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.ROUNDED_RECT_STAMPS
+            ? Constants.STAMP_PARAMS.ROUNDED_RECT_STAMPS.rubyStamp
+            : { text: 'ルビ', fontSizeRatio: 0.45, hasFill: true, textOutline: false, strokeWidth: 1 };
+        renderRoundedRectStamp(ctx, obj, def);
+    }
+
+    // ========================================
+    // テキストスタンプ汎用描画関数（リファクタリング）
+    // ========================================
+
+    /**
+     * テキストスタンプを汎用的に描画
+     * MojiQUtils.drawTextWithOutline を使用して白フチ付きテキストを描画
+     * @param {CanvasRenderingContext2D} ctx - キャンバスコンテキスト
+     * @param {Object} obj - 描画オブジェクト
+     * @param {string} text - 描画するテキスト
+     */
+    function renderTextStamp(ctx, obj, text) {
+        const Utils = window.MojiQUtils;
+        const Outline = Constants ? Constants.OUTLINE : null;
+        const StampParams = Constants ? Constants.STAMP_PARAMS : null;
+
+        ctx.save();
+
+        const x = obj.startPos.x;
+        const y = obj.startPos.y;
+        const size = obj.size || 28;
+        const color = obj.color || '#ff0000';
+
+        // 回転を適用
+        if (Utils && Utils.applyRotation) {
+            Utils.applyRotation(ctx, obj, x, y);
+        } else if (obj.rotation) {
+            ctx.translate(x, y);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-x, -y);
+        }
+
+        // フォントサイズ計算
+        const fontSizeRatio = StampParams ? StampParams.FONT_SIZE_RATIO : 0.9;
+        const fontSize = size * fontSizeRatio;
+
+        // 白フチ付きテキスト描画
+        if (Utils && Utils.drawTextWithOutline) {
+            Utils.drawTextWithOutline(ctx, text, x, y, {
+                fontSize: fontSize,
+                color: color,
+                shadowBlur: Outline ? Outline.SHADOW_BLUR : 5,
+                outlineWidthMax: Outline ? Outline.LINE_WIDTH_MAX : 8,
+                outlineWidthMin: Outline ? Outline.LINE_WIDTH_MIN : 2
+            });
+        } else {
+            // フォールバック: 従来の描画方法
+            ctx.font = `bold ${fontSize}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.shadowColor = '#ffffff';
+            ctx.shadowBlur = 5;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            for (let lw = 8; lw >= 2; lw--) {
+                ctx.lineWidth = lw;
+                ctx.strokeText(text, x, y);
+            }
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = color;
+            ctx.fillText(text, x, y);
+        }
+
+        ctx.restore();
+    }
+
+    /**
+     * トルスタンプを描画（後方互換エイリアス）
      */
     function renderToruStamp(ctx, obj) {
-        ctx.save();
-
-        const x = obj.startPos.x;
-        const y = obj.startPos.y;
-        const size = obj.size || 28;
-        const color = obj.color || '#ff0000';
-
-        // 回転を適用
-        if (obj.rotation) {
-            ctx.translate(x, y);
-            ctx.rotate(obj.rotation);
-            ctx.translate(-x, -y);
-        }
-
-        // 角丸長方形のサイズ
-        const width = size * 1.8;
-        const height = size * 0.9;
-        const cornerRadius = size * 0.15;
-
-        // 中心位置から左上位置を計算
-        const rectX = x - width / 2;
-        const rectY = y - height / 2;
-
-        // 角丸長方形のパスを作成
-        const drawRoundedRect = (rx, ry, rw, rh, r) => {
-            ctx.beginPath();
-            ctx.moveTo(rx + r, ry);
-            ctx.lineTo(rx + rw - r, ry);
-            ctx.arcTo(rx + rw, ry, rx + rw, ry + r, r);
-            ctx.lineTo(rx + rw, ry + rh - r);
-            ctx.arcTo(rx + rw, ry + rh, rx + rw - r, ry + rh, r);
-            ctx.lineTo(rx + r, ry + rh);
-            ctx.arcTo(rx, ry + rh, rx, ry + rh - r, r);
-            ctx.lineTo(rx, ry + r);
-            ctx.arcTo(rx, ry, rx + r, ry, r);
-            ctx.closePath();
-        };
-
-        // 「トル」の文字（白フチ）- 複数回描画+shadowBlurでアンチエイリアスの黒シミ対策
-        ctx.font = `bold ${size * 0.9}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = 5;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        for (let lw = 8; lw >= 2; lw--) {
-            ctx.lineWidth = lw;
-            ctx.strokeText('トル', x, y);
-        }
-        ctx.shadowBlur = 0;
-
-        // 「トル」の文字
-        ctx.fillStyle = color;
-        ctx.fillText('トル', x, y);
-
-        ctx.restore();
+        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS
+            ? Constants.STAMP_PARAMS.DEFINITIONS.toruStamp
+            : null;
+        renderTextStamp(ctx, obj, def ? def.text : 'トル');
     }
 
     /**
-     * トルツメスタンプを描画
+     * トルツメスタンプを描画（後方互換エイリアス）
      */
     function renderTorutsumeStamp(ctx, obj) {
-        ctx.save();
-
-        const x = obj.startPos.x;
-        const y = obj.startPos.y;
-        const size = obj.size || 28;
-        const color = obj.color || '#ff0000';
-
-        // 回転を適用
-        if (obj.rotation) {
-            ctx.translate(x, y);
-            ctx.rotate(obj.rotation);
-            ctx.translate(-x, -y);
-        }
-
-        // 「トルツメ」の文字（白フチ）- 複数回描画+shadowBlurでアンチエイリアスの黒シミ対策
-        ctx.font = `bold ${size * 0.9}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = 5;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        for (let lw = 8; lw >= 2; lw--) {
-            ctx.lineWidth = lw;
-            ctx.strokeText('トルツメ', x, y);
-        }
-        ctx.shadowBlur = 0;
-
-        // 「トルツメ」の文字
-        ctx.fillStyle = color;
-        ctx.fillText('トルツメ', x, y);
-
-        ctx.restore();
+        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS
+            ? Constants.STAMP_PARAMS.DEFINITIONS.torutsumeStamp
+            : null;
+        renderTextStamp(ctx, obj, def ? def.text : 'トルツメ');
     }
 
     /**
-     * トルママスタンプを描画
+     * トルママスタンプを描画（後方互換エイリアス）
      */
     function renderTorumamaStamp(ctx, obj) {
-        ctx.save();
-
-        const x = obj.startPos.x;
-        const y = obj.startPos.y;
-        const size = obj.size || 28;
-        const color = obj.color || '#ff0000';
-
-        // 回転を適用
-        if (obj.rotation) {
-            ctx.translate(x, y);
-            ctx.rotate(obj.rotation);
-            ctx.translate(-x, -y);
-        }
-
-        // 「トルママ」の文字（白フチ）- 複数回描画でアンチエイリアスの黒シミ対策
-        ctx.font = `bold ${size * 0.9}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = 5;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        for (let lw = 8; lw >= 2; lw--) {
-            ctx.lineWidth = lw;
-            ctx.strokeText('トルママ', x, y);
-        }
-
-        ctx.shadowBlur = 0;
-
-        // 「トルママ」の文字
-        ctx.fillStyle = color;
-        ctx.fillText('トルママ', x, y);
-
-        ctx.restore();
+        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS
+            ? Constants.STAMP_PARAMS.DEFINITIONS.torumamaStamp
+            : null;
+        renderTextStamp(ctx, obj, def ? def.text : 'トルママ');
     }
 
     /**
-     * 全角アキスタンプを描画
+     * 全角アキスタンプを描画（後方互換エイリアス）
      */
     function renderZenkakuakiStamp(ctx, obj) {
-        ctx.save();
-
-        const x = obj.startPos.x;
-        const y = obj.startPos.y;
-        const size = obj.size || 28;
-        const color = obj.color || '#ff0000';
-
-        // 回転を適用
-        if (obj.rotation) {
-            ctx.translate(x, y);
-            ctx.rotate(obj.rotation);
-            ctx.translate(-x, -y);
-        }
-
-        // 「全角アキ」の文字（白フチ）- 複数回描画でアンチエイリアスの黒シミ対策
-        ctx.font = `bold ${size * 0.9}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = 5;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        for (let lw = 8; lw >= 2; lw--) {
-            ctx.lineWidth = lw;
-            ctx.strokeText('全角アキ', x, y);
-        }
-
-        ctx.shadowBlur = 0;
-
-        // 「全角アキ」の文字
-        ctx.fillStyle = color;
-        ctx.fillText('全角アキ', x, y);
-
-        ctx.restore();
+        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS
+            ? Constants.STAMP_PARAMS.DEFINITIONS.zenkakuakiStamp
+            : null;
+        renderTextStamp(ctx, obj, def ? def.text : '全角アキ');
     }
 
     /**
-     * 半角アキスタンプを描画
+     * 半角アキスタンプを描画（後方互換エイリアス）
      */
     function renderNibunakiStamp(ctx, obj) {
-        ctx.save();
-
-        const x = obj.startPos.x;
-        const y = obj.startPos.y;
-        const size = obj.size || 28;
-        const color = obj.color || '#ff0000';
-
-        // 回転を適用
-        if (obj.rotation) {
-            ctx.translate(x, y);
-            ctx.rotate(obj.rotation);
-            ctx.translate(-x, -y);
-        }
-
-        // 「半角アキ」の文字（白フチ）- 複数回描画でアンチエイリアスの黒シミ対策
-        ctx.font = `bold ${size * 0.9}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = 5;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        for (let lw = 8; lw >= 2; lw--) {
-            ctx.lineWidth = lw;
-            ctx.strokeText('半角アキ', x, y);
-        }
-
-        ctx.shadowBlur = 0;
-
-        // 「半角アキ」の文字
-        ctx.fillStyle = color;
-        ctx.fillText('半角アキ', x, y);
-
-        ctx.restore();
+        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS
+            ? Constants.STAMP_PARAMS.DEFINITIONS.nibunakiStamp
+            : null;
+        renderTextStamp(ctx, obj, def ? def.text : '半角アキ');
     }
 
     /**
-     * 四分アキスタンプを描画
+     * 四分アキスタンプを描画（後方互換エイリアス）
      */
     function renderShibunakiStamp(ctx, obj) {
-        ctx.save();
-
-        const x = obj.startPos.x;
-        const y = obj.startPos.y;
-        const size = obj.size || 28;
-        const color = obj.color || '#ff0000';
-
-        // 回転を適用
-        if (obj.rotation) {
-            ctx.translate(x, y);
-            ctx.rotate(obj.rotation);
-            ctx.translate(-x, -y);
-        }
-
-        // 「四分アキ」の文字（白フチ）- 複数回描画でアンチエイリアスの黒シミ対策
-        ctx.font = `bold ${size * 0.9}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = 5;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        for (let lw = 8; lw >= 2; lw--) {
-            ctx.lineWidth = lw;
-            ctx.strokeText('四分アキ', x, y);
-        }
-
-        ctx.shadowBlur = 0;
-
-        // 「四分アキ」の文字
-        ctx.fillStyle = color;
-        ctx.fillText('四分アキ', x, y);
-
-        ctx.restore();
+        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS
+            ? Constants.STAMP_PARAMS.DEFINITIONS.shibunakiStamp
+            : null;
+        renderTextStamp(ctx, obj, def ? def.text : '四分アキ');
     }
 
     /**
-     * 改行スタンプを描画
+     * 改行スタンプを描画（後方互換エイリアス）
      */
     function renderKaigyouStamp(ctx, obj) {
-        ctx.save();
-
-        const x = obj.startPos.x;
-        const y = obj.startPos.y;
-        const size = obj.size || 28;
-        const color = obj.color || '#ff0000';
-
-        // 回転を適用
-        if (obj.rotation) {
-            ctx.translate(x, y);
-            ctx.rotate(obj.rotation);
-            ctx.translate(-x, -y);
-        }
-
-        // 「改行」の文字（白フチ）- 複数回描画でアンチエイリアスの黒シミ対策
-        ctx.font = `bold ${size * 0.9}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = 5;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        for (let lw = 8; lw >= 2; lw--) {
-            ctx.lineWidth = lw;
-            ctx.strokeText('改行', x, y);
-        }
-
-        ctx.shadowBlur = 0;
-
-        // 「改行」の文字
-        ctx.fillStyle = color;
-        ctx.fillText('改行', x, y);
-
-        ctx.restore();
+        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS
+            ? Constants.STAMP_PARAMS.DEFINITIONS.kaigyouStamp
+            : null;
+        renderTextStamp(ctx, obj, def ? def.text : '改行');
     }
 
     /**

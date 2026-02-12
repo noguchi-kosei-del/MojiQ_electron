@@ -6,6 +6,8 @@ window.MojiQPdfManager = (function() {
     'use strict';
 
     const Constants = window.MojiQConstants;
+    // 見開き状態管理モジュールへの参照
+    const SpreadState = window._MojiQPdfSpreadState;
     let mojiqCanvas = null;
     let bgCanvas = null;
     let simCanvas = null;
@@ -43,21 +45,12 @@ window.MojiQPdfManager = (function() {
     let isRendering = false;
     let pendingPageNum = null;  // レンダリング中に要求されたページ番号
 
-    // 見開きモード関連
-    let spreadViewMode = false;           // 見開きモードフラグ
-    let spreadMapping = [];               // 見開きマッピング配列
-    let currentSpreadIndex = 0;           // 現在の見開きインデックス
-    let isSpreadRendering = false;        // 見開きレンダリング中フラグ
-    let pendingSpreadIndex = null;        // 見開きレンダリング中に要求されたインデックス
-    let spreadRenderOperationId = 0;      // 見開きレンダリング操作ID（古い描画のキャンセル用）
-    let spreadBindingDirection = 'right'; // 綴じ方向: 'right'=右綴じ, 'left'=左綴じ
-    let spreadBlankPagesAdded = { front: 0, back: 0 }; // 追加した白紙ページ数
-
-    // 見開きキャッシュ（全ページを事前レンダリング）
-    let spreadPageCache = {};             // { pageNum: ImageData } 形式でキャッシュ
-    let spreadCacheReady = false;         // キャッシュ準備完了フラグ
-    let spreadBaseScale = 1;              // 見開き用基準スケール
-    let spreadDisplaying = false;         // 見開き表示処理中フラグ（外部からの再描画をブロック）
+    // 見開きモード関連 → _MojiQPdfSpreadState に移行
+    // 以下の変数は SpreadState モジュールで管理（後方互換のためゲッター関数を提供）
+    // - spreadViewMode, spreadMapping, currentSpreadIndex
+    // - isSpreadRendering, pendingSpreadIndex, spreadRenderOperationId
+    // - spreadBindingDirection, spreadBlankPagesAdded
+    // - spreadPageCache, spreadCacheReady, spreadBaseScale, spreadDisplaying
 
     // 単一ページ表示用レンダリングキャッシュ（LRU方式）
     let singlePageCache = null;              // PageRenderLRUCache インスタンス
@@ -448,7 +441,7 @@ window.MojiQPdfManager = (function() {
      */
     function schedulePrefetch(currentPage, containerWidth, containerHeight) {
         // 見開きモードではプリフェッチしない（独自キャッシュがある）
-        if (spreadViewMode) return;
+        if (SpreadState.isSpreadViewMode()) return;
 
         // 既存のプリフェッチをキャンセル
         cancelPrefetch();
@@ -740,7 +733,7 @@ window.MojiQPdfManager = (function() {
         }
 
         // 見開きモード時は見開きレンダリングにリダイレクト
-        if (spreadViewMode) {
+        if (SpreadState.isSpreadViewMode()) {
             // ページ番号から見開きインデックスを計算
             const spreadIndex = getSpreadIndexFromPage(pageNum);
             renderSpreadView(spreadIndex);
@@ -1317,15 +1310,15 @@ window.MojiQPdfManager = (function() {
             }
 
             // 見開きモードをリセット
-            if (spreadViewMode) {
-                spreadViewMode = false;
-                spreadMapping = [];
+            if (SpreadState.isSpreadViewMode()) {
+                SpreadState.setSpreadViewMode(false);
+                SpreadState.setSpreadMapping([]);
                 const spreadBtn = document.getElementById('spreadViewBtn');
                 if (spreadBtn) {
                     spreadBtn.classList.remove('active');
                 }
-                spreadPageCache = {};
-                spreadCacheReady = false;
+                SpreadState.clearSpreadPageCache();
+                SpreadState.setSpreadCacheReady(false);
             }
 
             // 単一ページキャッシュもクリア
@@ -1621,17 +1614,17 @@ window.MojiQPdfManager = (function() {
             }
 
             // 見開きモードをリセット
-            if (spreadViewMode) {
-                spreadViewMode = false;
-                spreadMapping = [];
+            if (SpreadState.isSpreadViewMode()) {
+                SpreadState.setSpreadViewMode(false);
+                SpreadState.setSpreadMapping([]);
                 // 見開きボタンの状態もリセット
                 const spreadBtn = document.getElementById('spreadViewBtn');
                 if (spreadBtn) {
                     spreadBtn.classList.remove('active');
                 }
                 // 見開きキャッシュをクリア
-                spreadPageCache = {};
-                spreadCacheReady = false;
+                SpreadState.clearSpreadPageCache();
+                SpreadState.setSpreadCacheReady(false);
             }
 
             // 単一ページキャッシュもクリア
@@ -1757,12 +1750,12 @@ window.MojiQPdfManager = (function() {
             };
 
             // 見開きモード時は見開き状態で保存
-            if (spreadViewMode && spreadMapping.length > 0) {
+            if (SpreadState.isSpreadViewMode() && SpreadState.getSpreadMapping().length > 0) {
                 saveOptions.spreadMode = true;
-                saveOptions.spreadMapping = spreadMapping;
+                saveOptions.spreadMapping = SpreadState.getSpreadMapping();
                 // 見開きモードでの座標変換に必要な情報を追加
-                saveOptions.spreadCssPageWidth = spreadBasePageSize.width * spreadBaseScale;
-                saveOptions.spreadCssPageHeight = spreadBasePageSize.height * spreadBaseScale;
+                saveOptions.spreadCssPageWidth = spreadBasePageSize.width * SpreadState.getSpreadBaseScale();
+                saveOptions.spreadCssPageHeight = spreadBasePageSize.height * SpreadState.getSpreadBaseScale();
             }
 
             const result = await PdfLibSaver.saveNonDestructive(state, fileName, saveOptions);
@@ -1904,12 +1897,12 @@ window.MojiQPdfManager = (function() {
             };
 
             // 見開きモード時は見開き状態で保存
-            if (spreadViewMode && spreadMapping.length > 0) {
+            if (SpreadState.isSpreadViewMode() && SpreadState.getSpreadMapping().length > 0) {
                 saveOptions.spreadMode = true;
-                saveOptions.spreadMapping = spreadMapping;
+                saveOptions.spreadMapping = SpreadState.getSpreadMapping();
                 // 見開きモードでの座標変換に必要な情報を追加
-                saveOptions.spreadCssPageWidth = spreadBasePageSize.width * spreadBaseScale;
-                saveOptions.spreadCssPageHeight = spreadBasePageSize.height * spreadBaseScale;
+                saveOptions.spreadCssPageWidth = spreadBasePageSize.width * SpreadState.getSpreadBaseScale();
+                saveOptions.spreadCssPageHeight = spreadBasePageSize.height * SpreadState.getSpreadBaseScale();
             }
 
             const result = await PdfLibSaver.saveNonDestructive(state, fileName, saveOptions);
@@ -2028,12 +2021,12 @@ window.MojiQPdfManager = (function() {
             };
 
             // 見開きモード時は見開き状態で保存
-            if (spreadViewMode && spreadMapping.length > 0) {
+            if (SpreadState.isSpreadViewMode() && SpreadState.getSpreadMapping().length > 0) {
                 saveOptions.spreadMode = true;
-                saveOptions.spreadMapping = spreadMapping;
+                saveOptions.spreadMapping = SpreadState.getSpreadMapping();
                 // 見開きモードでの座標変換に必要な情報を追加
-                saveOptions.spreadCssPageWidth = spreadBasePageSize.width * spreadBaseScale;
-                saveOptions.spreadCssPageHeight = spreadBasePageSize.height * spreadBaseScale;
+                saveOptions.spreadCssPageWidth = spreadBasePageSize.width * SpreadState.getSpreadBaseScale();
+                saveOptions.spreadCssPageHeight = spreadBasePageSize.height * SpreadState.getSpreadBaseScale();
             }
 
             const result = await PdfLibSaver.saveNonDestructive(state, fileName, saveOptions);
@@ -2115,11 +2108,11 @@ window.MojiQPdfManager = (function() {
                 onProgress: options.onProgress || (() => {})
             };
 
-            if (spreadViewMode && spreadMapping.length > 0) {
+            if (SpreadState.isSpreadViewMode() && SpreadState.getSpreadMapping().length > 0) {
                 saveOptions.spreadMode = true;
-                saveOptions.spreadMapping = spreadMapping;
-                saveOptions.spreadCssPageWidth = spreadBasePageSize.width * spreadBaseScale;
-                saveOptions.spreadCssPageHeight = spreadBasePageSize.height * spreadBaseScale;
+                saveOptions.spreadMapping = SpreadState.getSpreadMapping();
+                saveOptions.spreadCssPageWidth = spreadBasePageSize.width * SpreadState.getSpreadBaseScale();
+                saveOptions.spreadCssPageHeight = spreadBasePageSize.height * SpreadState.getSpreadBaseScale();
             }
 
             const result = await PdfLibSaver.saveNonDestructive(state, 'print-temp', saveOptions);
@@ -2218,8 +2211,8 @@ window.MojiQPdfManager = (function() {
 
                         // 見開きモード時は現在表示中の見開きからページ番号を取得
                         let effectivePageNum = state.currentPageNum;
-                        if (spreadViewMode && spreadMapping.length > 0) {
-                            const spread = spreadMapping[currentSpreadIndex];
+                        if (SpreadState.isSpreadViewMode() && SpreadState.getSpreadMapping().length > 0) {
+                            const spread = SpreadState.getSpreadMapping()[SpreadState.getCurrentSpreadIndex()];
                             if (spread) {
                                 effectivePageNum = spread.rightPage || spread.leftPage || state.currentPageNum;
                             }
@@ -2253,7 +2246,7 @@ window.MojiQPdfManager = (function() {
                             window.MojiQNavigation.clearThumbnailCache();
                         }
 
-                        if (spreadViewMode) {
+                        if (SpreadState.isSpreadViewMode()) {
                             // 見開きモード中: 見開きを再構築
                             await rebuildSpreadAfterPageChange(insertIndex + 1);
                         } else {
@@ -2286,8 +2279,8 @@ window.MojiQPdfManager = (function() {
 
                         // 見開きモード時は現在表示中の見開きからページ番号を取得
                         let effectivePageNum = state.currentPageNum;
-                        if (spreadViewMode && spreadMapping.length > 0) {
-                            const spread = spreadMapping[currentSpreadIndex];
+                        if (SpreadState.isSpreadViewMode() && SpreadState.getSpreadMapping().length > 0) {
+                            const spread = SpreadState.getSpreadMapping()[SpreadState.getCurrentSpreadIndex()];
                             if (spread) {
                                 effectivePageNum = spread.rightPage || spread.leftPage || state.currentPageNum;
                             }
@@ -2354,7 +2347,7 @@ window.MojiQPdfManager = (function() {
                             window.MojiQNavigation.clearThumbnailCache();
                         }
 
-                        if (spreadViewMode) {
+                        if (SpreadState.isSpreadViewMode()) {
                             // 見開きモード中: 見開きを再構築
                             await rebuildSpreadAfterPageChange(insertIndex + 1);
                         } else {
@@ -2801,15 +2794,15 @@ window.MojiQPdfManager = (function() {
             }
 
             // 見開きモードをリセット
-            if (spreadViewMode) {
-                spreadViewMode = false;
-                spreadMapping = [];
+            if (SpreadState.isSpreadViewMode()) {
+                SpreadState.setSpreadViewMode(false);
+                SpreadState.setSpreadMapping([]);
                 const spreadBtn = document.getElementById('spreadViewBtn');
                 if (spreadBtn) {
                     spreadBtn.classList.remove('active');
                 }
-                spreadPageCache = {};
-                spreadCacheReady = false;
+                SpreadState.clearSpreadPageCache();
+                SpreadState.setSpreadCacheReady(false);
             }
 
             // 単一ページキャッシュもクリア
@@ -2928,15 +2921,15 @@ window.MojiQPdfManager = (function() {
             }
 
             // 見開きモードをリセット
-            if (spreadViewMode) {
-                spreadViewMode = false;
-                spreadMapping = [];
+            if (SpreadState.isSpreadViewMode()) {
+                SpreadState.setSpreadViewMode(false);
+                SpreadState.setSpreadMapping([]);
                 const spreadBtn = document.getElementById('spreadViewBtn');
                 if (spreadBtn) {
                     spreadBtn.classList.remove('active');
                 }
-                spreadPageCache = {};
-                spreadCacheReady = false;
+                SpreadState.clearSpreadPageCache();
+                SpreadState.setSpreadCacheReady(false);
             }
 
             // 単一ページキャッシュもクリア
@@ -3106,12 +3099,12 @@ window.MojiQPdfManager = (function() {
             };
 
             // 見開きモード時は見開き状態で保存
-            if (spreadViewMode && spreadMapping.length > 0) {
+            if (SpreadState.isSpreadViewMode() && SpreadState.getSpreadMapping().length > 0) {
                 saveOptions.spreadMode = true;
-                saveOptions.spreadMapping = spreadMapping;
+                saveOptions.spreadMapping = SpreadState.getSpreadMapping();
                 // 見開きモードでの座標変換に必要な情報を追加
-                saveOptions.spreadCssPageWidth = spreadBasePageSize.width * spreadBaseScale;
-                saveOptions.spreadCssPageHeight = spreadBasePageSize.height * spreadBaseScale;
+                saveOptions.spreadCssPageWidth = spreadBasePageSize.width * SpreadState.getSpreadBaseScale();
+                saveOptions.spreadCssPageHeight = spreadBasePageSize.height * SpreadState.getSpreadBaseScale();
             }
 
             const result = await PdfLibSaver.saveTransparent(state, fileName, saveOptions);
@@ -3216,12 +3209,12 @@ window.MojiQPdfManager = (function() {
             };
 
             // 見開きモード時は見開き状態で保存
-            if (spreadViewMode && spreadMapping.length > 0) {
+            if (SpreadState.isSpreadViewMode() && SpreadState.getSpreadMapping().length > 0) {
                 saveOptions.spreadMode = true;
-                saveOptions.spreadMapping = spreadMapping;
+                saveOptions.spreadMapping = SpreadState.getSpreadMapping();
                 // 見開きモードでの座標変換に必要な情報を追加
-                saveOptions.spreadCssPageWidth = spreadBasePageSize.width * spreadBaseScale;
-                saveOptions.spreadCssPageHeight = spreadBasePageSize.height * spreadBaseScale;
+                saveOptions.spreadCssPageWidth = spreadBasePageSize.width * SpreadState.getSpreadBaseScale();
+                saveOptions.spreadCssPageHeight = spreadBasePageSize.height * SpreadState.getSpreadBaseScale();
             }
 
             const result = await PdfLibSaver.saveTransparent(state, fileName, saveOptions);
@@ -3482,7 +3475,8 @@ window.MojiQPdfManager = (function() {
      * @returns {Promise<boolean>} - 成功/失敗
      */
     async function renderSpreadThumbnail(spreadIndex, canvas, maxWidth = 200) {
-        if (!canvas || !spreadViewMode || spreadMapping.length === 0) return false;
+        const spreadMapping = SpreadState.getSpreadMapping();
+        if (!canvas || !SpreadState.isSpreadViewMode() || spreadMapping.length === 0) return false;
         if (spreadIndex < 0 || spreadIndex >= spreadMapping.length) return false;
 
         const spread = spreadMapping[spreadIndex];
@@ -3616,9 +3610,10 @@ window.MojiQPdfManager = (function() {
      * 白紙ページはpageMappingに実際に追加される
      */
     function generateSpreadMapping() {
-        spreadMapping = [];
-        spreadBlankPagesAdded = { front: 0, back: 0 };
+        SpreadState.setSpreadMapping([]);
+        SpreadState.setSpreadBlankPagesAdded({ front: 0, back: 0 });
         const originalTotalPages = state.totalPages;
+        const bindingDirection = SpreadState.getSpreadBindingDirection();
 
         if (originalTotalPages === 0) return;
 
@@ -3649,12 +3644,13 @@ window.MojiQPdfManager = (function() {
         const newPageMapping = [];
         let frontBlankAdded = false;
         let backBlankAdded = false;
+        const blankPagesAdded = { front: 0, back: 0 };
 
-        if (spreadBindingDirection === 'right') {
+        if (bindingDirection === 'right') {
             // 右綴じ: 1ページ目を右側に配置するため、先頭に白紙を追加
             newPageMapping.push(createBlankPage());
             frontBlankAdded = true;
-            spreadBlankPagesAdded.front = 1;
+            blankPagesAdded.front = 1;
 
             // 元のページを追加
             for (let i = 0; i < state.pageMapping.length; i++) {
@@ -3665,13 +3661,13 @@ window.MojiQPdfManager = (function() {
             if (newPageMapping.length % 2 !== 0) {
                 newPageMapping.push(createBlankPage());
                 backBlankAdded = true;
-                spreadBlankPagesAdded.back = 1;
+                blankPagesAdded.back = 1;
             }
         } else {
             // 左綴じ: 1ページ目を右側に配置するため、先頭に白紙を追加（右綴じの反転）
             newPageMapping.push(createBlankPage());
             frontBlankAdded = true;
-            spreadBlankPagesAdded.front = 1;
+            blankPagesAdded.front = 1;
 
             // 元のページを追加
             for (let i = 0; i < state.pageMapping.length; i++) {
@@ -3682,10 +3678,11 @@ window.MojiQPdfManager = (function() {
             if (newPageMapping.length % 2 !== 0) {
                 newPageMapping.push(createBlankPage());
                 backBlankAdded = true;
-                spreadBlankPagesAdded.back = 1;
+                blankPagesAdded.back = 1;
             }
         }
 
+        SpreadState.setSpreadBlankPagesAdded(blankPagesAdded);
         state.pageMapping = newPageMapping;
         state.totalPages = newPageMapping.length;
 
@@ -3696,12 +3693,13 @@ window.MojiQPdfManager = (function() {
         }
 
         // 見開きマッピングを生成
-        if (spreadBindingDirection === 'right') {
+        const newSpreadMapping = [];
+        if (bindingDirection === 'right') {
             // 右綴じ: 右から左に読む（見開きの左側が後のページ）
             for (let i = 1; i <= state.totalPages; i += 2) {
                 const leftPage = i;
                 const rightPage = i + 1 <= state.totalPages ? i + 1 : null;
-                spreadMapping.push({
+                newSpreadMapping.push({
                     leftPage: rightPage,  // 右綴じでは右側のページが先
                     rightPage: leftPage,
                     leftBlank: rightPage ? (state.pageMapping[rightPage - 1]?.isSpreadBlank || false) : true,
@@ -3714,7 +3712,7 @@ window.MojiQPdfManager = (function() {
             for (let i = 1; i <= state.totalPages; i += 2) {
                 const leftPage = i;
                 const rightPage = i + 1 <= state.totalPages ? i + 1 : null;
-                spreadMapping.push({
+                newSpreadMapping.push({
                     leftPage: leftPage,
                     rightPage: rightPage,
                     leftBlank: state.pageMapping[leftPage - 1]?.isSpreadBlank || false,
@@ -3722,6 +3720,7 @@ window.MojiQPdfManager = (function() {
                 });
             }
         }
+        SpreadState.setSpreadMapping(newSpreadMapping);
     }
 
     /**
@@ -3815,7 +3814,8 @@ window.MojiQPdfManager = (function() {
      * @param {number} spreadIndex - 見開きインデックス
      */
     async function renderSpreadView(spreadIndex) {
-        if (!spreadViewMode || spreadMapping.length === 0) {
+        const spreadMapping = SpreadState.getSpreadMapping();
+        if (!SpreadState.isSpreadViewMode() || spreadMapping.length === 0) {
             return;
         }
         if (spreadIndex < 0 || spreadIndex >= spreadMapping.length) {
@@ -3823,7 +3823,7 @@ window.MojiQPdfManager = (function() {
         }
 
         // 同じインデックスで既にレンダリング済みの場合はスキップ
-        if (currentSpreadIndex === spreadIndex && !isSpreadRendering) {
+        if (SpreadState.getCurrentSpreadIndex() === spreadIndex && !SpreadState.isSpreadRendering()) {
             // 既に表示中なのでスキップ（ただし初回は除く）
             if (state.spreadMetadata) {
                 return;
@@ -3831,18 +3831,18 @@ window.MojiQPdfManager = (function() {
         }
 
         // 連打対策（見開き専用フラグ）
-        if (isSpreadRendering) {
-            pendingSpreadIndex = spreadIndex;
+        if (SpreadState.isSpreadRendering()) {
+            SpreadState.setPendingSpreadIndex(spreadIndex);
             return;
         }
-        isSpreadRendering = true;
-        pendingSpreadIndex = null;
+        SpreadState.setSpreadRendering(true);
+        SpreadState.setPendingSpreadIndex(null);
 
         // 操作IDをインクリメント（古い描画をキャンセルするため）
-        const currentOperationId = ++spreadRenderOperationId;
+        const currentOperationId = SpreadState.incrementSpreadRenderOperationId();
 
         try {
-            currentSpreadIndex = spreadIndex;
+            SpreadState.setCurrentSpreadIndex(spreadIndex);
             const spread = spreadMapping[spreadIndex];
 
             // 初回レンダリング時にコンテナサイズを固定
@@ -3859,7 +3859,7 @@ window.MojiQPdfManager = (function() {
             let basePageSize = await getPageSizeAsync(1);
 
             // 操作IDチェック：古い操作の場合は中断
-            if (currentOperationId !== spreadRenderOperationId) {
+            if (currentOperationId !== SpreadState.getSpreadRenderOperationId()) {
                 return;
             }
 
@@ -3895,7 +3895,7 @@ window.MojiQPdfManager = (function() {
             }
 
             // 操作IDチェック：古い操作の場合は中断（キャンバスに反映せず終了）
-            if (currentOperationId !== spreadRenderOperationId) {
+            if (currentOperationId !== SpreadState.getSpreadRenderOperationId()) {
                 return;
             }
 
@@ -3905,7 +3905,7 @@ window.MojiQPdfManager = (function() {
             }
 
             // 操作IDチェック：古い操作の場合は中断（キャンバスに反映せず終了）
-            if (currentOperationId !== spreadRenderOperationId) {
+            if (currentOperationId !== SpreadState.getSpreadRenderOperationId()) {
                 return;
             }
 
@@ -3953,7 +3953,7 @@ window.MojiQPdfManager = (function() {
             }
 
             // 操作IDチェック：古い操作の場合は中断（キャンバスに反映せず終了）
-            if (currentOperationId !== spreadRenderOperationId) {
+            if (currentOperationId !== SpreadState.getSpreadRenderOperationId()) {
                 return;
             }
 
@@ -4022,10 +4022,11 @@ window.MojiQPdfManager = (function() {
             }
 
         } finally {
-            isSpreadRendering = false;
-            if (pendingSpreadIndex !== null && pendingSpreadIndex !== spreadIndex) {
-                const nextSpread = pendingSpreadIndex;
-                pendingSpreadIndex = null;
+            SpreadState.setSpreadRendering(false);
+            const pendingIdx = SpreadState.getPendingSpreadIndex();
+            if (pendingIdx !== null && pendingIdx !== spreadIndex) {
+                const nextSpread = pendingIdx;
+                SpreadState.setPendingSpreadIndex(null);
                 renderSpreadView(nextSpread);
             }
         }
@@ -4055,7 +4056,7 @@ window.MojiQPdfManager = (function() {
                 const img = new Image();
                 img.onload = () => {
                     // 操作IDチェック：古い操作の場合は描画をスキップ
-                    if (operationId !== spreadRenderOperationId) {
+                    if (operationId !== SpreadState.getSpreadRenderOperationId()) {
                         URL.revokeObjectURL(url);
                         resolve();
                         return;
@@ -4084,7 +4085,7 @@ window.MojiQPdfManager = (function() {
             const page = await targetDoc.getPage(mapItem.pageNum);
 
             // 操作IDチェック：古い操作の場合は描画をスキップ
-            if (operationId !== spreadRenderOperationId) {
+            if (operationId !== SpreadState.getSpreadRenderOperationId()) {
                 return;
             }
 
@@ -4121,6 +4122,8 @@ window.MojiQPdfManager = (function() {
      * 見開きモードのナビゲーションを更新
      */
     function updateSpreadNavigation() {
+        const spreadMapping = SpreadState.getSpreadMapping();
+        const currentSpreadIndex = SpreadState.getCurrentSpreadIndex();
         const spread = spreadMapping[currentSpreadIndex];
         if (!spread) return;
 
@@ -4162,15 +4165,16 @@ window.MojiQPdfManager = (function() {
     async function toggleSpreadViewMode() {
         if (state.pdfDocs.length === 0) return;
 
-        spreadViewMode = !spreadViewMode;
+        const newSpreadViewMode = !SpreadState.isSpreadViewMode();
+        SpreadState.setSpreadViewMode(newSpreadViewMode);
 
         // ボタンのアクティブ状態を更新
         const spreadBtn = document.getElementById('spreadViewBtn');
         if (spreadBtn) {
-            spreadBtn.classList.toggle('active', spreadViewMode);
+            spreadBtn.classList.toggle('active', newSpreadViewMode);
         }
 
-        if (spreadViewMode) {
+        if (newSpreadViewMode) {
             // 見開きモードをON
             // コンテナサイズをリセットして見開き用に再計算
             resetContainerSize();
@@ -4187,7 +4191,7 @@ window.MojiQPdfManager = (function() {
                 }
                 // スライダーの向きを綴じ方向に応じて設定
                 if (MojiQNavigation.setSliderDirection) {
-                    MojiQNavigation.setSliderDirection(spreadBindingDirection);
+                    MojiQNavigation.setSliderDirection(SpreadState.getSpreadBindingDirection());
                 }
             }
 
@@ -4200,13 +4204,13 @@ window.MojiQPdfManager = (function() {
             scaleSimulatorGridsForSpread(true);
 
             // 最初の見開きインデックスを計算
-            currentSpreadIndex = 0;
+            SpreadState.setCurrentSpreadIndex(0);
 
             // 描画オブジェクトを見開きページに統合
             mergeObjectsToSpreadPages();
 
             // キャッシュから表示
-            displaySpreadFromCache(currentSpreadIndex);
+            displaySpreadFromCache(SpreadState.getCurrentSpreadIndex());
         } else {
             // 写植グリッドのスケールを単ページ用に復元
             scaleSimulatorGridsForSpread(false);
@@ -4235,7 +4239,7 @@ window.MojiQPdfManager = (function() {
             // キャッシュをクリア
             clearSpreadCache();
 
-            spreadMapping = [];
+            SpreadState.setSpreadMapping([]);
             state.spreadMetadata = null;
 
             // コンテナサイズをリセットして再計算
@@ -4258,11 +4262,12 @@ window.MojiQPdfManager = (function() {
      * 見開きモード用：全てのページオブジェクトを見開きページに統合
      */
     function mergeObjectsToSpreadPages() {
+        const spreadMapping = SpreadState.getSpreadMapping();
         if (!window.MojiQDrawingObjects || spreadMapping.length === 0) return;
 
         // 見開きモードでの1ページのCSSサイズ
-        const spreadCssPageWidth = spreadBasePageSize.width * spreadBaseScale;
-        const spreadCssPageHeight = spreadBasePageSize.height * spreadBaseScale;
+        const spreadCssPageWidth = spreadBasePageSize.width * SpreadState.getSpreadBaseScale();
+        const spreadCssPageHeight = spreadBasePageSize.height * SpreadState.getSpreadBaseScale();
 
         // 単ページモードでの基準displayWidth/Heightを取得
         // 見開きモードでは白紙が追加されている可能性があるため、
@@ -4351,7 +4356,7 @@ window.MojiQPdfManager = (function() {
         if (!singlePageDisplayWidth) return;
 
         // 見開き時の1ページのCSSピクセル幅
-        const spreadCssPageWidth = spreadBasePageSize.width * spreadBaseScale;
+        const spreadCssPageWidth = spreadBasePageSize.width * SpreadState.getSpreadBaseScale();
 
         // スケール比率: 見開き座標系 / 単ページ座標系
         const scaleRatio = spreadCssPageWidth / singlePageDisplayWidth;
@@ -4423,7 +4428,7 @@ window.MojiQPdfManager = (function() {
         simCtx.clearRect(0, 0, simCanvas.width, simCanvas.height);
 
         // 右ページのオフセット（raw pixel座標系、buildSpreadCacheと同じ計算）
-        const cacheWidth = Math.floor(spreadBasePageSize.width * spreadBaseScale * dpr);
+        const cacheWidth = Math.floor(spreadBasePageSize.width * SpreadState.getSpreadBaseScale() * dpr);
 
         const pages = [];
         if (spread.leftPage !== null) pages.push({ pageNum: spread.leftPage, offsetX: 0 });
@@ -4582,11 +4587,12 @@ window.MojiQPdfManager = (function() {
      * 見開きモード解除用：見開きページから元のページにオブジェクトを分割
      */
     function splitObjectsFromSpreadPages() {
+        const spreadMapping = SpreadState.getSpreadMapping();
         if (!window.MojiQDrawingObjects || spreadMapping.length === 0) return;
 
         // 見開きモードでの1ページのCSSサイズ
-        const spreadCssPageWidth = spreadBasePageSize.width * spreadBaseScale;
-        const spreadCssPageHeight = spreadBasePageSize.height * spreadBaseScale;
+        const spreadCssPageWidth = spreadBasePageSize.width * SpreadState.getSpreadBaseScale();
+        const spreadCssPageHeight = spreadBasePageSize.height * SpreadState.getSpreadBaseScale();
 
         // 単ページモードでの基準displayWidth/Heightを取得
         // 白紙ページではないページから取得する
@@ -4657,8 +4663,8 @@ window.MojiQPdfManager = (function() {
      * 見開きキャッシュをクリア
      */
     function clearSpreadCache() {
-        spreadPageCache = {};
-        spreadCacheReady = false;
+        SpreadState.clearSpreadPageCache();
+        SpreadState.setSpreadCacheReady(false);
         // 単一ページキャッシュもクリア
         if (singlePageCache) singlePageCache.clear();
         cancelPrefetch();
@@ -4718,8 +4724,8 @@ window.MojiQPdfManager = (function() {
         updateLoadingProgress(0, totalPages);
 
         // キャッシュをリセット
-        spreadPageCache = {};
-        spreadCacheReady = false;
+        SpreadState.clearSpreadPageCache();
+        SpreadState.setSpreadCacheReady(false);
         // 単一ページキャッシュもクリア（見開きモード移行時）
         if (singlePageCache) singlePageCache.clear();
         cancelPrefetch();
@@ -4737,12 +4743,13 @@ window.MojiQPdfManager = (function() {
         spreadBasePageSize = await getPageSizeAsync(1);
         const spreadWidth = spreadBasePageSize.width * 2;
         const spreadHeight = spreadBasePageSize.height;
-        spreadBaseScale = Math.min(
+        SpreadState.setSpreadBaseScale(Math.min(
             containerWidth / spreadWidth,
             containerHeight / spreadHeight
-        );
+        ));
 
         // キャッシュ用のキャンバスサイズ（全ページ共通）
+        const spreadBaseScale = SpreadState.getSpreadBaseScale();
         const cacheWidth = Math.floor(spreadBasePageSize.width * spreadBaseScale * dpr);
         const cacheHeight = Math.floor(spreadBasePageSize.height * spreadBaseScale * dpr);
 
@@ -4758,7 +4765,7 @@ window.MojiQPdfManager = (function() {
 
             try {
                 const cachedImage = await renderPageForCache(pageNum, cacheWidth, cacheHeight);
-                spreadPageCache[pageNum] = cachedImage;
+                SpreadState.setSpreadPageCacheEntry(pageNum, cachedImage);
             } catch (e) {
                 console.error(`ページ ${pageNum} のキャッシュ作成に失敗:`, e);
             }
@@ -4772,7 +4779,7 @@ window.MojiQPdfManager = (function() {
             }
         }
 
-        spreadCacheReady = true;
+        SpreadState.setSpreadCacheReady(true);
 
         // プログレスオーバーレイを非表示
         isProcessing = false;
@@ -4877,6 +4884,7 @@ window.MojiQPdfManager = (function() {
      * @param {number} spreadIndex - 見開きインデックス
      */
     function displaySpreadFromCache(spreadIndex) {
+        const spreadMapping = SpreadState.getSpreadMapping();
         if (spreadMapping.length === 0) {
             return;
         }
@@ -4884,18 +4892,19 @@ window.MojiQPdfManager = (function() {
             return;
         }
         // キャッシュが準備できていない場合はrenderSpreadViewにフォールバック
-        if (!spreadCacheReady) {
+        if (!SpreadState.isSpreadCacheReady()) {
             renderSpreadView(spreadIndex);
             return;
         }
 
         // 表示処理中フラグをON（外部からのredrawCanvasをブロック）
-        spreadDisplaying = true;
+        SpreadState.setSpreadDisplaying(true);
 
-        currentSpreadIndex = spreadIndex;
+        SpreadState.setCurrentSpreadIndex(spreadIndex);
         const spread = spreadMapping[spreadIndex];
 
         // キャッシュのサイズ（固定、buildSpreadCacheと同じ計算）
+        const spreadBaseScale = SpreadState.getSpreadBaseScale();
         const cacheWidth = Math.floor(spreadBasePageSize.width * spreadBaseScale * dpr);
         const cacheHeight = Math.floor(spreadBasePageSize.height * spreadBaseScale * dpr);
 
@@ -4912,6 +4921,7 @@ window.MojiQPdfManager = (function() {
         bgContext.fillRect(0, 0, canvasWidth, canvasHeight);
 
         // 左ページを描画
+        const spreadPageCache = SpreadState.getSpreadPageCache();
         if (spread.leftPage !== null && spreadPageCache[spread.leftPage]) {
             const leftCache = spreadPageCache[spread.leftPage];
             bgContext.drawImage(leftCache, 0, 0);
@@ -4995,7 +5005,7 @@ window.MojiQPdfManager = (function() {
         window.MojiQGlobal.pdfLoaded = true;
 
         // 表示処理中フラグをOFF
-        spreadDisplaying = false;
+        SpreadState.setSpreadDisplaying(false);
     }
 
     /**
@@ -5003,7 +5013,7 @@ window.MojiQPdfManager = (function() {
      * @returns {boolean}
      */
     function isSpreadDisplaying() {
-        return spreadDisplaying;
+        return SpreadState.isSpreadDisplaying();
     }
 
     /**
@@ -5068,7 +5078,7 @@ window.MojiQPdfManager = (function() {
         }
 
         state.totalPages = state.pageMapping.length;
-        spreadBlankPagesAdded = { front: 0, back: 0 };
+        SpreadState.setSpreadBlankPagesAdded({ front: 0, back: 0 });
     }
 
     /**
@@ -5076,7 +5086,7 @@ window.MojiQPdfManager = (function() {
      * @param {number} targetPageNum - 表示対象のページ番号（元のページ番号）
      */
     async function rebuildSpreadAfterPageChange(targetPageNum) {
-        if (!spreadViewMode) return;
+        if (!SpreadState.isSpreadViewMode()) return;
 
         // グリッドスケールを単ページ用に戻す
         scaleSimulatorGridsForSpread(false);
@@ -5094,7 +5104,7 @@ window.MojiQPdfManager = (function() {
 
         // キャッシュをクリア
         clearSpreadCache();
-        spreadMapping = [];
+        SpreadState.setSpreadMapping([]);
         state.spreadMetadata = null;
 
         // コンテナサイズをリセット
@@ -5111,8 +5121,9 @@ window.MojiQPdfManager = (function() {
         mergeObjectsToSpreadPages();
 
         // 対象ページの見開きインデックスを計算して表示
-        currentSpreadIndex = getSpreadIndexFromPage(targetPageNum);
-        displaySpreadFromCache(currentSpreadIndex);
+        const newSpreadIndex = getSpreadIndexFromPage(targetPageNum);
+        SpreadState.setCurrentSpreadIndex(newSpreadIndex);
+        displaySpreadFromCache(newSpreadIndex);
     }
 
     /**
@@ -5120,7 +5131,7 @@ window.MojiQPdfManager = (function() {
      * @returns {boolean}
      */
     function isSpreadViewMode() {
-        return spreadViewMode;
+        return SpreadState.isSpreadViewMode();
     }
 
     /**
@@ -5129,7 +5140,7 @@ window.MojiQPdfManager = (function() {
      */
     function isSpreadRenderingNow() {
         // キャッシュ方式では、キャッシュ準備中の場合にtrueを返す
-        return spreadViewMode && !spreadCacheReady;
+        return SpreadState.isSpreadViewMode() && !SpreadState.isSpreadCacheReady();
     }
 
     /**
@@ -5137,7 +5148,7 @@ window.MojiQPdfManager = (function() {
      * @returns {number}
      */
     function getCurrentSpreadIndex() {
-        return currentSpreadIndex;
+        return SpreadState.getCurrentSpreadIndex();
     }
 
     /**
@@ -5145,8 +5156,7 @@ window.MojiQPdfManager = (function() {
      * @returns {{leftPage: number|null, rightPage: number|null}|null}
      */
     function getCurrentSpread() {
-        if (!spreadViewMode || spreadMapping.length === 0) return null;
-        return spreadMapping[currentSpreadIndex] || null;
+        return SpreadState.getCurrentSpread();
     }
 
     /**
@@ -5154,7 +5164,7 @@ window.MojiQPdfManager = (function() {
      * @returns {Array}
      */
     function getSpreadMapping() {
-        return spreadMapping;
+        return SpreadState.getSpreadMapping();
     }
 
     /**
@@ -5169,7 +5179,9 @@ window.MojiQPdfManager = (function() {
      * 見開きモードで次の見開きへ移動（右開き仕様: 左ボタンで呼ばれる）
      */
     function prevSpread() {
-        if (!spreadViewMode || !spreadCacheReady) return;
+        if (!SpreadState.isSpreadViewMode() || !SpreadState.isSpreadCacheReady()) return;
+        const spreadMapping = SpreadState.getSpreadMapping();
+        const currentSpreadIndex = SpreadState.getCurrentSpreadIndex();
         // 次の見開きへ = インデックスを増やす
         if (currentSpreadIndex < spreadMapping.length - 1) {
             displaySpreadFromCache(currentSpreadIndex + 1);
@@ -5180,7 +5192,8 @@ window.MojiQPdfManager = (function() {
      * 見開きモードで前の見開きへ移動（右開き仕様: 右ボタンで呼ばれる）
      */
     function nextSpread() {
-        if (!spreadViewMode || !spreadCacheReady) return;
+        if (!SpreadState.isSpreadViewMode() || !SpreadState.isSpreadCacheReady()) return;
+        const currentSpreadIndex = SpreadState.getCurrentSpreadIndex();
         // 前の見開きへ = インデックスを減らす
         if (currentSpreadIndex > 0) {
             displaySpreadFromCache(currentSpreadIndex - 1);
@@ -5193,6 +5206,7 @@ window.MojiQPdfManager = (function() {
      * @returns {number} - 見開きインデックス
      */
     function getSpreadIndexFromPage(pageNum) {
+        const spreadMapping = SpreadState.getSpreadMapping();
         for (let i = 0; i < spreadMapping.length; i++) {
             const spread = spreadMapping[i];
             if (spread.leftPage === pageNum || spread.rightPage === pageNum) {
@@ -5208,12 +5222,13 @@ window.MojiQPdfManager = (function() {
      * @returns {{pageNum: number, localX: number, isLeftPage: boolean}}
      */
     function getSpreadPageInfo(x) {
-        if (!spreadViewMode || !state.spreadMetadata) {
+        if (!SpreadState.isSpreadViewMode() || !state.spreadMetadata) {
             return { pageNum: state.currentPageNum, localX: x, isLeftPage: false };
         }
 
         const meta = state.spreadMetadata;
-        const spread = spreadMapping[currentSpreadIndex];
+        const spreadMapping = SpreadState.getSpreadMapping();
+        const spread = spreadMapping[SpreadState.getCurrentSpreadIndex()];
 
         if (x < meta.leftWidth) {
             // 左ページ上の座標
@@ -5237,9 +5252,7 @@ window.MojiQPdfManager = (function() {
      * @param {string} direction - 'right' または 'left'
      */
     function setSpreadBindingDirection(direction) {
-        if (direction === 'right' || direction === 'left') {
-            spreadBindingDirection = direction;
-        }
+        SpreadState.setSpreadBindingDirection(direction);
     }
 
     /**
@@ -5247,7 +5260,7 @@ window.MojiQPdfManager = (function() {
      * @returns {string} - 'right' または 'left'
      */
     function getSpreadBindingDirection() {
-        return spreadBindingDirection;
+        return SpreadState.getSpreadBindingDirection();
     }
 
     /**
@@ -5255,8 +5268,8 @@ window.MojiQPdfManager = (function() {
      * @returns {string|null} - 見開きページキー（例：'spread_0'）
      */
     function getCurrentSpreadPageKey() {
-        if (!spreadViewMode || !window.MojiQDrawingObjects) return null;
-        return MojiQDrawingObjects.getSpreadPageKey(currentSpreadIndex);
+        if (!SpreadState.isSpreadViewMode() || !window.MojiQDrawingObjects) return null;
+        return MojiQDrawingObjects.getSpreadPageKey(SpreadState.getCurrentSpreadIndex());
     }
 
     return {

@@ -18,6 +18,59 @@ window.MojiQConstants = (function() {
         FONT_LABEL: 12      // フォントラベルのフォントサイズ
     };
 
+    /** @type {Object} スタンプ描画パラメータ（重複コード削減用） */
+    const STAMP_PARAMS = {
+        WIDTH_RATIO: 1.8,           // 幅計算用: size * WIDTH_RATIO
+        HEIGHT_RATIO: 0.9,          // 高さ計算用: size * HEIGHT_RATIO
+        CORNER_RADIUS: 0.15,        // 角丸比率: size * CORNER_RADIUS
+        FONT_SIZE_RATIO: 0.9,       // フォントサイズ比率: size * FONT_SIZE_RATIO
+        // テキストスタンプの定義（白フチ付きテキストのみ）
+        DEFINITIONS: {
+            toruStamp: { text: 'トル' },
+            torutsumeStamp: { text: 'トルツメ' },
+            torumamaStamp: { text: 'トルママ' },
+            zenkakuakiStamp: { text: '全角アキ' },
+            nibunakiStamp: { text: '半角アキ' },
+            shibunakiStamp: { text: '四分アキ' },
+            kaigyouStamp: { text: '改行' }
+        },
+        // 円形スタンプの定義（済、小文字など）
+        CIRCLE_STAMPS: {
+            doneStamp: {
+                text: '済',
+                fontSizeRatio: 0.6,     // size * 0.6
+                hasFill: true,          // 内部白塗り
+                textOutline: false,     // テキスト白フチなし
+                strokeWidth: 2
+            },
+            komojiStamp: {
+                text: '小',
+                fontSizeRatio: 0.6,
+                hasFill: false,         // 内部透明
+                textOutline: true,      // テキスト白フチあり
+                strokeWidth: 1
+            }
+        },
+        // 角丸長方形スタンプの定義（ルビなど）
+        ROUNDED_RECT_STAMPS: {
+            rubyStamp: {
+                text: 'ルビ',
+                fontSizeRatio: 0.45,
+                hasFill: true,          // 内部白塗り
+                textOutline: false,     // テキスト白フチなし
+                strokeWidth: 1
+            }
+        }
+    };
+
+    /** @type {Object} テキストアウトライン（白フチ）描画パラメータ */
+    const OUTLINE = {
+        SHADOW_BLUR: 5,             // 影のぼかし半径
+        LINE_WIDTH_MAX: 8,          // アウトライン最大線幅
+        LINE_WIDTH_MIN: 2,          // アウトライン最小線幅
+        ANNOTATION_SHADOW_BLUR: 4   // アノテーション用影のぼかし
+    };
+
     /** @type {Object} 線の太さ */
     const LINE_WIDTHS = {
         DEFAULT: 2,         // デフォルトの線幅
@@ -198,9 +251,11 @@ window.MojiQConstants = (function() {
     return Object.freeze({
         // 描画
         STAMP_SIZES,
+        STAMP_PARAMS,
         LINE_WIDTHS,
         SELECTION,
         ROTATION,
+        OUTLINE,
 
         // 色
         COLORS,

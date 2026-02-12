@@ -80,6 +80,21 @@ window.MojiQStore = (function() {
             pageGridStates: {},
             currentMode: null,
             ptStep: 1.0
+        },
+
+        // PDF管理（将来的にpdf-manager.jsの状態変数を統合予定）
+        pdf: {
+            isProcessing: false,        // 処理中フラグ
+            isRendering: false,         // レンダリング中フラグ
+            currentFilePath: null,      // 現在開いているファイルパス
+            hasUnsavedChanges: false,   // 未保存の変更有無
+            spread: {
+                viewMode: false,        // 見開きモード
+                mapping: [],            // 見開きページマッピング
+                currentIndex: 0,        // 現在の見開きインデックス
+                bindingDirection: 'right', // 綴じ方向: 'right'(右綴じ) | 'left'(左綴じ)
+                cacheReady: false       // キャッシュ準備完了
+            }
         }
     };
 
