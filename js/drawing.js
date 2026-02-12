@@ -211,84 +211,88 @@ window.MojiQDrawing = (function() {
      * @returns {{x: number, y: number}} キャンバス座標
      */
     function getPos(e) {
+        let pos;
+
         // ユーティリティを使用（利用可能な場合）
         if (Utils && Utils.getCanvasCoordinates) {
-            return Utils.getCanvasCoordinates(e, mojiqCanvas, dpr);
-        }
-
-        // フォールバック
-        // タッチイベントの安全なアクセス（changedTouchesが空の場合に対応）
-        let clientX, clientY;
-        if (e.clientX !== undefined) {
-            clientX = e.clientX;
-            clientY = e.clientY;
-        } else if (e.changedTouches && e.changedTouches.length > 0) {
-            clientX = e.changedTouches[0].clientX;
-            clientY = e.changedTouches[0].clientY;
+            pos = Utils.getCanvasCoordinates(e, mojiqCanvas, dpr);
         } else {
-            // フォールバック：座標が取得できない場合は0を返す
-            return { x: 0, y: 0 };
-        }
-
-        const canvasWrapper = mojiqCanvas.parentElement;
-
-        // キャンバスの論理サイズ（dpr適用前）
-        const canvasWidth = mojiqCanvas.width / dpr;
-        const canvasHeight = mojiqCanvas.height / dpr;
-
-        if (!canvasWrapper) {
             // フォールバック
-            const rect = mojiqCanvas.getBoundingClientRect();
-            const scaleX = mojiqCanvas.width / rect.width;
-            const scaleY = mojiqCanvas.height / rect.height;
-            return {
-                x: (clientX - rect.left) * scaleX / dpr,
-                y: (clientY - rect.top) * scaleY / dpr
-            };
+            // タッチイベントの安全なアクセス（changedTouchesが空の場合に対応）
+            let clientX, clientY;
+            if (e.clientX !== undefined) {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            } else {
+                // フォールバック：座標が取得できない場合は0を返す
+                return { x: 0, y: 0 };
+            }
+
+            const canvasWrapper = mojiqCanvas.parentElement;
+
+            // キャンバスの論理サイズ（dpr適用前）
+            const canvasWidth = mojiqCanvas.width / dpr;
+            const canvasHeight = mojiqCanvas.height / dpr;
+
+            if (!canvasWrapper) {
+                // フォールバック
+                const rect = mojiqCanvas.getBoundingClientRect();
+                const scaleX = mojiqCanvas.width / rect.width;
+                const scaleY = mojiqCanvas.height / rect.height;
+                pos = {
+                    x: (clientX - rect.left) * scaleX / dpr,
+                    y: (clientY - rect.top) * scaleY / dpr
+                };
+            } else {
+                // CSS変換を取得
+                const style = window.getComputedStyle(canvasWrapper);
+                const transform = style.transform;
+
+                if (transform === 'none' || transform === '') {
+                    // 変換なし: 通常の計算
+                    const rect = mojiqCanvas.getBoundingClientRect();
+                    const scaleX = mojiqCanvas.width / rect.width;
+                    const scaleY = mojiqCanvas.height / rect.height;
+                    pos = {
+                        x: (clientX - rect.left) * scaleX / dpr,
+                        y: (clientY - rect.top) * scaleY / dpr
+                    };
+                } else {
+                    // DOMMatrixで逆変換を計算
+                    const matrix = new DOMMatrix(transform);
+                    const inverseMatrix = matrix.inverse();
+
+                    // canvasWrapperの変換前のサイズ
+                    const cssWidth = canvasWrapper.offsetWidth;
+                    const cssHeight = canvasWrapper.offsetHeight;
+
+                    // 変換後のバウンディングボックスの中心
+                    const rect = canvasWrapper.getBoundingClientRect();
+                    const rectCenterX = rect.left + rect.width / 2;
+                    const rectCenterY = rect.top + rect.height / 2;
+
+                    // クリック位置を中心からの相対座標に変換
+                    const relPoint = new DOMPoint(clientX - rectCenterX, clientY - rectCenterY);
+
+                    // 逆変換を適用
+                    const unrotatedPoint = relPoint.matrixTransform(inverseMatrix);
+
+                    // 中心からの相対座標をキャンバス座標に変換
+                    const scaleX = canvasWidth / cssWidth;
+                    const scaleY = canvasHeight / cssHeight;
+
+                    pos = {
+                        x: unrotatedPoint.x * scaleX + canvasWidth / 2,
+                        y: unrotatedPoint.y * scaleY + canvasHeight / 2
+                    };
+                }
+            }
         }
 
-        // CSS変換を取得
-        const style = window.getComputedStyle(canvasWrapper);
-        const transform = style.transform;
-
-        if (transform === 'none' || transform === '') {
-            // 変換なし: 通常の計算
-            const rect = mojiqCanvas.getBoundingClientRect();
-            const scaleX = mojiqCanvas.width / rect.width;
-            const scaleY = mojiqCanvas.height / rect.height;
-            return {
-                x: (clientX - rect.left) * scaleX / dpr,
-                y: (clientY - rect.top) * scaleY / dpr
-            };
-        }
-
-        // DOMMatrixで逆変換を計算
-        const matrix = new DOMMatrix(transform);
-        const inverseMatrix = matrix.inverse();
-
-        // canvasWrapperの変換前のサイズ
-        const cssWidth = canvasWrapper.offsetWidth;
-        const cssHeight = canvasWrapper.offsetHeight;
-
-        // 変換後のバウンディングボックスの中心
-        const rect = canvasWrapper.getBoundingClientRect();
-        const rectCenterX = rect.left + rect.width / 2;
-        const rectCenterY = rect.top + rect.height / 2;
-
-        // クリック位置を中心からの相対座標に変換
-        const relPoint = new DOMPoint(clientX - rectCenterX, clientY - rectCenterY);
-
-        // 逆変換を適用
-        const unrotatedPoint = relPoint.matrixTransform(inverseMatrix);
-
-        // 中心からの相対座標をキャンバス座標に変換
-        const scaleX = canvasWidth / cssWidth;
-        const scaleY = canvasHeight / cssHeight;
-
-        return {
-            x: unrotatedPoint.x * scaleX + canvasWidth / 2,
-            y: unrotatedPoint.y * scaleY + canvasHeight / 2
-        };
+        return pos;
     }
 
     /**

@@ -37,6 +37,121 @@ window.MojiQDrawingRenderer = (function() {
         lastRenderTime: 0
     };
 
+    // --- ビュー回転座標変換関連関数 ---
+
+    /**
+     * オリジナル座標を回転後の座標に変換
+     * @param {number} x - オリジナルX座標
+     * @param {number} y - オリジナルY座標
+     * @param {number} originalW - オリジナル幅
+     * @param {number} originalH - オリジナル高さ
+     * @param {number} rotation - 回転角度（0, 90, 180, 270）
+     * @returns {{x: number, y: number}} 回転後の座標
+     */
+    function transformCoordinates(x, y, originalW, originalH, rotation) {
+        switch (rotation) {
+            case 90:
+                return { x: originalH - y, y: x };
+            case 180:
+                return { x: originalW - x, y: originalH - y };
+            case 270:
+                return { x: y, y: originalW - x };
+            default:
+                return { x, y };
+        }
+    }
+
+    /**
+     * オブジェクトの座標を回転変換した新しいオブジェクトを作成
+     * （元のオブジェクトは変更しない）
+     * @param {Object} obj - オリジナルオブジェクト
+     * @param {number} originalW - オリジナル幅
+     * @param {number} originalH - オリジナル高さ
+     * @param {number} rotation - 回転角度
+     * @returns {Object} 座標変換済みオブジェクト
+     */
+    function transformObjectCoordinates(obj, originalW, originalH, rotation) {
+        if (rotation === 0) return obj;
+
+        // オブジェクトをシャローコピー
+        const transformed = { ...obj };
+
+        // startPos, endPosの変換
+        if (obj.startPos && obj.endPos) {
+            const newStart = transformCoordinates(
+                obj.startPos.x, obj.startPos.y, originalW, originalH, rotation
+            );
+            const newEnd = transformCoordinates(
+                obj.endPos.x, obj.endPos.y, originalW, originalH, rotation
+            );
+            // 変換後、startPosが左上、endPosが右下になるよう正規化
+            transformed.startPos = {
+                x: Math.min(newStart.x, newEnd.x),
+                y: Math.min(newStart.y, newEnd.y)
+            };
+            transformed.endPos = {
+                x: Math.max(newStart.x, newEnd.x),
+                y: Math.max(newStart.y, newEnd.y)
+            };
+        } else {
+            if (obj.startPos) {
+                transformed.startPos = transformCoordinates(
+                    obj.startPos.x, obj.startPos.y, originalW, originalH, rotation
+                );
+            }
+            if (obj.endPos) {
+                transformed.endPos = transformCoordinates(
+                    obj.endPos.x, obj.endPos.y, originalW, originalH, rotation
+                );
+            }
+        }
+
+        // pointsの変換（polyline, pen, marker, eraser）
+        if (obj.points && Array.isArray(obj.points)) {
+            transformed.points = obj.points.map(p =>
+                transformCoordinates(p.x, p.y, originalW, originalH, rotation)
+            );
+        }
+
+        // leaderLineの変換
+        if (obj.leaderLine) {
+            transformed.leaderLine = {
+                start: transformCoordinates(
+                    obj.leaderLine.start.x, obj.leaderLine.start.y, originalW, originalH, rotation
+                ),
+                end: transformCoordinates(
+                    obj.leaderLine.end.x, obj.leaderLine.end.y, originalW, originalH, rotation
+                )
+            };
+        }
+
+        // annotationの変換
+        if (obj.annotation) {
+            transformed.annotation = { ...obj.annotation };
+            if (obj.annotation.x !== undefined && obj.annotation.y !== undefined) {
+                const pos = transformCoordinates(
+                    obj.annotation.x, obj.annotation.y, originalW, originalH, rotation
+                );
+                transformed.annotation.x = pos.x;
+                transformed.annotation.y = pos.y;
+            }
+            if (obj.annotation.leaderLine) {
+                transformed.annotation.leaderLine = {
+                    start: transformCoordinates(
+                        obj.annotation.leaderLine.start.x, obj.annotation.leaderLine.start.y,
+                        originalW, originalH, rotation
+                    ),
+                    end: transformCoordinates(
+                        obj.annotation.leaderLine.end.x, obj.annotation.leaderLine.end.y,
+                        originalW, originalH, rotation
+                    )
+                };
+            }
+        }
+
+        return transformed;
+    }
+
     // --- ビューポートカリング関連関数 ---
 
     /**
@@ -3998,7 +4113,11 @@ window.MojiQDrawingRenderer = (function() {
 
         // zIndexでソート（消しゴム以外のオブジェクトのみ）
         const sortedObjects = objects
-            .map((obj, index) => ({ obj, index }))
+            .map((obj, index) => ({
+                obj: obj,
+                originalObj: obj,
+                index
+            }))
             .filter(({ obj }) => obj.type !== 'eraser')
             .sort((a, b) => (a.obj.zIndex || 0) - (b.obj.zIndex || 0));
 
@@ -4009,9 +4128,10 @@ window.MojiQDrawingRenderer = (function() {
         }
 
         // 描画（ビューポートカリング適用）
-        sortedObjects.forEach(({ obj, index }) => {
-            // PDF注釈テキストの表示/非表示チェック
-            if (window.MojiQTextLayerManager && !MojiQTextLayerManager.shouldRenderObject(obj)) {
+        sortedObjects.forEach(({ obj, originalObj, index }) => {
+            // PDF注釈テキストの表示/非表示チェック（オリジナルオブジェクトでチェック）
+            const checkObj = originalObj || obj;
+            if (window.MojiQTextLayerManager && !MojiQTextLayerManager.shouldRenderObject(checkObj)) {
                 cullingStats.culledObjects++;
                 return;
             }
@@ -4022,8 +4142,9 @@ window.MojiQDrawingRenderer = (function() {
 
             // 選択中のオブジェクトは常に描画（ハンドル表示のため）
             if (isSelected || visible) {
-                // このオブジェクトに関連する消しゴムストロークを取得
-                const linkedErasers = obj.id ? (erasersByObjectId[obj.id] || []) : [];
+                // このオブジェクトに関連する消しゴムストロークを取得（オリジナルIDで検索）
+                const objId = checkObj.id;
+                const linkedErasers = objId ? (erasersByObjectId[objId] || []) : [];
 
                 if (linkedErasers.length > 0) {
                     // 消しゴムストロークがある場合は、オフスクリーンキャンバスで合成

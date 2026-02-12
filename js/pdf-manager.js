@@ -482,7 +482,7 @@ window.MojiQPdfManager = (function() {
             for (const targetPage of targets) {
                 if (signal.aborted) break;
 
-                const cacheKey = PageRenderLRUCache.makeKey(targetPage, containerWidth, containerHeight, dpr);
+                const cacheKey = PageRenderLRUCache.makeKey(targetPage, containerWidth, containerHeight, dpr, 0);
                 // 既にキャッシュにあればスキップ
                 if (singlePageCache.get(cacheKey)) continue;
 
@@ -523,6 +523,7 @@ window.MojiQPdfManager = (function() {
                 const scale = Math.min(containerWidth / imgData.width, containerHeight / imgData.height);
                 const contentW = imgData.width * scale * dpr;
                 const contentH = imgData.height * scale * dpr;
+
                 offCanvas.width = contentW;
                 offCanvas.height = contentH;
 
@@ -554,6 +555,7 @@ window.MojiQPdfManager = (function() {
                 const scale = Math.min(containerWidth / blankW, containerHeight / blankH);
                 const contentW = blankW * scale * dpr;
                 const contentH = blankH * scale * dpr;
+
                 offCanvas.width = contentW;
                 offCanvas.height = contentH;
 
@@ -623,7 +625,7 @@ window.MojiQPdfManager = (function() {
         const BATCH_SIZE = 3;
 
         for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-            const cacheKey = PageRenderLRUCache.makeKey(pageNum, containerWidth, containerHeight, dpr);
+            const cacheKey = PageRenderLRUCache.makeKey(pageNum, containerWidth, containerHeight, dpr, 0);
 
             // 既にキャッシュにあればスキップ
             if (singlePageCache && singlePageCache.get(cacheKey)) {
@@ -796,7 +798,7 @@ window.MojiQPdfManager = (function() {
         const containerHeight = fixedContainerHeight;
 
         // --- キャッシュルックアップ ---
-        const cacheKey = PageRenderLRUCache.makeKey(pageNum, containerWidth, containerHeight, dpr);
+        const cacheKey = PageRenderLRUCache.makeKey(pageNum, containerWidth, containerHeight, dpr, 0);
         const cachedEntry = singlePageCache ? singlePageCache.get(cacheKey) : null;
 
         if (cachedEntry) {
@@ -872,6 +874,8 @@ window.MojiQPdfManager = (function() {
 
                 mapItem.displayWidth = contentW / dpr;
                 mapItem.displayHeight = contentH / dpr;
+                mapItem.originalWidth = contentW / dpr;
+                mapItem.originalHeight = contentH / dpr;
             } else if (mapItem.docIndex === -1) {
                 // 白紙ページ
                 const blankW = mapItem.width;
@@ -890,6 +894,8 @@ window.MojiQPdfManager = (function() {
 
                 state.baseCSSExtent = { width: contentW / dpr, height: contentH / dpr };
                 state.pdfContentOffset = { x: 0, y: 0 };
+                mapItem.originalWidth = contentW / dpr;
+                mapItem.originalHeight = contentH / dpr;
 
                 // ページごとの表示サイズを保存（描画オブジェクトのスケーリング用）
                 mapItem.displayWidth = contentW / dpr;
@@ -921,6 +927,8 @@ window.MojiQPdfManager = (function() {
                 // ページごとの表示サイズを保存（描画オブジェクトのスケーリング用）
                 mapItem.displayWidth = contentW / dpr;
                 mapItem.displayHeight = contentH / dpr;
+                mapItem.originalWidth = contentW / dpr;
+                mapItem.originalHeight = contentH / dpr;
             }
 
             // --- 背景のみをキャッシュに保存（描画オブジェクトは含めない） ---
@@ -1004,15 +1012,6 @@ window.MojiQPdfManager = (function() {
         schedulePrefetch(pageNum, containerWidth, containerHeight);
     }
 
-    /**
-     * キャンバスに回転を適用（グローバル回転を使用）
-     */
-    function applyRotationToCanvas() {
-        if (!canvasWrapper) return;
-
-        // 回転ラベルを更新
-        updateRotateLabel();
-    }
 
     /**
      * ヘッダーボタンを有効化
@@ -3750,6 +3749,27 @@ window.MojiQPdfManager = (function() {
     }
 
     /**
+     * ページのオリジナルサイズを取得
+     * 描画座標変換に使用
+     * @param {number} pageNum - ページ番号
+     * @returns {{width: number, height: number}}
+     */
+    function getOriginalPageSize(pageNum) {
+        const mapItem = state.pageMapping[pageNum - 1];
+        if (mapItem) {
+            // originalWidth/Heightがある場合はそれを使用
+            if (mapItem.originalWidth && mapItem.originalHeight) {
+                return { width: mapItem.originalWidth, height: mapItem.originalHeight };
+            }
+            // displayWidth/Heightがある場合はそれを使用
+            if (mapItem.displayWidth && mapItem.displayHeight) {
+                return { width: mapItem.displayWidth, height: mapItem.displayHeight };
+            }
+        }
+        return { width: 595, height: 842 };
+    }
+
+    /**
      * ページのサイズを非同期で取得（PDFから直接サイズを取得）
      * @param {number} pageNum - ページ番号
      * @returns {Promise<{width: number, height: number}>}
@@ -4000,7 +4020,6 @@ window.MojiQPdfManager = (function() {
             if (canvasWrapper) {
                 canvasWrapper.style.transform = '';
             }
-            updateRotateLabel();
 
         } finally {
             isSpreadRendering = false;
@@ -5263,6 +5282,7 @@ window.MojiQPdfManager = (function() {
         isBgTransparent,
         applyBgOpacity,
         getBgOpacity,
+        getOriginalPageSize,  // ページサイズ取得（描画座標変換用）
         triggerInsertPdf,
         updateSaveButtonState,  // 保存ボタン状態更新
         getImagePageData,  // 画像ページデータ取得

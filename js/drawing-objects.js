@@ -1448,6 +1448,24 @@ window.MojiQDrawingObjects = (function() {
                 delete state.undoStacks[key];
                 delete state.redoStacks[key];
             }
+        },
+
+        // --- プロジェクトメタデータ（回転状態など） ---
+
+        /**
+         * プロジェクトメタデータを取得（保存用）
+         * @returns {Object} メタデータオブジェクト
+         */
+        getProjectMetadata: function() {
+            return {};
+        },
+
+        /**
+         * プロジェクトメタデータを設定（読込用）
+         * @param {Object} metadata - メタデータオブジェクト
+         */
+        setProjectMetadata: function(metadata) {
+            // 現在は追加のメタデータ処理なし
         }
     };
 })();

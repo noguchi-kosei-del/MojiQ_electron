@@ -8,22 +8,73 @@ window.SimulatorEventHandlers = (function() {
     const State = window.SimulatorState;
     const DOM = window.SimulatorDOM;
 
-    // 座標取得
+    // 座標取得（回転対応）
     // 注意: イベントはmojiqCanvas(whiteboard)で受け取るが、座標はsim-whiteboardと同じサイズなので
     // どちらのキャンバスを基準にしても同じ結果になる
     function getPos(e) {
         // mojiqCanvas（イベントを受け取るキャンバス）を使用
         const canvas = DOM.getMojiqCanvas() || DOM.getCanvas();
-        const rect = canvas.getBoundingClientRect();
         const cx = e.clientX !== undefined ? e.clientX : e.changedTouches[0].clientX;
         const cy = e.clientY !== undefined ? e.clientY : e.changedTouches[0].clientY;
 
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
+        const canvasWrapper = canvas.parentElement;
+
+        // キャンバスの論理サイズ
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+
+        if (!canvasWrapper) {
+            // フォールバック
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (cx - rect.left) * scaleX,
+                y: (cy - rect.top) * scaleY
+            };
+        }
+
+        // CSS変換を取得
+        const style = window.getComputedStyle(canvasWrapper);
+        const transform = style.transform;
+
+        if (transform === 'none' || transform === '') {
+            // 変換なし: 通常の計算
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (cx - rect.left) * scaleX,
+                y: (cy - rect.top) * scaleY
+            };
+        }
+
+        // DOMMatrixで逆変換を計算
+        const matrix = new DOMMatrix(transform);
+        const inverseMatrix = matrix.inverse();
+
+        // canvasWrapperの変換前のサイズ
+        const cssWidth = canvasWrapper.offsetWidth;
+        const cssHeight = canvasWrapper.offsetHeight;
+
+        // 変換後のバウンディングボックスの中心
+        const rect = canvasWrapper.getBoundingClientRect();
+        const rectCenterX = rect.left + rect.width / 2;
+        const rectCenterY = rect.top + rect.height / 2;
+
+        // クリック位置を中心からの相対座標に変換
+        const relPoint = new DOMPoint(cx - rectCenterX, cy - rectCenterY);
+
+        // 逆変換を適用
+        const unrotatedPoint = relPoint.matrixTransform(inverseMatrix);
+
+        // 中心からの相対座標をキャンバス座標に変換
+        const scaleX = canvasWidth / cssWidth;
+        const scaleY = canvasHeight / cssHeight;
 
         return {
-            x: (cx - rect.left) * scaleX,
-            y: (cy - rect.top) * scaleY
+            x: unrotatedPoint.x * scaleX + canvasWidth / 2,
+            y: unrotatedPoint.y * scaleY + canvasHeight / 2
         };
     }
 

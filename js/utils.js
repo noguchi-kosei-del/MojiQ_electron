@@ -75,23 +75,113 @@ window.MojiQUtils = (function() {
     }
 
     /**
-     * キャンバス座標に変換
+     * キャンバス座標に変換（回転対応）
      * @param {MouseEvent|TouchEvent} e - イベントオブジェクト
      * @param {HTMLCanvasElement} canvas - キャンバス要素
      * @param {number} [dpr=1] - デバイスピクセル比
      * @returns {{x: number, y: number}} キャンバス座標
      */
     function getCanvasCoordinates(e, canvas, dpr = 1) {
-        const rect = canvas.getBoundingClientRect();
         const client = getEventCoordinates(e, 'client');
+        const canvasWrapper = canvas.parentElement;
 
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
+        // キャンバスの論理サイズ（dpr適用前）
+        const canvasWidth = canvas.width / dpr;
+        const canvasHeight = canvas.height / dpr;
+
+        if (!canvasWrapper) {
+            // フォールバック
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (client.x - rect.left) * scaleX / dpr,
+                y: (client.y - rect.top) * scaleY / dpr
+            };
+        }
+
+        // CSS変換を取得
+        const style = window.getComputedStyle(canvasWrapper);
+        const transform = style.transform;
+
+        if (transform === 'none' || transform === '') {
+            // 変換なし: 通常の計算
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (client.x - rect.left) * scaleX / dpr,
+                y: (client.y - rect.top) * scaleY / dpr
+            };
+        }
+
+        // DOMMatrixで逆変換を計算
+        const matrix = new DOMMatrix(transform);
+        const inverseMatrix = matrix.inverse();
+
+        // canvasWrapperの変換前のサイズ（offsetWidth/offsetHeightは変換前のサイズ）
+        const cssWidth = canvasWrapper.offsetWidth;
+        const cssHeight = canvasWrapper.offsetHeight;
+
+        // 変換後のバウンディングボックスの中心
+        const rect = canvasWrapper.getBoundingClientRect();
+        const rectCenterX = rect.left + rect.width / 2;
+        const rectCenterY = rect.top + rect.height / 2;
+
+        // クリック位置を中心からの相対座標に変換
+        const relPoint = new DOMPoint(client.x - rectCenterX, client.y - rectCenterY);
+
+        // 逆変換を適用
+        const unrotatedPoint = relPoint.matrixTransform(inverseMatrix);
+
+        // 中心からの相対座標をキャンバス座標に変換
+        const scaleX = canvasWidth / cssWidth;
+        const scaleY = canvasHeight / cssHeight;
 
         return {
-            x: (client.x - rect.left) * scaleX / dpr,
-            y: (client.y - rect.top) * scaleY / dpr
+            x: unrotatedPoint.x * scaleX + canvasWidth / 2,
+            y: unrotatedPoint.y * scaleY + canvasHeight / 2
         };
+    }
+
+    /**
+     * 回転後のキャンバス座標をオリジナル座標系に逆変換
+     * @param {{x: number, y: number}} pos - 回転後のキャンバス座標
+     * @param {number} rotation - ビュー回転角度（0, 90, 180, 270）
+     * @param {number} rotatedW - 回転後のキャンバス幅
+     * @param {number} rotatedH - 回転後のキャンバス高さ
+     * @returns {{x: number, y: number}} オリジナル座標系での座標
+     */
+    function screenToOriginalCoordinates(pos, rotation, rotatedW, rotatedH) {
+        if (rotation === 0) return { ...pos };
+
+        // 逆変換
+        // 90° CW forward: (x, y) → (originalH - y, x)
+        // 90° CW inverse: (x', y') → (y', rotatedW - x')
+        // where rotatedW = originalH
+
+        switch (rotation) {
+            case 90:
+                // rotatedW = originalH, rotatedH = originalW
+                return {
+                    x: pos.y,
+                    y: rotatedW - pos.x
+                };
+            case 180:
+                // rotatedW = originalW, rotatedH = originalH
+                return {
+                    x: rotatedW - pos.x,
+                    y: rotatedH - pos.y
+                };
+            case 270:
+                // rotatedW = originalH, rotatedH = originalW
+                return {
+                    x: rotatedH - pos.y,
+                    y: pos.x
+                };
+            default:
+                return { ...pos };
+        }
     }
 
     // ========================================
@@ -217,6 +307,7 @@ window.MojiQUtils = (function() {
         // イベント座標
         getEventCoordinates,
         getCanvasCoordinates,
+        screenToOriginalCoordinates,  // ビュー回転逆変換
 
         // 数学
         distance,

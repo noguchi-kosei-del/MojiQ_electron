@@ -18,10 +18,12 @@ window._MojiQPdfCache = (function() {
      * @param {number} containerWidth - コンテナ幅
      * @param {number} containerHeight - コンテナ高さ
      * @param {number} dprValue - デバイスピクセル比
+     * @param {number} rotation - ビュー回転角度（オプション、デフォルト0）
      * @returns {string}
      */
-    PageRenderLRUCache.makeKey = function(pageNum, containerWidth, containerHeight, dprValue) {
-        return pageNum + '_' + containerWidth + '_' + containerHeight + '_' + dprValue;
+    PageRenderLRUCache.makeKey = function(pageNum, containerWidth, containerHeight, dprValue, rotation) {
+        var rot = rotation || 0;
+        return pageNum + '_' + containerWidth + '_' + containerHeight + '_' + dprValue + '_r' + rot;
     };
 
     /**

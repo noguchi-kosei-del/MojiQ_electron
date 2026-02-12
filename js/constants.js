@@ -33,6 +33,14 @@ window.MojiQConstants = (function() {
         HIT_TOLERANCE: 5    // ヒットテストの許容誤差
     };
 
+    /** @type {Object} 回転ハンドル */
+    const ROTATION = {
+        HANDLE_DISTANCE: 25,    // tmハンドルからの距離
+        HANDLE_RADIUS: 6,       // 回転ハンドルの半径
+        HANDLE_COLOR: '#4CAF50', // 緑色
+        SNAP_ANGLE: Math.PI / 12 // 15度スナップ（ラジアン）
+    };
+
     // ========================================
     // 色の定数
     // ========================================
@@ -144,6 +152,12 @@ window.MojiQConstants = (function() {
         DEFAULT: 1.0
     };
 
+    /** @type {Object} ビュー回転設定 */
+    const VIEW_ROTATION = {
+        STEP: 90,                       // 回転ステップ（度）
+        OPTIONS: [0, 90, 180, 270]      // 有効な回転値
+    };
+
     // ========================================
     // 描画モード
     // ========================================
@@ -186,6 +200,7 @@ window.MojiQConstants = (function() {
         STAMP_SIZES,
         LINE_WIDTHS,
         SELECTION,
+        ROTATION,
 
         // 色
         COLORS,
@@ -213,6 +228,9 @@ window.MojiQConstants = (function() {
 
         // ズーム
         ZOOM,
+
+        // ビュー回転
+        VIEW_ROTATION,
 
         // モード
         MODES,

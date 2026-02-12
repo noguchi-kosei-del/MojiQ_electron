@@ -426,6 +426,19 @@ G:\共有ドライブ\CLLENN\編集部フォルダ\編集企画部\編集企画_
 ## 変更履歴
 
 ### 2026-02-12
+#### ビュー回転機能の削除
+- **変更内容**: PDFビューの回転ボタン（rotateViewBtn）と回転関連のロジックをすべて削除
+- **理由**: ページ回転機能削除（2026-02-11）に続き、ビュー回転機能も座標変換の複雑さにより描画とヒットテストの座標が一致しない問題があったため
+- **削除内容**:
+  - 回転ボタンUI（rotateViewBtn, rotateLabel）- index.html
+  - 回転コントロールのCSS - header.css, dark-mode.css
+  - viewRotation変数と関連関数（getViewRotation, setViewRotation, rotateViewClockwise, rotateViewCounterClockwise, applyRotationTransform）- pdf-manager.js
+  - 回転イベントリスナーとupdateRotateLabel - zoom.js
+  - 描画座標の回転変換処理 - drawing.js, drawing-renderer.js
+  - プロジェクトメタデータの回転状態保存/復元 - drawing-objects.js
+  - script.jsからの回転関連DOM参照
+- **修正ファイル**: `index.html`, `css/header.css`, `css/dark-mode.css`, `js/zoom.js`, `js/script.js`, `js/pdf-manager.js`, `js/drawing.js`, `js/drawing-renderer.js`, `js/drawing-objects.js`
+
 #### 校正チェックポップアップのElectron対応
 - **問題**: 校正チェックのJSON内容を表示するポップアップがElectronアプリ化すると何も表示されない
 - **原因**: Electronの`contextIsolation: true`設定により、`window.open()`で開いた新しいウィンドウと親ウィンドウ間でJavaScript変数を直接共有できなかった
