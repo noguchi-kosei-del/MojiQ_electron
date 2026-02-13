@@ -126,6 +126,7 @@ canvas-wrapper
 | PDFUtils | `js/pdf/pdf-utils.js` | PDFユーティリティ |
 | PDFCompress | `js/pdf/pdf-compress.js` | PDF圧縮処理 |
 | PDFCache | `js/pdf/pdf-cache.js` | PDFキャッシュ |
+| PDFSpreadState | `js/pdf/pdf-spread-state.js` | 見開き状態管理 |
 | TextLayerManager | `js/text-layer-manager.js` | テキストレイヤー管理 |
 
 ### UIモジュール
@@ -269,7 +270,8 @@ MojiQ/
 │   ├── pdf/                  # PDFサブモジュール
 │   │   ├── pdf-utils.js
 │   │   ├── pdf-compress.js
-│   │   └── pdf-cache.js
+│   │   ├── pdf-cache.js
+│   │   └── pdf-spread-state.js  # 見開き状態管理
 │   ├── simulator/            # シミュレーター
 │   │   ├── state.js
 │   │   ├── dom-elements.js
@@ -662,3 +664,32 @@ G:\共有ドライブ\CLLENN\編集部フォルダ\編集企画部\編集企画_
   - `ctx.getTransform()`で現在のキャンバスのスケーリング係数を取得
   - オフスクリーンキャンバスに現在のスケーリングを適用
 - **修正ファイル**: `js/drawing-renderer.js`
+
+#### リファクタリング: 見開き状態管理モジュールの分離
+- **目的**: pdf-manager.js (5,300行超) の肥大化解消と保守性向上
+- **変更内容**:
+  - `js/pdf/pdf-spread-state.js` を新規作成 - 見開きモードの状態管理を専用モジュールに分離
+  - 12個の状態変数をSpreadStateモジュールに移行:
+    - `spreadViewMode`, `spreadMapping`, `currentSpreadIndex`
+    - `isSpreadRendering`, `pendingSpreadIndex`, `spreadRenderOperationId`
+    - `spreadBindingDirection`, `spreadBlankPagesAdded`
+    - `spreadPageCache`, `spreadCacheReady`, `spreadBaseScale`, `spreadDisplaying`
+  - pdf-manager.jsの全関数でSpreadStateのゲッター/セッターを使用するよう更新
+- **新規ファイル**: `js/pdf/pdf-spread-state.js`
+- **修正ファイル**: `js/pdf-manager.js`, `index.html`
+
+#### リファクタリング: 定数・ユーティリティの整備
+- **目的**: 重複コード削減とマジックナンバーの排除
+- **constants.js追加**:
+  - `STAMP_PARAMS`: スタンプ描画パラメータ（WIDTH_RATIO, HEIGHT_RATIO, CORNER_RADIUS, FONT_SIZE_RATIO）
+  - `STAMP_PARAMS.DEFINITIONS`: テキストスタンプ定義（トル、トルツメ、トルママ、全角アキ、半角アキ、四分アキ、改行）
+  - `STAMP_PARAMS.CIRCLE_STAMPS`: 円形スタンプ定義（済、小文字）
+  - `STAMP_PARAMS.ROUNDED_RECT_STAMPS`: 角丸長方形スタンプ定義（ルビ）
+  - `OUTLINE`: テキストアウトライン描画パラメータ（SHADOW_BLUR, LINE_WIDTH_MAX, LINE_WIDTH_MIN）
+- **utils.js追加**:
+  - `getBoundsFromStartEnd()`: startPos/endPosからバウンディングボックスを計算
+  - `drawTextWithOutline()`: 白フチ付きテキスト描画の汎用関数
+  - `applyRotation()`: オブジェクト回転適用の汎用関数
+- **store.js追加**:
+  - `pdf`状態スキーマ: isProcessing, isRendering, currentFilePath, hasUnsavedChanges, spread（将来の統合用）
+- **修正ファイル**: `js/constants.js`, `js/utils.js`, `js/core/store.js`

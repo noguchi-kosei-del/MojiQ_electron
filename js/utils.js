@@ -144,46 +144,6 @@ window.MojiQUtils = (function() {
         };
     }
 
-    /**
-     * 回転後のキャンバス座標をオリジナル座標系に逆変換
-     * @param {{x: number, y: number}} pos - 回転後のキャンバス座標
-     * @param {number} rotation - ビュー回転角度（0, 90, 180, 270）
-     * @param {number} rotatedW - 回転後のキャンバス幅
-     * @param {number} rotatedH - 回転後のキャンバス高さ
-     * @returns {{x: number, y: number}} オリジナル座標系での座標
-     */
-    function screenToOriginalCoordinates(pos, rotation, rotatedW, rotatedH) {
-        if (rotation === 0) return { ...pos };
-
-        // 逆変換
-        // 90° CW forward: (x, y) → (originalH - y, x)
-        // 90° CW inverse: (x', y') → (y', rotatedW - x')
-        // where rotatedW = originalH
-
-        switch (rotation) {
-            case 90:
-                // rotatedW = originalH, rotatedH = originalW
-                return {
-                    x: pos.y,
-                    y: rotatedW - pos.x
-                };
-            case 180:
-                // rotatedW = originalW, rotatedH = originalH
-                return {
-                    x: rotatedW - pos.x,
-                    y: rotatedH - pos.y
-                };
-            case 270:
-                // rotatedW = originalH, rotatedH = originalW
-                return {
-                    x: rotatedH - pos.y,
-                    y: pos.x
-                };
-            default:
-                return { ...pos };
-        }
-    }
-
     // ========================================
     // 数学ユーティリティ
     // ========================================
@@ -224,6 +184,90 @@ window.MojiQUtils = (function() {
             a.y + a.height < b.y ||
             b.y + b.height < a.y
         );
+    }
+
+    /**
+     * startPos/endPosからバウンディングボックスを計算
+     * @param {{x: number, y: number}} startPos - 開始位置
+     * @param {{x: number, y: number}} endPos - 終了位置
+     * @returns {{minX: number, maxX: number, minY: number, maxY: number}} バウンディングボックス
+     */
+    function getBoundsFromStartEnd(startPos, endPos) {
+        return {
+            minX: Math.min(startPos.x, endPos.x),
+            maxX: Math.max(startPos.x, endPos.x),
+            minY: Math.min(startPos.y, endPos.y),
+            maxY: Math.max(startPos.y, endPos.y)
+        };
+    }
+
+    // ========================================
+    // 描画ユーティリティ
+    // ========================================
+
+    /**
+     * 白フチ付きテキストを描画
+     * @param {CanvasRenderingContext2D} ctx - キャンバスコンテキスト
+     * @param {string} text - 描画するテキスト
+     * @param {number} x - X座標
+     * @param {number} y - Y座標
+     * @param {Object} options - オプション
+     * @param {number} options.fontSize - フォントサイズ
+     * @param {string} options.color - 塗りつぶし色
+     * @param {number} [options.shadowBlur=5] - 影のぼかし半径
+     * @param {number} [options.outlineWidthMax=8] - アウトライン最大線幅
+     * @param {number} [options.outlineWidthMin=2] - アウトライン最小線幅
+     * @param {string} [options.fontFamily='sans-serif'] - フォントファミリー
+     * @param {string} [options.fontWeight='bold'] - フォントウェイト
+     */
+    function drawTextWithOutline(ctx, text, x, y, options) {
+        const {
+            fontSize,
+            color,
+            shadowBlur = 5,
+            outlineWidthMax = 8,
+            outlineWidthMin = 2,
+            fontFamily = 'sans-serif',
+            fontWeight = 'bold'
+        } = options;
+
+        ctx.save();
+        ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = shadowBlur;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+
+        // 複数回ストロークして白フチを作成
+        for (let lw = outlineWidthMax; lw >= outlineWidthMin; lw--) {
+            ctx.lineWidth = lw;
+            ctx.strokeText(text, x, y);
+        }
+
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = color;
+        ctx.fillText(text, x, y);
+        ctx.restore();
+    }
+
+    /**
+     * オブジェクトに回転を適用
+     * @param {CanvasRenderingContext2D} ctx - キャンバスコンテキスト
+     * @param {Object} obj - 描画オブジェクト（rotationプロパティを持つ）
+     * @param {number} centerX - 回転中心X座標
+     * @param {number} centerY - 回転中心Y座標
+     */
+    function applyRotation(ctx, obj, centerX, centerY) {
+        if (obj.rotation) {
+            ctx.translate(centerX, centerY);
+            ctx.rotate(obj.rotation);
+            ctx.translate(-centerX, -centerY);
+        }
     }
 
     // ========================================
@@ -307,12 +351,16 @@ window.MojiQUtils = (function() {
         // イベント座標
         getEventCoordinates,
         getCanvasCoordinates,
-        screenToOriginalCoordinates,  // ビュー回転逆変換
 
         // 数学
         distance,
         clamp,
         boundsIntersect,
+        getBoundsFromStartEnd,
+
+        // 描画
+        drawTextWithOutline,
+        applyRotation,
 
         // 色変換
         hslToHex,
