@@ -23,38 +23,59 @@ window.MojiQPdfLibSaver = (function() {
      * CanvasをPNG Blobに変換（タイムアウト・エラーハンドリング付き）
      * @param {HTMLCanvasElement} canvas - 変換するCanvas
      * @param {number} timeout - タイムアウト時間（ミリ秒、デフォルト30秒）
-     * @returns {Promise<Uint8Array|null>} - PNG画像データ（失敗時はnull）
+     * @returns {Promise<{data: Uint8Array|null, timedOut: boolean}>} - PNG画像データとタイムアウトフラグ
      */
     function canvasToPngWithTimeout(canvas, timeout = 30000) {
         return new Promise((resolve) => {
             const timeoutId = setTimeout(() => {
                 console.warn('canvasToPngWithTimeout: toBlob timeout');
-                resolve(null);
+                resolve({ data: null, timedOut: true });
             }, timeout);
 
             try {
                 canvas.toBlob((blob) => {
                     clearTimeout(timeoutId);
                     if (!blob) {
-                        resolve(null);
+                        resolve({ data: null, timedOut: false });
                         return;
                     }
                     const reader = new FileReader();
                     reader.onload = () => {
-                        resolve(new Uint8Array(reader.result));
+                        resolve({ data: new Uint8Array(reader.result), timedOut: false });
                     };
                     reader.onerror = () => {
                         console.warn('canvasToPngWithTimeout: FileReader error');
-                        resolve(null);
+                        resolve({ data: null, timedOut: false });
                     };
                     reader.readAsArrayBuffer(blob);
                 }, 'image/png');
             } catch (e) {
                 clearTimeout(timeoutId);
                 console.warn('canvasToPngWithTimeout: toBlob exception', e);
-                resolve(null);
+                resolve({ data: null, timedOut: false });
             }
         });
+    }
+
+    /**
+     * オブジェクト数に応じて最適なスケールを計算
+     * @param {number} objectCount - オブジェクト数
+     * @returns {number} - スケール値（2〜4）
+     */
+    function getOptimalScale(objectCount) {
+        if (objectCount > 200) return 2;  // 大量オブジェクト: 低解像度で高速化
+        if (objectCount > 100) return 3;  // 中量オブジェクト: 中解像度
+        return 4;  // 少量オブジェクト: 高解像度
+    }
+
+    /**
+     * オブジェクト数に応じてタイムアウトを計算
+     * @param {number} objectCount - オブジェクト数
+     * @returns {number} - タイムアウト値（ミリ秒）
+     */
+    function getOptimalTimeout(objectCount) {
+        // ベース30秒 + オブジェクト1個あたり500ms
+        return 30000 + (objectCount * 500);
     }
 
     /**
@@ -77,11 +98,14 @@ window.MojiQPdfLibSaver = (function() {
 
         const objects = DrawingObjects.getPageObjects(pageNum);
         if (!objects || objects.length === 0) {
-            return null;
+            return { data: null, timedOut: false };
         }
 
-        // 高解像度でレンダリングするためのスケール
-        const scale = 4;  // 高解像度PDF出力用（テキスト・スタンプのぼやけ防止）
+        // オブジェクト数に応じてスケールとタイムアウトを動的調整
+        const objectCount = objects.length;
+        const scale = getOptimalScale(objectCount);
+        const timeout = getOptimalTimeout(objectCount);
+
         const canvas = document.createElement('canvas');
         canvas.width = width * scale;
         canvas.height = height * scale;
@@ -122,8 +146,8 @@ window.MojiQPdfLibSaver = (function() {
 
         ctx.restore();
 
-        // CanvasをPNG Blobに変換（タイムアウト付き）
-        return canvasToPngWithTimeout(canvas);
+        // CanvasをPNG Blobに変換（動的タイムアウト付き）
+        return canvasToPngWithTimeout(canvas, timeout);
     }
 
     /**
@@ -176,11 +200,16 @@ window.MojiQPdfLibSaver = (function() {
         }
 
         if ((!leftObjects || leftObjects.length === 0) && (!rightObjects || rightObjects.length === 0)) {
-            return null;
+            return { data: null, timedOut: false };
         }
 
-        // 高解像度でレンダリングするためのスケール
-        const scale = 4;  // 高解像度PDF出力用（テキスト・スタンプのぼやけ防止）
+        // オブジェクト数に応じてスケールとタイムアウトを動的調整
+        const totalObjectCount = (spreadObjects ? spreadObjects.length : 0) +
+                                 (leftObjects ? leftObjects.length : 0) +
+                                 (rightObjects ? rightObjects.length : 0);
+        const scale = getOptimalScale(totalObjectCount);
+        const timeout = getOptimalTimeout(totalObjectCount);
+
         const canvas = document.createElement('canvas');
         canvas.width = spreadWidth * scale;
         canvas.height = spreadHeight * scale;
@@ -264,8 +293,8 @@ window.MojiQPdfLibSaver = (function() {
             DrawingRenderer.setExportMode(false);
         }
 
-        // CanvasをPNG Blobに変換（タイムアウト付き）
-        return canvasToPngWithTimeout(canvas);
+        // CanvasをPNG Blobに変換（動的タイムアウト付き）
+        return canvasToPngWithTimeout(canvas, timeout);
     }
 
     /**
@@ -319,6 +348,9 @@ window.MojiQPdfLibSaver = (function() {
         if (spreadMode && spreadMapping.length > 0) {
             return await saveNonDestructiveSpread(state, fileName, options, imagePageData, spreadMapping);
         }
+
+        // タイムアウトしたページを追跡
+        const timedOutPages = [];
 
         try {
             // 新しいPDFドキュメントを作成
@@ -516,7 +548,7 @@ window.MojiQPdfLibSaver = (function() {
                 const displayWidth = mapItem.displayWidth || pageWidth;
                 const displayHeight = mapItem.displayHeight || pageHeight;
 
-                const drawingPng = await renderDrawingObjectsToPng(
+                const drawingResult = await renderDrawingObjectsToPng(
                     pageNum,
                     pageWidth,
                     pageHeight,
@@ -524,8 +556,13 @@ window.MojiQPdfLibSaver = (function() {
                     displayHeight
                 );
 
-                if (drawingPng) {
-                    const drawingImage = await pdfDoc.embedPng(drawingPng);
+                if (drawingResult.timedOut) {
+                    timedOutPages.push(pageNum);
+                    console.warn(`ページ ${pageNum} の描画オブジェクト保存がタイムアウトしました`);
+                }
+
+                if (drawingResult.data) {
+                    const drawingImage = await pdfDoc.embedPng(drawingResult.data);
                     page.drawImage(drawingImage, {
                         x: 0,
                         y: 0,
@@ -550,7 +587,12 @@ window.MojiQPdfLibSaver = (function() {
             // 100%完了を報告
             onProgress(100);
 
-            return { success: true, data: pdfBytes };
+            // タイムアウト警告がある場合は結果に含める
+            const result = { success: true, data: pdfBytes };
+            if (timedOutPages.length > 0) {
+                result.warnings = timedOutPages;
+            }
+            return result;
 
         } catch (error) {
             console.error('PDF保存エラー:', error);
@@ -576,6 +618,8 @@ window.MojiQPdfLibSaver = (function() {
         const spreadCssPageHeight = options.spreadCssPageHeight || null;
         // ページ処理を90%、pdfDoc.save()を10%として扱う
         const PAGE_PROGRESS_RATIO = 0.9;
+        // タイムアウトした見開きを追跡
+        const timedOutSpreads = [];
 
         try {
             const pdfDoc = await PDFDocument.create();
@@ -655,7 +699,7 @@ window.MojiQPdfLibSaver = (function() {
                 const spreadCssWidth = spreadCssPageWidth ? spreadCssPageWidth * 2 : null;
                 const spreadCssHeight = spreadCssPageHeight || null;
 
-                const drawingPng = await renderSpreadDrawingObjectsToPng(
+                const drawingResult = await renderSpreadDrawingObjectsToPng(
                     spread,
                     spreadIdx,
                     spreadWidth,
@@ -668,8 +712,13 @@ window.MojiQPdfLibSaver = (function() {
                     spreadCssHeight
                 );
 
-                if (drawingPng) {
-                    const drawingImage = await pdfDoc.embedPng(drawingPng);
+                if (drawingResult.timedOut) {
+                    timedOutSpreads.push(spreadIdx + 1);
+                    console.warn(`見開き ${spreadIdx + 1} の描画オブジェクト保存がタイムアウトしました`);
+                }
+
+                if (drawingResult.data) {
+                    const drawingImage = await pdfDoc.embedPng(drawingResult.data);
                     page.drawImage(drawingImage, {
                         x: 0,
                         y: 0,
@@ -693,7 +742,12 @@ window.MojiQPdfLibSaver = (function() {
             // 100%完了を報告
             onProgress(100);
 
-            return { success: true, data: pdfBytes };
+            // タイムアウト警告がある場合は結果に含める
+            const result = { success: true, data: pdfBytes };
+            if (timedOutSpreads.length > 0) {
+                result.warnings = timedOutSpreads;
+            }
+            return result;
 
         } catch (error) {
             console.error('見開きPDF保存エラー:', error);
@@ -889,6 +943,9 @@ window.MojiQPdfLibSaver = (function() {
         try {
             const pdfDoc = await PDFDocument.create();
 
+            // タイムアウトした見開きを追跡
+            const timedOutSpreads = [];
+
             for (let spreadIdx = 0; spreadIdx < spreadMapping.length; spreadIdx++) {
                 const spread = spreadMapping[spreadIdx];
 
@@ -967,7 +1024,7 @@ window.MojiQPdfLibSaver = (function() {
                 const spreadCssWidth = spreadCssPageWidth ? spreadCssPageWidth * 2 : null;
                 const spreadCssHeight = spreadCssPageHeight || null;
 
-                const drawingPng = await renderSpreadDrawingObjectsToPng(
+                const drawingResult = await renderSpreadDrawingObjectsToPng(
                     spread,
                     spreadIdx,
                     spreadWidth,
@@ -980,8 +1037,14 @@ window.MojiQPdfLibSaver = (function() {
                     spreadCssHeight
                 );
 
-                if (drawingPng) {
-                    const drawingImage = await pdfDoc.embedPng(drawingPng);
+                // タイムアウトを追跡
+                if (drawingResult && drawingResult.timedOut) {
+                    timedOutSpreads.push(spreadIdx + 1);
+                    console.warn(`見開き透過PDF保存: 見開き ${spreadIdx + 1} の描画オブジェクトレンダリングがタイムアウトしました`);
+                }
+
+                if (drawingResult && drawingResult.data) {
+                    const drawingImage = await pdfDoc.embedPng(drawingResult.data);
                     page.drawImage(drawingImage, {
                         x: 0,
                         y: 0,
@@ -1005,7 +1068,12 @@ window.MojiQPdfLibSaver = (function() {
             // 100%完了を報告
             onProgress(100);
 
-            return { success: true, data: pdfBytes };
+            // 警告があれば結果に含める
+            const result = { success: true, data: pdfBytes };
+            if (timedOutSpreads.length > 0) {
+                result.warnings = [`描画オブジェクトのレンダリングがタイムアウトした見開き: ${timedOutSpreads.join(', ')}`];
+            }
+            return result;
 
         } catch (error) {
             console.error('見開き透過PDF保存エラー:', error);
@@ -1285,6 +1353,9 @@ window.MojiQPdfLibSaver = (function() {
             const srcPdfCache = {};
             const originalPdfBytesArray = state.originalPdfBytesArray || [];
 
+            // タイムアウトしたページを追跡
+            const timedOutPages = [];
+
             for (let i = 0; i < state.totalPages; i++) {
                 const mapItem = state.pageMapping[i];
                 if (!mapItem) {
@@ -1403,7 +1474,7 @@ window.MojiQPdfLibSaver = (function() {
                 const displayWidth = mapItem.displayWidth || pageWidth;
                 const displayHeight = mapItem.displayHeight || pageHeight;
 
-                const drawingPng = await renderDrawingObjectsToPng(
+                const drawingResult = await renderDrawingObjectsToPng(
                     pageNum,
                     pageWidth,
                     pageHeight,
@@ -1411,8 +1482,14 @@ window.MojiQPdfLibSaver = (function() {
                     displayHeight
                 );
 
-                if (drawingPng) {
-                    const drawingImage = await pdfDoc.embedPng(drawingPng);
+                // タイムアウトを追跡
+                if (drawingResult && drawingResult.timedOut) {
+                    timedOutPages.push(pageNum);
+                    console.warn(`透過PDF保存: ページ ${pageNum} の描画オブジェクトレンダリングがタイムアウトしました`);
+                }
+
+                if (drawingResult && drawingResult.data) {
+                    const drawingImage = await pdfDoc.embedPng(drawingResult.data);
                     page.drawImage(drawingImage, {
                         x: 0,
                         y: 0,
@@ -1437,7 +1514,12 @@ window.MojiQPdfLibSaver = (function() {
             // 100%完了を報告
             onProgress(100);
 
-            return { success: true, data: pdfBytes };
+            // 警告があれば結果に含める
+            const result = { success: true, data: pdfBytes };
+            if (timedOutPages.length > 0) {
+                result.warnings = [`描画オブジェクトのレンダリングがタイムアウトしたページ: ${timedOutPages.join(', ')}`];
+            }
+            return result;
 
         } catch (error) {
             console.error('透過PDF保存エラー:', error);
