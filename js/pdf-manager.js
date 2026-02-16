@@ -1054,15 +1054,23 @@ window.MojiQPdfManager = (function() {
 
     /**
      * 保存ボタンの有効/無効状態を更新
-     * 描画オブジェクトがある場合、または画像ページがある場合に有効化
+     * PDFまたは画像が読み込まれている場合に有効化
      */
     function updateSaveButtonState() {
         const savePdfBtn = document.getElementById('savePdfBtn');
         if (!savePdfBtn) return;
 
-        // PDFまたは画像が読み込まれているかチェック
-        const pdfLoaded = window.MojiQGlobal && window.MojiQGlobal.pdfLoaded;
-        if (!pdfLoaded) {
+        // PDFまたは画像が読み込まれているかを複数の方法でチェック
+        // pdfLoadedフラグだけに依存すると、フラグの不整合時に保存できなくなるリスクがある
+        // そのため、実際のデータ状態も確認する
+        const hasPdfDocs = state.pdfDocs && state.pdfDocs.length > 0;
+        const hasPages = state.totalPages > 0;
+        const pdfLoadedFlag = window.MojiQGlobal && window.MojiQGlobal.pdfLoaded;
+
+        // いずれかの条件が満たされていれば保存可能
+        const isLoaded = hasPdfDocs || hasPages || pdfLoadedFlag;
+
+        if (!isLoaded) {
             savePdfBtn.disabled = true;
             updateSaveMenuState(false);
             return;
