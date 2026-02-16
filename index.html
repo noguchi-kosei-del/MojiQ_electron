@@ -306,7 +306,7 @@
                     <input type="checkbox" id="modalVerticalCheck"> 縦書き
                 </label>
             </div>
-            <textarea id="modalTextInput" placeholder="ここにテキストを入力..." tabindex="0"></textarea>
+            <textarea id="modalTextInput" placeholder="ここにテキストを入力..." tabindex="0" maxlength="50000"></textarea>
             <div style="font-size:11px; color:#666; text-align:right;">Enterで改行</div>
             <div id="modalFontSizeRow" style="display:none; margin-top:8px; align-items:center; gap:8px;">
                 <label for="modalFontSizeInput" style="font-size:13px; color:#333;">文字サイズ:</label>
@@ -464,7 +464,7 @@
     <div id="sim-textModal" class="modal-overlay">
         <div style="background:white; padding:20px; border-radius:16px; width:320px; display:flex; flex-direction:column; gap:10px; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
             <strong style="color:#333;">テキスト入力 (Sim)</strong>
-            <textarea id="sim-modalTextInput" rows="5" style="width:100%; resize:vertical; border:1px solid #ccc; padding:8px; border-radius:8px;"></textarea>
+            <textarea id="sim-modalTextInput" rows="5" style="width:100%; resize:vertical; border:1px solid #ccc; padding:8px; border-radius:8px;" maxlength="50000"></textarea>
             <div style="display:flex; justify-content:flex-end; gap:10px;">
                 <button id="sim-modalCancelBtn">キャンセル</button>
                 <button id="sim-modalOkBtn" class="active">OK</button>
@@ -554,14 +554,16 @@
                 " title="クリックで色を選択"></div>
                 <input type="color" id="colorPicker" value="#ff0000" style="display:none;">
 
-                <label>線の太さ <input type="number" id="lineWidthInput" min="0.1" max="10" step="0.1" value="2" style="width:50px; font-weight:bold; color:#1976d2; font-size:12px; text-align:center;">px</label>
-                <input type="range" id="lineWidth" min="0.1" max="10" step="0.1" value="2">
+                <!-- QA対策 #25,#26: 線幅の範囲制限 (1-20px) -->
+                <label>線の太さ <input type="number" id="lineWidthInput" min="1" max="20" step="0.5" value="3" style="width:50px; font-weight:bold; color:#1976d2; font-size:12px; text-align:center;">px</label>
+                <input type="range" id="lineWidth" min="1" max="20" step="0.5" value="3">
 
                 <label>背景透過度 <input type="number" id="bgOpacityInput" min="0" max="100" step="1" value="100" style="width:50px; font-weight:bold; color:#26c6da; font-size:12px; text-align:center;">%</label>
                 <input type="range" id="bgOpacitySlider" min="0" max="100" value="100" class="bg-opacity-sidebar-slider" disabled>
 
+                <!-- QA対策 #27,#28: フォントサイズの範囲制限 (1-500pt) -->
                 <label id="fontSizeLabel">文字サイズ (pt)</label>
-                <input type="number" id="fontSizeInput" min="8" max="100" value="12" style="font-weight:bold; font-size:14px;">
+                <input type="number" id="fontSizeInput" min="1" max="500" value="12" style="font-weight:bold; font-size:14px;">
 
 
                 <div id="scaleDisplay" style="font-size:10px; color:#1976d2; margin-bottom:8px; margin-top:10px; text-align:left; font-weight:bold;">縮尺: 未設定</div>

@@ -1433,3 +1433,12 @@ body.dark-mode .sidebar-bottom-btn:hover {
     background: transparent !important;
     background-color: transparent !important;
 }
+
+/* 非表示状態のボタン（赤色） */
+body.dark-mode .sidebar-bottom-btn.hidden-state {
+    color: #ef5350;
+}
+
+body.dark-mode .sidebar-bottom-btn.hidden-state:hover {
+    color: #f44336;
+}

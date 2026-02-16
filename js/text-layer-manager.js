@@ -70,9 +70,11 @@ window.MojiQTextLayerManager = (function() {
         if (btn) {
             if (isHidden) {
                 btn.title = 'コメントテキスト表示 (Ctrl+T) - 非表示中';
+                btn.classList.add('hidden-state');
                 if (slash) slash.style.display = '';
             } else {
                 btn.title = 'コメントテキスト非表示 (Ctrl+T)';
+                btn.classList.remove('hidden-state');
                 if (slash) slash.style.display = 'none';
             }
         }
@@ -83,6 +85,16 @@ window.MojiQTextLayerManager = (function() {
      */
     function getIsHidden() {
         return isHidden;
+    }
+
+    /**
+     * 非表示状態を設定（PDF読み込み時の状態復元用）
+     * @param {boolean} hidden - 非表示にするかどうか
+     */
+    function setIsHidden(hidden) {
+        if (!initialized) init();
+        isHidden = !!hidden;
+        updateButtonState();
     }
 
     /**
@@ -123,6 +135,7 @@ window.MojiQTextLayerManager = (function() {
         show: show,
         hide: hide,
         isHidden: getIsHidden,
+        setIsHidden: setIsHidden,  // PDF読み込み時の状態復元用
         isVisible: function() { return !isHidden; }, // 後方互換性
         isPdfAnnotationObject: isPdfAnnotationObject,
         shouldRenderObject: shouldRenderObject,

@@ -63,7 +63,11 @@ window.MojiQZoom = (function() {
      */
     function performZoom(newZoom) {
         const oldZoom = state.currentZoom;
-        const nextZoom = Math.min(Math.max(newZoom, 0.1), 5.0);
+        // QA対策 #29: constants.jsからズーム制限値を取得
+        const zoomLimits = window.MojiQConstants?.ZOOM || {};
+        const minZoom = zoomLimits.MIN || 0.25;
+        const maxZoom = zoomLimits.MAX || 4.0;
+        const nextZoom = Math.min(Math.max(newZoom, minZoom), maxZoom);
         if (oldZoom === nextZoom) return;
 
         const rect = canvasArea.getBoundingClientRect();
@@ -175,7 +179,11 @@ window.MojiQZoom = (function() {
      * @param {number} zoom - ズーム値
      */
     function setZoom(zoom) {
-        state.currentZoom = zoom;
+        // QA対策 #29: ズーム値のバウンドチェック
+        const zoomLimits = window.MojiQConstants?.ZOOM || {};
+        const minZoom = zoomLimits.MIN || 0.25;
+        const maxZoom = zoomLimits.MAX || 4.0;
+        state.currentZoom = Math.min(Math.max(zoom, minZoom), maxZoom);
         updateZoomDisplay();
     }
 

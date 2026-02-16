@@ -11,15 +11,15 @@ window.MojiQSettings = (function() {
         version: 1,
         // ツール別線幅設定
         toolLineWidths: {
-            draw: 2,        // ペン
+            draw: 3,        // ペン
             marker: 8,      // マーカー
-            eraser: 10,     // 消しゴム
-            line: 2,        // 直線
-            arrow: 2,       // 矢印
-            doubleArrow: 2, // 両端矢印
-            rect: 2,        // 矩形
-            ellipse: 2,     // 楕円
-            polyline: 2     // 折れ線
+            eraser: 5,      // 消しゴム
+            line: 3,        // 直線
+            arrow: 3,       // 矢印
+            doubleArrow: 3, // 両端矢印
+            rect: 3,        // 矩形
+            ellipse: 3,     // 楕円
+            polyline: 3     // 折れ線
         },
         shortcuts: {
             // ズーム操作
@@ -246,7 +246,7 @@ window.MojiQSettings = (function() {
         if (settings && settings.toolLineWidths && settings.toolLineWidths[toolName] !== undefined) {
             return settings.toolLineWidths[toolName];
         }
-        return DEFAULT_SETTINGS.toolLineWidths[toolName] || 2;
+        return DEFAULT_SETTINGS.toolLineWidths[toolName] || 3;
     }
 
     /**

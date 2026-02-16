@@ -41,6 +41,13 @@ window.MojiQPdfManager = (function() {
     // プログレスバー処理中フラグ（保存・読込中のファイルオープン防止）
     let isProcessing = false;
 
+    // 保存ロック機構（QA対策 #42, #52, #54）
+    let saveOperation = {
+        isLocked: false,
+        lockTime: null
+    };
+    let saveDebounceTimer = null;
+
     // ページレンダリング中フラグ（連打対策）
     let isRendering = false;
     let pendingPageNum = null;  // レンダリング中に要求されたページ番号
@@ -273,6 +280,37 @@ window.MojiQPdfManager = (function() {
 
         if (totalAnnotations > 0) {
             console.log('[MojiQ PdfManager] 合計 ' + totalAnnotations + '件の注釈を読み込みました');
+        }
+    }
+
+    /**
+     * MojiQメタデータ（コメントテキスト非表示状態など）をPDFから読み込み復元
+     * @param {Uint8Array} pdfBytes - PDFバイトデータ
+     */
+    async function loadMojiQMetadata(pdfBytes) {
+        if (!pdfBytes || !window.PDFLib) return;
+
+        try {
+            const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes, {
+                ignoreEncryption: true
+            });
+
+            // SubjectフィールドからMojiQメタデータを読み込む
+            const subject = pdfDoc.getSubject();
+
+            if (subject && subject.includes('MojiQ:commentTextHidden=true')) {
+                // コメントテキスト非表示状態を復元
+                if (window.MojiQTextLayerManager && window.MojiQTextLayerManager.setIsHidden) {
+                    window.MojiQTextLayerManager.setIsHidden(true);
+                }
+            } else {
+                // 明示的に表示状態に設定（他のPDFから状態が引き継がれるのを防止）
+                if (window.MojiQTextLayerManager && window.MojiQTextLayerManager.setIsHidden) {
+                    window.MojiQTextLayerManager.setIsHidden(false);
+                }
+            }
+        } catch (e) {
+            // メタデータ読み込み失敗は無視（非MojiQ PDFの場合など）
         }
     }
 
@@ -1582,6 +1620,32 @@ window.MojiQPdfManager = (function() {
             };
             const pdf = await loadingTask.promise;
 
+            // ページ数チェック（QA対策 #3）
+            const pdfLimits = window.MojiQConstants?.PDF_LIMITS || {};
+            const maxPages = pdfLimits.MAX_PAGES || 500;
+            const warningPages = pdfLimits.WARNING_PAGES || 200;
+            const numPages = pdf.numPages;
+
+            if (numPages > maxPages) {
+                await MojiQModal.showAlert(
+                    `このPDFは${numPages}ページあります。\n処理可能な最大ページ数(${maxPages})を超えているため開けません。`,
+                    'エラー'
+                );
+                isProcessing = false;
+                return;
+            }
+
+            if (numPages > warningPages) {
+                const proceed = await MojiQModal.showConfirm(
+                    `このPDFは${numPages}ページあります。\n処理に時間がかかる可能性があります。続行しますか？`,
+                    '確認'
+                );
+                if (!proceed) {
+                    isProcessing = false;
+                    return;
+                }
+            }
+
             state.pdfDocs = [pdf];
 
             // 元のPDFバイトデータを保存（非破壊保存用）
@@ -1686,6 +1750,10 @@ window.MojiQPdfManager = (function() {
             updateProgressOverlayText('注釈を読み込み中...');
             await loadPdfAnnotationsForAllPages(pdf);
 
+            // MojiQメタデータ（コメントテキスト非表示状態など）を読み込み
+            // 元のPDFファイルデータからメタデータを読み込む（最適化前のデータを使用）
+            await loadMojiQMetadata(typedarray);
+
             // プログレスオーバーレイを非表示
             isProcessing = false;
             showLoadingOverlay(false);
@@ -1705,15 +1773,57 @@ window.MojiQPdfManager = (function() {
      * PDF保存（非破壊合成方式 - pdf-lib使用）
      * 背景透過モードがオンの場合は透過PDFとして保存
      */
+    /**
+     * 保存ロックを取得（QA対策 #42, #52, #54）
+     * @returns {boolean} ロック取得成功
+     */
+    function acquireSaveLock() {
+        const now = Date.now();
+        const timeout = window.MojiQConstants?.SAVE?.LOCK_TIMEOUT_MS || 60000;
+
+        // タイムアウトしたロックは解除
+        if (saveOperation.isLocked && (now - saveOperation.lockTime) > timeout) {
+            console.warn('[MojiQ] 保存ロックがタイムアウトしました。強制解除します。');
+            saveOperation.isLocked = false;
+        }
+
+        if (saveOperation.isLocked) {
+            return false;
+        }
+
+        saveOperation.isLocked = true;
+        saveOperation.lockTime = now;
+        return true;
+    }
+
+    /**
+     * 保存ロックを解放
+     */
+    function releaseSaveLock() {
+        saveOperation.isLocked = false;
+        saveOperation.lockTime = null;
+    }
+
     async function savePdf() {
         if (state.pdfDocs.length === 0) return;
 
         // 処理中の場合は保存をスキップ（ロード中に保存されるのを防止）
         if (isProcessing) return;
 
+        // 保存ロック取得（QA対策 #42, #52, #54）
+        if (!acquireSaveLock()) {
+            console.warn('[MojiQ] 保存処理が既に実行中です。');
+            MojiQModal.showAlert('現在保存処理中です。完了までお待ちください。', '処理中');
+            return;
+        }
+
         // 背景透過モードがオンの場合は透過PDF保存を実行
         if (isBgTransparentMode) {
-            await saveTransparentPdfDirect();
+            try {
+                await saveTransparentPdfDirect();
+            } finally {
+                releaseSaveLock();
+            }
             return;
         }
 
@@ -1847,6 +1957,7 @@ window.MojiQPdfManager = (function() {
                 hideProgressOverlay();
             }
             isProcessing = false;
+            releaseSaveLock(); // QA対策 #42, #52, #54
             if (savePdfBtn) {
                 savePdfBtn.title = originalTitle;
                 savePdfBtn.disabled = false;
@@ -1864,9 +1975,20 @@ window.MojiQPdfManager = (function() {
         // 処理中の場合は保存をスキップ（ロード中に保存されるのを防止）
         if (isProcessing) return;
 
+        // 保存ロック取得（QA対策 #42, #52, #54）
+        if (!acquireSaveLock()) {
+            console.warn('[MojiQ] 保存処理が既に実行中です。');
+            MojiQModal.showAlert('現在保存処理中です。完了までお待ちください。', '処理中');
+            return;
+        }
+
         // 背景透過モードがオンの場合は透過PDF保存を実行
         if (isBgTransparentMode) {
-            await saveTransparentPdfDirect();
+            try {
+                await saveTransparentPdfDirect();
+            } finally {
+                releaseSaveLock();
+            }
             return;
         }
 
@@ -1984,6 +2106,7 @@ window.MojiQPdfManager = (function() {
                 hideProgressOverlay();
             }
             isProcessing = false;
+            releaseSaveLock(); // QA対策 #42, #52, #54
             if (savePdfBtn) {
                 savePdfBtn.title = originalTitle;
                 savePdfBtn.disabled = false;
@@ -2785,6 +2908,32 @@ window.MojiQPdfManager = (function() {
             };
             const pdf = await loadingTask.promise;
 
+            // ページ数チェック（QA対策 #3）
+            const pdfLimits2 = window.MojiQConstants?.PDF_LIMITS || {};
+            const maxPages2 = pdfLimits2.MAX_PAGES || 500;
+            const warningPages2 = pdfLimits2.WARNING_PAGES || 200;
+            const numPages2 = pdf.numPages;
+
+            if (numPages2 > maxPages2) {
+                await MojiQModal.showAlert(
+                    `このPDFは${numPages2}ページあります。\n処理可能な最大ページ数(${maxPages2})を超えているため開けません。`,
+                    'エラー'
+                );
+                isProcessing = false;
+                return;
+            }
+
+            if (numPages2 > warningPages2) {
+                const proceed = await MojiQModal.showConfirm(
+                    `このPDFは${numPages2}ページあります。\n処理に時間がかかる可能性があります。続行しますか？`,
+                    '確認'
+                );
+                if (!proceed) {
+                    isProcessing = false;
+                    return;
+                }
+            }
+
             state.pdfDocs = [pdf];
 
             // 元のPDFバイトデータを保存（非破壊保存用）
@@ -2877,6 +3026,10 @@ window.MojiQPdfManager = (function() {
             // PDF注釈を読み込み
             updateProgressOverlayText('注釈を読み込み中...');
             await loadPdfAnnotationsForAllPages(pdf);
+
+            // MojiQメタデータ（コメントテキスト非表示状態など）を読み込み
+            // 元のPDFデータからメタデータを読み込む（最適化/圧縮前のデータを使用）
+            await loadMojiQMetadata(typedarray);
 
             hideProgressOverlay();
             // 検版ビューワー連携: 指定された初期ページを表示
@@ -3006,6 +3159,10 @@ window.MojiQPdfManager = (function() {
             // PDF注釈を読み込み
             showProgressOverlay('注釈を読み込み中...');
             await loadPdfAnnotationsForAllPages(pdf);
+
+            // MojiQメタデータ（コメントテキスト非表示状態など）を読み込み
+            // 元のPDFデータからメタデータを読み込む
+            await loadMojiQMetadata(bytes);
 
             hideProgressOverlay();
 

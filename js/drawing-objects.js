@@ -20,6 +20,9 @@ window.MojiQDrawingObjects = (function() {
         undoStacks: {},  // undoStacks[pageNum] = [...]
         redoStacks: {},  // redoStacks[pageNum] = [...]
 
+        // QA対策 #38,#41: Undo/Redo処理中フラグ（連続操作・描画中操作防止）
+        isUndoRedoProcessing: false,
+
         // オブジェクトIDカウンター
         idCounter: 0
     };
@@ -129,6 +132,24 @@ window.MojiQDrawingObjects = (function() {
          */
         addObject: function(pageNum, obj) {
             initPageData(pageNum);
+
+            // オブジェクト数制限チェック（QA対策 #21）
+            const limits = window.MojiQConstants?.OBJECT_LIMITS || {};
+            const maxObjects = limits.MAX_PER_PAGE || 5000;
+            const currentObjects = state.pageObjects[pageNum].objects;
+
+            if (currentObjects.length >= maxObjects) {
+                // 非同期でアラート表示（描画処理をブロックしない）
+                setTimeout(() => {
+                    if (window.MojiQModal) {
+                        MojiQModal.showAlert(
+                            `このページの描画オブジェクト数が上限(${maxObjects})に達しました。\n新しいオブジェクトを追加するには、不要なオブジェクトを削除してください。`,
+                            '制限に達しました'
+                        );
+                    }
+                }, 0);
+                return null; // 追加失敗
+            }
 
             // IDが無ければ生成
             if (!obj.id) {
@@ -567,6 +588,17 @@ window.MojiQDrawingObjects = (function() {
          * Undo状態を保存
          */
         saveUndoState: function(pageNum, action, data) {
+            // QA対策 #41: 処理中は保存しない
+            if (state.isUndoRedoProcessing) {
+                return;
+            }
+
+            // QA対策 #39: データ検証
+            if (!action || data === undefined || data === null) {
+                console.warn('[MojiQ] saveUndoState: 無効なデータ', { action, data });
+                return;
+            }
+
             if (!state.undoStacks[pageNum]) {
                 state.undoStacks[pageNum] = [];
             }
@@ -577,8 +609,10 @@ window.MojiQDrawingObjects = (function() {
                 timestamp: Date.now()
             });
 
-            // スタックサイズ制限（最大30件）
-            if (state.undoStacks[pageNum].length > 30) {
+            // QA対策 #40: constants.jsからスタックサイズ制限を取得
+            const historyLimits = window.MojiQConstants?.HISTORY || {};
+            const maxStackSize = historyLimits.MAX_STACK_SIZE || 50;
+            if (state.undoStacks[pageNum].length > maxStackSize) {
                 state.undoStacks[pageNum].shift();
             }
 
@@ -602,133 +636,175 @@ window.MojiQDrawingObjects = (function() {
          * Undo実行
          */
         undo: function(pageNum) {
+            // QA対策 #38,#41: 処理中は実行しない（連続操作防止）
+            if (state.isUndoRedoProcessing) {
+                console.warn('[MojiQ] Undo: 処理中のため実行をスキップ');
+                return false;
+            }
+
             if (!state.undoStacks[pageNum] || state.undoStacks[pageNum].length === 0) {
                 return false;
             }
 
-            initPageData(pageNum);
-            const action = state.undoStacks[pageNum].pop();
-            const objects = state.pageObjects[pageNum].objects;
+            // 処理開始
+            state.isUndoRedoProcessing = true;
 
-            // Redo用に保存
-            if (!state.redoStacks[pageNum]) {
-                state.redoStacks[pageNum] = [];
+            try {
+                initPageData(pageNum);
+                const action = state.undoStacks[pageNum].pop();
+
+                // QA対策 #39: アクションデータの検証
+                if (!action || !action.action || action.data === undefined) {
+                    console.warn('[MojiQ] Undo: 無効なアクションデータ', action);
+                    return false;
+                }
+
+                const objects = state.pageObjects[pageNum].objects;
+
+                // Redo用に保存
+                if (!state.redoStacks[pageNum]) {
+                    state.redoStacks[pageNum] = [];
+                }
+                state.redoStacks[pageNum].push(action);
+
+                // 操作を取り消し
+                switch (action.action) {
+                    case 'add':
+                        // 追加を取り消し → 削除
+                        const idx = this.findIndexById(pageNum, action.data.id);
+                        if (idx >= 0) {
+                            objects.splice(idx, 1);
+                        }
+                        break;
+
+                    case 'remove':
+                        // 削除を取り消し → 復元
+                        objects.splice(action.data.index, 0, action.data.object);
+                        break;
+
+                    case 'update':
+                        // 更新を取り消し → 前の状態に戻す
+                        const updateIdx = this.findIndexById(pageNum, action.data.old.id);
+                        if (updateIdx >= 0) {
+                            objects[updateIdx] = action.data.old;
+                        }
+                        break;
+
+                    case 'clear':
+                        // クリアを取り消し → 復元
+                        state.pageObjects[pageNum].objects = action.data.objects;
+                        break;
+                }
+
+                // idIndexを再構築（undo操作後のインデックス整合性を保証）
+                rebuildPageIndex(pageNum);
+
+                // ページキャッシュを無効化（描画オブジェクトが変更されたため）
+                if (window.MojiQPdfManager && MojiQPdfManager.invalidatePageCache) {
+                    MojiQPdfManager.invalidatePageCache(pageNum);
+                }
+
+                // 変更フラグをセット（上書き保存時のスキップ判定用）
+                if (window.MojiQPdfManager && MojiQPdfManager.markAsChanged) {
+                    MojiQPdfManager.markAsChanged();
+                }
+
+                // ヒストリーパネルへ通知
+                window.dispatchEvent(new CustomEvent('mojiq:history-undo'));
+
+                return true;
+            } finally {
+                // QA対策 #38: 処理完了フラグをリセット
+                state.isUndoRedoProcessing = false;
             }
-            state.redoStacks[pageNum].push(action);
-
-            // 操作を取り消し
-            switch (action.action) {
-                case 'add':
-                    // 追加を取り消し → 削除
-                    const idx = this.findIndexById(pageNum, action.data.id);
-                    if (idx >= 0) {
-                        objects.splice(idx, 1);
-                    }
-                    break;
-
-                case 'remove':
-                    // 削除を取り消し → 復元
-                    objects.splice(action.data.index, 0, action.data.object);
-                    break;
-
-                case 'update':
-                    // 更新を取り消し → 前の状態に戻す
-                    const updateIdx = this.findIndexById(pageNum, action.data.old.id);
-                    if (updateIdx >= 0) {
-                        objects[updateIdx] = action.data.old;
-                    }
-                    break;
-
-                case 'clear':
-                    // クリアを取り消し → 復元
-                    state.pageObjects[pageNum].objects = action.data.objects;
-                    break;
-            }
-
-            // idIndexを再構築（undo操作後のインデックス整合性を保証）
-            rebuildPageIndex(pageNum);
-
-            // ページキャッシュを無効化（描画オブジェクトが変更されたため）
-            if (window.MojiQPdfManager && MojiQPdfManager.invalidatePageCache) {
-                MojiQPdfManager.invalidatePageCache(pageNum);
-            }
-
-            // 変更フラグをセット（上書き保存時のスキップ判定用）
-            if (window.MojiQPdfManager && MojiQPdfManager.markAsChanged) {
-                MojiQPdfManager.markAsChanged();
-            }
-
-            // ヒストリーパネルへ通知
-            window.dispatchEvent(new CustomEvent('mojiq:history-undo'));
-
-            return true;
         },
 
         /**
          * Redo実行
          */
         redo: function(pageNum) {
+            // QA対策 #38,#41: 処理中は実行しない（連続操作防止）
+            if (state.isUndoRedoProcessing) {
+                console.warn('[MojiQ] Redo: 処理中のため実行をスキップ');
+                return false;
+            }
+
             if (!state.redoStacks[pageNum] || state.redoStacks[pageNum].length === 0) {
                 return false;
             }
 
-            initPageData(pageNum);
-            const action = state.redoStacks[pageNum].pop();
-            const objects = state.pageObjects[pageNum].objects;
+            // 処理開始
+            state.isUndoRedoProcessing = true;
 
-            // Undo用に保存（ただしRedoスタックはクリアしない）
-            if (!state.undoStacks[pageNum]) {
-                state.undoStacks[pageNum] = [];
+            try {
+                initPageData(pageNum);
+                const action = state.redoStacks[pageNum].pop();
+
+                // QA対策 #39: アクションデータの検証
+                if (!action || !action.action || action.data === undefined) {
+                    console.warn('[MojiQ] Redo: 無効なアクションデータ', action);
+                    return false;
+                }
+
+                const objects = state.pageObjects[pageNum].objects;
+
+                // Undo用に保存（ただしRedoスタックはクリアしない）
+                if (!state.undoStacks[pageNum]) {
+                    state.undoStacks[pageNum] = [];
+                }
+                state.undoStacks[pageNum].push(action);
+
+                // 操作を再実行
+                switch (action.action) {
+                    case 'add':
+                        // 追加を再実行
+                        objects.push(action.data);
+                        break;
+
+                    case 'remove':
+                        // 削除を再実行
+                        const idx = this.findIndexById(pageNum, action.data.object.id);
+                        if (idx >= 0) {
+                            objects.splice(idx, 1);
+                        }
+                        break;
+
+                    case 'update':
+                        // 更新を再実行
+                        const updateIdx = this.findIndexById(pageNum, action.data.new.id);
+                        if (updateIdx >= 0) {
+                            objects[updateIdx] = action.data.new;
+                        }
+                        break;
+
+                    case 'clear':
+                        // クリアを再実行
+                        state.pageObjects[pageNum].objects = [];
+                        state.pageObjects[pageNum].selectedIndex = null;
+                        break;
+                }
+
+                // idIndexを再構築（redo操作後のインデックス整合性を保証）
+                rebuildPageIndex(pageNum);
+
+                // ページキャッシュを無効化（描画オブジェクトが変更されたため）
+                if (window.MojiQPdfManager && MojiQPdfManager.invalidatePageCache) {
+                    MojiQPdfManager.invalidatePageCache(pageNum);
+                }
+
+                // 変更フラグをセット（上書き保存時のスキップ判定用）
+                if (window.MojiQPdfManager && MojiQPdfManager.markAsChanged) {
+                    MojiQPdfManager.markAsChanged();
+                }
+
+                // ヒストリーパネルへ通知
+                window.dispatchEvent(new CustomEvent('mojiq:history-redo'));
+
+                return true;
+            } finally {
+                // QA対策 #38: 処理完了フラグをリセット
+                state.isUndoRedoProcessing = false;
             }
-            state.undoStacks[pageNum].push(action);
-
-            // 操作を再実行
-            switch (action.action) {
-                case 'add':
-                    // 追加を再実行
-                    objects.push(action.data);
-                    break;
-
-                case 'remove':
-                    // 削除を再実行
-                    const idx = this.findIndexById(pageNum, action.data.object.id);
-                    if (idx >= 0) {
-                        objects.splice(idx, 1);
-                    }
-                    break;
-
-                case 'update':
-                    // 更新を再実行
-                    const updateIdx = this.findIndexById(pageNum, action.data.new.id);
-                    if (updateIdx >= 0) {
-                        objects[updateIdx] = action.data.new;
-                    }
-                    break;
-
-                case 'clear':
-                    // クリアを再実行
-                    state.pageObjects[pageNum].objects = [];
-                    state.pageObjects[pageNum].selectedIndex = null;
-                    break;
-            }
-
-            // idIndexを再構築（redo操作後のインデックス整合性を保証）
-            rebuildPageIndex(pageNum);
-
-            // ページキャッシュを無効化（描画オブジェクトが変更されたため）
-            if (window.MojiQPdfManager && MojiQPdfManager.invalidatePageCache) {
-                MojiQPdfManager.invalidatePageCache(pageNum);
-            }
-
-            // 変更フラグをセット（上書き保存時のスキップ判定用）
-            if (window.MojiQPdfManager && MojiQPdfManager.markAsChanged) {
-                MojiQPdfManager.markAsChanged();
-            }
-
-            // ヒストリーパネルへ通知
-            window.dispatchEvent(new CustomEvent('mojiq:history-redo'));
-
-            return true;
         },
 
         /**

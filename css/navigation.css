@@ -161,6 +161,15 @@
     height: 20px;
 }
 
+/* 非表示状態のボタン（赤色） */
+.sidebar-bottom-btn.hidden-state {
+    color: #e53935;
+}
+
+.sidebar-bottom-btn.hidden-state:hover {
+    color: #c62828;
+}
+
 /* サイドバー折り畳み時は非表示 */
 .sidebar.collapsed .sidebar-bottom-actions {
     display: none;

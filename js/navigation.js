@@ -69,13 +69,14 @@ window.MojiQNavigation = (function() {
     function restoreSavedState() {
         const savedHidden = localStorage.getItem('mojiq_pagebar_hidden');
         if (savedHidden === 'true') {
-            // ページバーを非表示状態で初期化
+            // ページバーを非表示状態で初期化（赤色アイコン）
             isUserHidden = true;
             bottomNavBar.classList.add('user-hidden');
             if (navBarToggleBtn) {
                 navBarToggleBtn.querySelector('.nav-toggle-hide').style.display = 'none';
                 navBarToggleBtn.querySelector('.nav-toggle-show').style.display = '';
                 navBarToggleBtn.title = 'ページバーを表示';
+                navBarToggleBtn.classList.add('hidden-state');
             }
         }
     }
@@ -530,11 +531,12 @@ window.MojiQNavigation = (function() {
         isUserHidden = true;
         clearTimeout(navBarHideTimer);
         bottomNavBar.classList.add('user-hidden');
-        // アイコン切り替え: 目→目斜線
+        // アイコン切り替え: 目→目斜線（赤色）
         if (navBarToggleBtn) {
             navBarToggleBtn.querySelector('.nav-toggle-hide').style.display = 'none';
             navBarToggleBtn.querySelector('.nav-toggle-show').style.display = '';
             navBarToggleBtn.title = 'ページバーを表示';
+            navBarToggleBtn.classList.add('hidden-state');
         }
         // 設定を保存
         localStorage.setItem('mojiq_pagebar_hidden', 'true');
@@ -546,11 +548,12 @@ window.MojiQNavigation = (function() {
     function userShowNavBar() {
         isUserHidden = false;
         bottomNavBar.classList.remove('user-hidden');
-        // アイコン切り替え: 目斜線→目
+        // アイコン切り替え: 目斜線→目（通常色）
         if (navBarToggleBtn) {
             navBarToggleBtn.querySelector('.nav-toggle-hide').style.display = '';
             navBarToggleBtn.querySelector('.nav-toggle-show').style.display = 'none';
             navBarToggleBtn.title = 'ページバーを隠す';
+            navBarToggleBtn.classList.remove('hidden-state');
         }
         showNavBar();
         resetNavBarTimer();

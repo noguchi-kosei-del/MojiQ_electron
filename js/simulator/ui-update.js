@@ -409,7 +409,19 @@ window.SimulatorUI = (function() {
         // ステップボタン
         document.querySelectorAll('.step-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                State.set('ptStep', parseFloat(e.target.dataset.step));
+                const step = parseFloat(e.target.dataset.step);
+
+                // バリデーション（QA対策 #63）
+                const limits = window.MojiQConstants?.SIMULATOR_LIMITS || {};
+                const minStep = limits.MIN_PT_STEP || 0.1;
+                const maxStep = limits.MAX_PT_STEP || 10;
+
+                if (isNaN(step) || step < minStep || step > maxStep) {
+                    console.warn('[MojiQ] 無効なステップ値:', step);
+                    return;
+                }
+
+                State.set('ptStep', step);
                 updateStepVisuals();
                 setWheelMode('pt');
             });

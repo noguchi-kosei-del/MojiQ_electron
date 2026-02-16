@@ -73,11 +73,12 @@ window.MojiQConstants = (function() {
 
     /** @type {Object} 線の太さ */
     const LINE_WIDTHS = {
-        DEFAULT: 2,         // デフォルトの線幅
+        DEFAULT: 3,         // ペンのデフォルト線幅
+        MARKER_DEFAULT: 8,  // マーカーのデフォルト線幅
+        ERASER_DEFAULT: 5,  // 消しゴムのデフォルトサイズ
         OUTLINE: 3,         // テキストのアウトライン幅
         MIN: 1,             // 最小線幅
-        MAX: 50,            // 最大線幅
-        ERASER_DEFAULT: 2   // 消しゴムのデフォルトサイズ（ペンと同じ）
+        MAX: 20             // 最大線幅
     };
 
     /** @type {Object} 選択ハンドル */
@@ -157,6 +158,49 @@ window.MojiQConstants = (function() {
         PDF_OPTIMIZE_LIMIT: 500 * 1024 * 1024,  // pdf-lib最適化処理の上限 (500MB未満で発動)
         IMAGE_SIZE_LIMIT: 300 * 1024 * 1024,    // 画像圧縮しきい値 (300MB)
         IMAGE_COMPRESS_QUALITY: 0.75            // JPEG圧縮品質 (0.0-1.0)
+    };
+
+    // ========================================
+    // 入力制限（QA対策）
+    // ========================================
+
+    /** @type {Object} PDF制限 */
+    const PDF_LIMITS = {
+        MAX_PAGES: 500,                         // 最大ページ数
+        WARNING_PAGES: 200,                     // 警告を出すページ数
+        SINGLE_PAGE_SIZE_LIMIT: 100 * 1024 * 1024  // 単ページ100MB
+    };
+
+    /** @type {Object} オブジェクト制限 */
+    const OBJECT_LIMITS = {
+        MAX_PER_PAGE: 5000,         // 1ページあたりの最大オブジェクト数
+        WARNING_PER_PAGE: 3000      // 警告を出すオブジェクト数
+    };
+
+    /** @type {Object} ストローク制限 */
+    const STROKE_LIMITS = {
+        MAX_POINTS: 50000,          // 1ストロークあたりの最大ポイント数
+        WARNING_POINTS: 30000       // 警告を出すポイント数
+    };
+
+    /** @type {Object} テキスト制限 */
+    const TEXT_LIMITS = {
+        MAX_LENGTH: 50000,          // 最大文字数
+        WARNING_LENGTH: 30000       // 警告を出す文字数
+    };
+
+    /** @type {Object} 保存設定 */
+    const SAVE = {
+        DEBOUNCE_MS: 500,           // 保存デバウンス時間
+        LOCK_TIMEOUT_MS: 60000      // ロックタイムアウト
+    };
+
+    /** @type {Object} シミュレーター制限 */
+    const SIMULATOR_LIMITS = {
+        MIN_CALIBRATION_MM: 0.1,    // キャリブレーション最小値
+        MAX_CALIBRATION_MM: 10000,  // キャリブレーション最大値
+        MIN_PT_STEP: 0.1,           // ptステップ最小値
+        MAX_PT_STEP: 10             // ptステップ最大値
     };
 
     // ========================================
@@ -270,6 +314,14 @@ window.MojiQConstants = (function() {
 
         // しきい値
         THRESHOLDS,
+
+        // 入力制限（QA対策）
+        PDF_LIMITS,
+        OBJECT_LIMITS,
+        STROKE_LIMITS,
+        TEXT_LIMITS,
+        SAVE,
+        SIMULATOR_LIMITS,
 
         // 履歴
         HISTORY,

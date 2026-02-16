@@ -428,6 +428,43 @@ G:\共有ドライブ\CLLENN\編集部フォルダ\編集企画部\編集企画_
 ## 変更履歴
 
 ### 2026-02-16
+#### 見開き表示時のPDF保存エラー修正
+- **問題**: 見開き表示にして保存すると「`png` must be of type `string` or `Uint8Array` or `ArrayBuffer`, but was actually of type `NaN`」エラーが発生
+- **原因**: `canvasToPngWithTimeout()`が`{ data, timedOut }`オブジェクトを返すのに、戻り値をそのまま`embedPng()`に渡していた
+- **修正内容**:
+  - `pngData`を`pngResult`にリネームし、`pngResult.data`を使用するよう修正
+  - `renderPdfPageToPng()`の戻り値を`result.data`のみに変更
+  - `embedPng`呼び出し前にUint8Arrayバリデーションを追加
+- **修正ファイル**: `js/pdf-lib-saver.js`
+
+#### 線幅設定の変更
+- **変更内容**:
+  - 最大線幅: 50px → 20px
+  - ペンのデフォルト: 2px → 3px
+  - マーカーのデフォルト: 6px → 8px（MARKER_DEFAULT定数を新規追加）
+  - 消しゴムのデフォルト: 2px → 5px（ERASER_DEFAULT定数を新規追加）
+- **修正ファイル**: `js/constants.js`, `js/settings.js`, `index.html`
+
+#### 非表示状態ボタンの赤色アイコン表示
+- **変更内容**: ページバー・コメントテキスト表示/非表示ボタンで、非表示状態の際にアイコンを赤色で表示
+- **実装方法**:
+  - `.hidden-state`クラスを追加/削除で制御
+  - ライトモード: #e53935（ホバー時: #c62828）
+  - ダークモード: #ef5350（ホバー時: #f44336）
+- **修正ファイル**: `css/navigation.css`, `css/dark-mode.css`, `js/navigation.js`, `js/text-layer-manager.js`
+
+#### コメントテキスト非表示状態のPDF保存/読み込み対応
+- **問題**: コメントテキストを非表示にしてPDFを保存しても、再度開くと表示状態に戻ってしまう
+- **原因**: コメントテキストの表示/非表示状態がPDFに保存されていなかった
+- **修正内容**:
+  - **PDF保存時**: PDFのSubjectメタデータに`MojiQ:commentTextHidden=true/false`を保存
+  - **PDF読み込み時**: Subjectメタデータを読み込み、非表示状態を復元
+  - **最適化処理**: `optimizePdfResources`でメタデータ（Title, Subject, Creator, Keywords）をコピーするよう修正
+- **新規関数**:
+  - `loadMojiQMetadata(pdfBytes)`: PDFバイトデータからMojiQメタデータを読み込み状態を復元
+  - `setIsHidden(hidden)`: TextLayerManagerに状態設定用メソッドを追加
+- **修正ファイル**: `js/text-layer-manager.js`, `js/pdf-lib-saver.js`, `js/pdf-manager.js`
+
 #### 保存ボタン有効/無効判定の堅牢化
 - **問題**: `pdfLoaded`フラグの状態管理に依存しているため、フラグの不整合時に保存ボタンが無効のままになるリスクがあった
 - **原因**: `updateSaveButtonState()`関数が`MojiQGlobal.pdfLoaded`フラグのみをチェックしていた

@@ -8,6 +8,9 @@ window.SimulatorEventHandlers = (function() {
     const State = window.SimulatorState;
     const DOM = window.SimulatorDOM;
 
+    // 二重初期化防止フラグ（QA対策 #71 メモリリーク対策）
+    let isInitialized = false;
+
     // 座標取得（回転対応）
     // 注意: イベントはmojiqCanvas(whiteboard)で受け取るが、座標はsim-whiteboardと同じサイズなので
     // どちらのキャンバスを基準にしても同じ結果になる
@@ -607,9 +610,25 @@ window.SimulatorEventHandlers = (function() {
             State.set('isShiftPressed', false);
 
             setTimeout(async () => {
-                const userMm = await MojiQModal.showPrompt("実際の長さ(mm)を入力:", "180", "縮尺設定");
-                if (userMm && !isNaN(userMm)) {
-                    const pixelsPerMm = distPx / parseFloat(userMm);
+                const userMmStr = await MojiQModal.showPrompt("実際の長さ(mm)を入力:", "180", "縮尺設定");
+                if (userMmStr !== null && userMmStr !== '') {
+                    const mmValue = parseFloat(userMmStr);
+
+                    // バリデーション（QA対策 #59）
+                    const limits = window.MojiQConstants?.SIMULATOR_LIMITS || {};
+                    const minMm = limits.MIN_CALIBRATION_MM || 0.1;
+                    const maxMm = limits.MAX_CALIBRATION_MM || 10000;
+
+                    if (isNaN(mmValue) || mmValue < minMm || mmValue > maxMm) {
+                        await MojiQModal.showAlert(
+                            `${minMm}〜${maxMm}mmの範囲で数値を入力してください。`,
+                            '入力エラー'
+                        );
+                        calibrateBtn.classList.remove('active');
+                        return;
+                    }
+
+                    const pixelsPerMm = distPx / mmValue;
                     State.set('pixelsPerMm', pixelsPerMm);
                     State.set('isCalibrated', true);
                     scaleDisplay.textContent = `設定済 (1mm=${pixelsPerMm.toFixed(1)}px)`;
@@ -781,6 +800,12 @@ window.SimulatorEventHandlers = (function() {
     }
 
     function init() {
+        // 二重初期化防止（QA対策 #71 メモリリーク対策）
+        if (isInitialized) {
+            console.warn('[SimulatorEventHandlers] 既に初期化されています。二重初期化をスキップします。');
+            return;
+        }
+
         const canvas = DOM.getCanvas();
         const canvasArea = DOM.get('canvasArea');
         // イベントはwhiteboardキャンバスで受け取る（sim-whiteboardはpointer-events: none）
@@ -804,6 +829,8 @@ window.SimulatorEventHandlers = (function() {
         }
 
         window.addEventListener('wheel', handleWheel, { passive: false });
+
+        isInitialized = true;
     }
 
     return {

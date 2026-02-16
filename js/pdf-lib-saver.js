@@ -93,7 +93,7 @@ window.MojiQPdfLibSaver = (function() {
         const DrawingRenderer = window.MojiQDrawingRenderer;
 
         if (!DrawingObjects || !DrawingRenderer) {
-            return null;
+            return { data: null, timedOut: false };
         }
 
         const objects = DrawingObjects.getPageObjects(pageNum);
@@ -169,7 +169,7 @@ window.MojiQPdfLibSaver = (function() {
         const DrawingRenderer = window.MojiQDrawingRenderer;
 
         if (!DrawingObjects || !DrawingRenderer) {
-            return null;
+            return { data: null, timedOut: false };
         }
 
         // 見開きモード中は spread_N キーからオブジェクトを取得
@@ -383,8 +383,17 @@ window.MojiQPdfLibSaver = (function() {
                 if (mapItem.docIndex === -2) {
                     // 画像ページ
                     const imgData = imagePageData[mapItem.imageIndex];
-                    if (!imgData) {
+                    if (!imgData || !imgData.data) {
                         console.error('画像データが見つかりません:', mapItem.imageIndex);
+                        continue;
+                    }
+
+                    // 画像データの検証
+                    const isValidData = (typeof imgData.data === 'string') ||
+                                        (imgData.data instanceof Uint8Array) ||
+                                        (imgData.data instanceof ArrayBuffer);
+                    if (!isValidData) {
+                        console.error('画像データの形式が無効です:', mapItem.imageIndex, typeof imgData.data);
                         continue;
                     }
 
@@ -476,9 +485,9 @@ window.MojiQPdfLibSaver = (function() {
                                 viewport: scaledViewport
                             }).promise;
 
-                            const pngData = await canvasToPngWithTimeout(canvas);
+                            const pngResult = await canvasToPngWithTimeout(canvas);
 
-                            if (!pngData) {
+                            if (!pngResult || !pngResult.data) {
                                 canvas.width = 0;
                                 canvas.height = 0;
                                 console.error('Canvas to Blob変換に失敗しました（ページ:', pageNum, '）');
@@ -486,7 +495,7 @@ window.MojiQPdfLibSaver = (function() {
                             }
 
                             page = pdfDoc.addPage([pageWidth, pageHeight]);
-                            const bgImage = await pdfDoc.embedPng(pngData);
+                            const bgImage = await pdfDoc.embedPng(pngResult.data);
                             page.drawImage(bgImage, {
                                 x: 0,
                                 y: 0,
@@ -521,9 +530,9 @@ window.MojiQPdfLibSaver = (function() {
                             viewport: scaledViewport
                         }).promise;
 
-                        const pngData = await canvasToPngWithTimeout(canvas);
+                        const pngResult = await canvasToPngWithTimeout(canvas);
 
-                        if (!pngData) {
+                        if (!pngResult || !pngResult.data) {
                             canvas.width = 0;
                             canvas.height = 0;
                             console.error('Canvas to Blob変換に失敗しました（ページ:', pageNum, '）');
@@ -531,7 +540,7 @@ window.MojiQPdfLibSaver = (function() {
                         }
 
                         page = pdfDoc.addPage([pageWidth, pageHeight]);
-                        const bgImage = await pdfDoc.embedPng(pngData);
+                        const bgImage = await pdfDoc.embedPng(pngResult.data);
                         page.drawImage(bgImage, {
                             x: 0,
                             y: 0,
@@ -561,7 +570,8 @@ window.MojiQPdfLibSaver = (function() {
                     console.warn(`ページ ${pageNum} の描画オブジェクト保存がタイムアウトしました`);
                 }
 
-                if (drawingResult.data) {
+                // 描画データの検証: Uint8Array であることを確認
+                if (drawingResult.data && drawingResult.data instanceof Uint8Array && drawingResult.data.length > 0) {
                     const drawingImage = await pdfDoc.embedPng(drawingResult.data);
                     page.drawImage(drawingImage, {
                         x: 0,
@@ -576,6 +586,10 @@ window.MojiQPdfLibSaver = (function() {
             pdfDoc.setTitle(fileName);
             pdfDoc.setCreator('MojiQ');
             pdfDoc.setProducer('MojiQ PDF-Lib Saver');
+
+            // コメントテキスト非表示状態をSubjectに保存
+            const textLayerHidden = window.MojiQTextLayerManager && window.MojiQTextLayerManager.isHidden();
+            pdfDoc.setSubject(textLayerHidden ? 'MojiQ:commentTextHidden=true' : 'MojiQ:commentTextHidden=false');
 
             // 90%完了を報告（PDF出力処理開始）
             onProgress(90);
@@ -717,7 +731,8 @@ window.MojiQPdfLibSaver = (function() {
                     console.warn(`見開き ${spreadIdx + 1} の描画オブジェクト保存がタイムアウトしました`);
                 }
 
-                if (drawingResult.data) {
+                // 描画データの検証: Uint8Array であることを確認
+                if (drawingResult.data && drawingResult.data instanceof Uint8Array && drawingResult.data.length > 0) {
                     const drawingImage = await pdfDoc.embedPng(drawingResult.data);
                     page.drawImage(drawingImage, {
                         x: 0,
@@ -732,6 +747,10 @@ window.MojiQPdfLibSaver = (function() {
             pdfDoc.setTitle(fileName);
             pdfDoc.setCreator('MojiQ');
             pdfDoc.setProducer('MojiQ PDF-Lib Saver (Spread)');
+
+            // コメントテキスト非表示状態をSubjectに保存
+            const textLayerHidden = window.MojiQTextLayerManager && window.MojiQTextLayerManager.isHidden();
+            pdfDoc.setSubject(textLayerHidden ? 'MojiQ:commentTextHidden=true' : 'MojiQ:commentTextHidden=false');
 
             // 90%完了を報告（PDF出力処理開始）
             onProgress(90);
@@ -762,7 +781,16 @@ window.MojiQPdfLibSaver = (function() {
         if (mapItem.docIndex === -2) {
             // 画像ページ
             const imgData = imagePageData[mapItem.imageIndex];
-            if (!imgData) return;
+            if (!imgData || !imgData.data) return;
+
+            // 画像データの検証
+            const isValidData = (typeof imgData.data === 'string') ||
+                                (imgData.data instanceof Uint8Array) ||
+                                (imgData.data instanceof ArrayBuffer);
+            if (!isValidData) {
+                console.error('画像データの形式が無効です:', mapItem.imageIndex, typeof imgData.data);
+                return;
+            }
 
             let image;
             if (imgData.type === 'png') {
@@ -840,15 +868,15 @@ window.MojiQPdfLibSaver = (function() {
                         viewport: scaledViewport
                     }).promise;
 
-                    const pngData = await canvasToPngWithTimeout(canvas);
+                    const pngResult = await canvasToPngWithTimeout(canvas);
 
-                    if (!pngData) {
+                    if (!pngResult || !pngResult.data) {
                         canvas.width = 0;
                         canvas.height = 0;
                         return;
                     }
 
-                    const bgImage = await pdfDoc.embedPng(pngData);
+                    const bgImage = await pdfDoc.embedPng(pngResult.data);
 
                     // アスペクト比を保持してスケーリング
                     const imgAspect = viewport.width / viewport.height;
@@ -898,15 +926,15 @@ window.MojiQPdfLibSaver = (function() {
                     viewport: scaledViewport
                 }).promise;
 
-                const pngData = await canvasToPngWithTimeout(canvas);
+                const pngResult = await canvasToPngWithTimeout(canvas);
 
-                if (!pngData) {
+                if (!pngResult || !pngResult.data) {
                     canvas.width = 0;
                     canvas.height = 0;
                     return;
                 }
 
-                const bgImage = await pdfDoc.embedPng(pngData);
+                const bgImage = await pdfDoc.embedPng(pngResult.data);
                 page.drawImage(bgImage, {
                     x: xOffset,
                     y: 0,
@@ -1043,7 +1071,8 @@ window.MojiQPdfLibSaver = (function() {
                     console.warn(`見開き透過PDF保存: 見開き ${spreadIdx + 1} の描画オブジェクトレンダリングがタイムアウトしました`);
                 }
 
-                if (drawingResult && drawingResult.data) {
+                // 描画データの検証: Uint8Array であることを確認
+                if (drawingResult && drawingResult.data instanceof Uint8Array && drawingResult.data.length > 0) {
                     const drawingImage = await pdfDoc.embedPng(drawingResult.data);
                     page.drawImage(drawingImage, {
                         x: 0,
@@ -1058,6 +1087,10 @@ window.MojiQPdfLibSaver = (function() {
             pdfDoc.setTitle(fileName);
             pdfDoc.setCreator('MojiQ');
             pdfDoc.setProducer('MojiQ PDF-Lib Saver (Spread Transparent)');
+
+            // コメントテキスト非表示状態をSubjectに保存
+            const textLayerHidden = window.MojiQTextLayerManager && window.MojiQTextLayerManager.isHidden();
+            pdfDoc.setSubject(textLayerHidden ? 'MojiQ:commentTextHidden=true' : 'MojiQ:commentTextHidden=false');
 
             // 90%完了を報告（PDF出力処理開始）
             onProgress(90);
@@ -1088,7 +1121,16 @@ window.MojiQPdfLibSaver = (function() {
         if (mapItem.docIndex === -2) {
             // 画像ページ
             const imgData = imagePageData[mapItem.imageIndex];
-            if (!imgData) return;
+            if (!imgData || !imgData.data) return;
+
+            // 画像データの検証
+            const isValidData = (typeof imgData.data === 'string') ||
+                                (imgData.data instanceof Uint8Array) ||
+                                (imgData.data instanceof ArrayBuffer);
+            if (!isValidData) {
+                console.error('画像データの形式が無効です:', mapItem.imageIndex, typeof imgData.data);
+                return;
+            }
 
             let image;
             if (imgData.type === 'png') {
@@ -1159,15 +1201,15 @@ window.MojiQPdfLibSaver = (function() {
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
 
-            const pngData = await canvasToPngWithTimeout(canvas);
+            const pngResult = await canvasToPngWithTimeout(canvas);
 
-            if (!pngData) {
+            if (!pngResult || !pngResult.data) {
                 canvas.width = 0;
                 canvas.height = 0;
                 return;
             }
 
-            const bgImage = await pdfDoc.embedPng(pngData);
+            const bgImage = await pdfDoc.embedPng(pngResult.data);
 
             // アスペクト比を保持してスケーリング
             const imgAspect = viewport.width / viewport.height;
@@ -1251,6 +1293,16 @@ window.MojiQPdfLibSaver = (function() {
                 }
             }
 
+            // 元のPDFからメタデータをコピー
+            const srcTitle = srcPdf.getTitle();
+            const srcSubject = srcPdf.getSubject();
+            const srcCreator = srcPdf.getCreator();
+            const srcKeywords = srcPdf.getKeywords();
+            if (srcTitle) pdfDoc.setTitle(srcTitle);
+            if (srcSubject) pdfDoc.setSubject(srcSubject);
+            if (srcCreator) pdfDoc.setCreator(srcCreator);
+            if (srcKeywords) pdfDoc.setKeywords([srcKeywords]);
+
             onProgress('最適化されたPDFを生成しています...');
 
             // 最適化されたPDFを出力（useObjectStreams: falseで高速化）
@@ -1312,7 +1364,8 @@ window.MojiQPdfLibSaver = (function() {
         }
 
         // CanvasをPNG Blobに変換（タイムアウト付き）
-        return canvasToPngWithTimeout(canvas);
+        const result = await canvasToPngWithTimeout(canvas);
+        return result ? result.data : null;
     }
 
     /**
@@ -1377,8 +1430,17 @@ window.MojiQPdfLibSaver = (function() {
                 if (mapItem.docIndex === -2) {
                     // 画像ページ
                     const imgData = imagePageData[mapItem.imageIndex];
-                    if (!imgData) {
+                    if (!imgData || !imgData.data) {
                         console.error('画像データが見つかりません:', mapItem.imageIndex);
+                        continue;
+                    }
+
+                    // 画像データの検証
+                    const isValidData = (typeof imgData.data === 'string') ||
+                                        (imgData.data instanceof Uint8Array) ||
+                                        (imgData.data instanceof ArrayBuffer);
+                    if (!isValidData) {
+                        console.error('画像データの形式が無効です:', mapItem.imageIndex, typeof imgData.data);
                         continue;
                     }
 
@@ -1488,7 +1550,8 @@ window.MojiQPdfLibSaver = (function() {
                     console.warn(`透過PDF保存: ページ ${pageNum} の描画オブジェクトレンダリングがタイムアウトしました`);
                 }
 
-                if (drawingResult && drawingResult.data) {
+                // 描画データの検証: Uint8Array であることを確認
+                if (drawingResult && drawingResult.data instanceof Uint8Array && drawingResult.data.length > 0) {
                     const drawingImage = await pdfDoc.embedPng(drawingResult.data);
                     page.drawImage(drawingImage, {
                         x: 0,
@@ -1503,6 +1566,10 @@ window.MojiQPdfLibSaver = (function() {
             pdfDoc.setTitle(fileName);
             pdfDoc.setCreator('MojiQ');
             pdfDoc.setProducer('MojiQ PDF-Lib Saver (Transparent)');
+
+            // コメントテキスト非表示状態をSubjectに保存
+            const textLayerHidden = window.MojiQTextLayerManager && window.MojiQTextLayerManager.isHidden();
+            pdfDoc.setSubject(textLayerHidden ? 'MojiQ:commentTextHidden=true' : 'MojiQ:commentTextHidden=false');
 
             // 90%完了を報告（PDF出力処理開始）
             onProgress(90);

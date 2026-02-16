@@ -17,6 +17,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ファイル保存
   saveFile: (filePath, base64Data) => ipcRenderer.invoke('save-file', filePath, base64Data),
 
+  // ディスク容量チェック（QA対策 #50）
+  checkDiskSpace: (filePath, requiredBytes) => ipcRenderer.invoke('check-disk-space', filePath, requiredBytes),
+
   // 確認ダイアログ
   showConfirmDialog: (options) => ipcRenderer.invoke('show-confirm-dialog', options),
 
@@ -71,6 +74,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ダークモード設定（ネイティブUIテーマ）
   setNativeTheme: (isDark) => ipcRenderer.invoke('set-native-theme', isDark),
   getNativeTheme: () => ipcRenderer.invoke('get-native-theme'),
+
+  // QA対策 #49: DPI変更イベントリスナー
+  onDpiChanged: (callback) => { ipcRenderer.removeAllListeners('dpi-changed'); ipcRenderer.on('dpi-changed', (event, data) => callback(data)); },
 
   // ウィンドウ操作（カスタムタイトルバー用）
   windowMinimize: () => ipcRenderer.send('window-minimize'),

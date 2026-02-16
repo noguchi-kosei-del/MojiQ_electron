@@ -292,6 +292,14 @@ window.MojiQDrawing = (function() {
             }
         }
 
+        // QA対策 #30: 負の座標をクランプ（キャンバス範囲内に収める）
+        if (pos) {
+            const canvasWidth = mojiqCanvas.width / dpr;
+            const canvasHeight = mojiqCanvas.height / dpr;
+            pos.x = Math.max(0, Math.min(pos.x, canvasWidth));
+            pos.y = Math.max(0, Math.min(pos.y, canvasHeight));
+        }
+
         return pos;
     }
 
@@ -1064,6 +1072,16 @@ window.MojiQDrawing = (function() {
                     drawCanvasPos = { x: startPosCanvas.x, y: canvasPos.y };
                     drawPos = { x: startPos.x, y: pos.y };
                 }
+            }
+
+            // ポイント数制限チェック（QA対策 #23）
+            const strokeLimits = window.MojiQConstants?.STROKE_LIMITS || {};
+            const maxPoints = strokeLimits.MAX_POINTS || 50000;
+            if (currentStrokePoints.length >= maxPoints) {
+                // 上限に達したらストロークを自動終了
+                console.warn('[MojiQ] ストロークポイント数が上限に達しました。自動終了します。');
+                handleMouseUp({ clientX: e.clientX, clientY: e.clientY });
+                return;
             }
 
             if (state.currentMode === 'marker') {

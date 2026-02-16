@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, nativeTheme } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, nativeTheme, screen } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -34,11 +34,19 @@ const TXT_FOLDER_BASE_PATH = 'G:\\共有ドライブ\\CLLENN\\編集部フォル
 const UPDATE_FOLDER = 'G:\\共有ドライブ\\CLLENN\\編集部フォルダ\\編集企画部\\編集企画_C班(AT業務推進)\\DTP制作部\\App_installer';
 
 // ファイルパス検証（パストラバーサル防止）
+// QA対策 #8, #9: 特殊文字・長いパスの検証
 function isPathSafe(filePath) {
   if (!filePath || typeof filePath !== 'string') return false;
 
   // 空白やnull文字を含むパスは拒否
   if (filePath.includes('\0')) return false;
+
+  // QA対策 #9: Windowsの従来のパス長制限（260文字）をチェック
+  // 長すぎるパスは多くのWindowsアプリで問題を起こす
+  if (process.platform === 'win32' && filePath.length > 260) {
+    console.warn('[MojiQ] パスが長すぎます（260文字超）:', filePath.length);
+    // ただし、拒否はせずに警告のみ（Windows 10以降は長いパスをサポート）
+  }
 
   // パスを正規化して解決
   const normalized = path.normalize(filePath);
@@ -55,6 +63,14 @@ function isPathSafe(filePath) {
     const baseName = path.basename(filePath).toUpperCase().split('.')[0];
     const reservedNames = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
     if (reservedNames.includes(baseName)) return false;
+
+    // QA対策 #8: Windowsで禁止されている文字をチェック
+    // ファイル名に使えない文字: < > : " / \ | ? *
+    const fileName = path.basename(filePath);
+    if (/[<>:"|?*]/.test(fileName)) {
+      console.warn('[MojiQ] ファイル名に禁止文字が含まれています:', fileName);
+      return false;
+    }
   }
 
   return true;
@@ -85,6 +101,62 @@ function isPathInTxtFolder(filePath) {
   const normalizedBase = txtFolderResolved.toLowerCase();
 
   return normalizedPath.startsWith(normalizedBase + path.sep) || normalizedPath === normalizedBase;
+}
+
+// ========================================
+// QA対策 #46-49: ウィンドウ位置・サイズ検証
+// ========================================
+
+/**
+ * ウィンドウが画面内に収まるよう位置を調整
+ * マルチモニター環境でウィンドウが見えない位置に配置されることを防止
+ * @param {Object} bounds - { x, y, width, height }
+ * @returns {Object} 調整後の bounds
+ */
+function ensureWindowBoundsVisible(bounds) {
+  const displays = screen.getAllDisplays();
+  const primaryDisplay = screen.getPrimaryDisplay();
+
+  // ウィンドウの中心点
+  const centerX = bounds.x + bounds.width / 2;
+  const centerY = bounds.y + bounds.height / 2;
+
+  // いずれかのディスプレイに中心点があるかチェック
+  let isVisible = displays.some(display => {
+    const { x, y, width, height } = display.bounds;
+    return centerX >= x && centerX <= x + width &&
+           centerY >= y && centerY <= y + height;
+  });
+
+  if (!isVisible) {
+    // 見えない位置の場合、プライマリディスプレイの中央に配置
+    console.log('[MojiQ] ウィンドウが見えない位置にあるため、プライマリディスプレイに移動します');
+    const { width, height } = primaryDisplay.workArea;
+    bounds.x = Math.round((width - bounds.width) / 2) + primaryDisplay.workArea.x;
+    bounds.y = Math.round((height - bounds.height) / 2) + primaryDisplay.workArea.y;
+  }
+
+  return bounds;
+}
+
+/**
+ * 画面サイズに対してウィンドウサイズを調整
+ * @param {number} requestedWidth
+ * @param {number} requestedHeight
+ * @returns {Object} { width, height }
+ */
+function adjustWindowSizeToScreen(requestedWidth, requestedHeight) {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.workArea;
+
+  // 画面の90%を超えないように調整
+  const maxWidth = Math.floor(screenWidth * 0.9);
+  const maxHeight = Math.floor(screenHeight * 0.9);
+
+  return {
+    width: Math.min(requestedWidth, maxWidth),
+    height: Math.min(requestedHeight, maxHeight)
+  };
 }
 
 // ========================================
@@ -215,10 +287,14 @@ function updateSplashProgress(progress) {
 }
 
 function createWindow() {
+  // QA対策 #46: 画面サイズに応じてウィンドウサイズを調整
+  const { width: adjustedWidth, height: adjustedHeight } = adjustWindowSizeToScreen(1400, 900);
+
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: adjustedWidth,
+    height: adjustedHeight,
     minWidth: 1100, // 最小幅（これ以下に縮めるとレイアウトが崩れるため）
+    minHeight: 600, // QA対策 #46: 最小高さを追加
     frame: false, // ネイティブフレームを非表示（カスタムメニューバー用）
     titleBarStyle: 'hidden', // タイトルバーを非表示
     show: false, // 最初は非表示（スプラッシュ表示中）
@@ -229,6 +305,13 @@ function createWindow() {
     },
     icon: path.join(__dirname, '..', 'logo', 'MojiQ_icon.ico')
   });
+
+  // QA対策 #48: マルチモニター環境でウィンドウが見える位置にあることを確認
+  const bounds = mainWindow.getBounds();
+  const adjustedBounds = ensureWindowBoundsVisible(bounds);
+  if (bounds.x !== adjustedBounds.x || bounds.y !== adjustedBounds.y) {
+    mainWindow.setBounds(adjustedBounds);
+  }
 
   mainWindow.loadFile(path.join(__dirname, '..', 'index.html'));
 
@@ -265,6 +348,26 @@ function createWindow() {
 
     e.preventDefault();
     mainWindow.webContents.send('check-unsaved-changes');
+  });
+
+  // QA対策 #48: ディスプレイ切断時にウィンドウが見える位置に移動
+  screen.on('display-removed', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      const currentBounds = mainWindow.getBounds();
+      const adjustedBounds = ensureWindowBoundsVisible(currentBounds);
+      if (currentBounds.x !== adjustedBounds.x || currentBounds.y !== adjustedBounds.y) {
+        console.log('[MojiQ] ディスプレイ切断を検知、ウィンドウを再配置します');
+        mainWindow.setBounds(adjustedBounds);
+      }
+    }
+  });
+
+  // QA対策 #49: DPI変更をレンダラーに通知
+  screen.on('display-metrics-changed', (event, display, changedMetrics) => {
+    if (changedMetrics.includes('scaleFactor') && mainWindow && !mainWindow.isDestroyed()) {
+      console.log('[MojiQ] DPI変更を検知:', display.scaleFactor);
+      mainWindow.webContents.send('dpi-changed', { scaleFactor: display.scaleFactor });
+    }
   });
 
   // ネイティブメニューを非表示にする（カスタムメニューバーを使用）
@@ -396,10 +499,36 @@ ipcMain.handle('read-file', async (event, filePath) => {
 });
 
 // ファイル保存（アトミック書き込み: 一時ファイルに書いてからリネーム）
+// QA対策 #10: 読み取り専用ファイル判定
 ipcMain.handle('save-file', async (event, filePath, base64Data) => {
   if (!isPathSafe(filePath)) {
-    return { success: false, error: '不正なファイルパスです' };
+    return { success: false, error: '不正なファイルパスです', errorCode: 'INVALID_PATH' };
   }
+
+  // 書き込み権限チェック（QA対策 #10）
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.accessSync(filePath, fs.constants.W_OK);
+    }
+    const dirPath = path.dirname(filePath);
+    fs.accessSync(dirPath, fs.constants.W_OK);
+  } catch (accessError) {
+    if (accessError.code === 'EACCES' || accessError.code === 'EPERM') {
+      return {
+        success: false,
+        error: 'ファイルが読み取り専用です。別の場所に保存してください。',
+        errorCode: 'READONLY'
+      };
+    }
+    if (accessError.code === 'ENOENT') {
+      return {
+        success: false,
+        error: '保存先のフォルダが存在しません。',
+        errorCode: 'NO_DIRECTORY'
+      };
+    }
+  }
+
   const tempFilePath = filePath + '.tmp.' + Date.now();
   try {
     const buffer = Buffer.from(base64Data, 'base64');
@@ -410,7 +539,59 @@ ipcMain.handle('save-file', async (event, filePath, base64Data) => {
   } catch (error) {
     // 一時ファイルが残っている場合は削除
     try { if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath); } catch (e) { /* ignore */ }
-    return { success: false, error: error.message };
+
+    // エラーコードに基づく詳細メッセージ（QA対策 #10）
+    let errorMessage = error.message;
+    let errorCode = error.code || 'UNKNOWN';
+
+    switch (error.code) {
+      case 'EACCES':
+      case 'EPERM':
+        errorMessage = 'ファイルが読み取り専用です。別の場所に保存してください。';
+        errorCode = 'READONLY';
+        break;
+      case 'ENOSPC':
+        errorMessage = 'ディスク容量が不足しています。';
+        errorCode = 'NO_SPACE';
+        break;
+      case 'EBUSY':
+        errorMessage = 'ファイルが他のアプリケーションで使用中です。';
+        errorCode = 'FILE_BUSY';
+        break;
+    }
+
+    return { success: false, error: errorMessage, errorCode: errorCode };
+  }
+});
+
+// ディスク容量チェック（QA対策 #50）
+ipcMain.handle('check-disk-space', async (event, filePath, requiredBytes) => {
+  try {
+    if (process.platform === 'win32') {
+      const drive = path.parse(filePath).root.charAt(0);
+      const { execSync } = require('child_process');
+      const result = execSync(
+        `wmic logicaldisk where "DeviceID='${drive}:'" get FreeSpace`,
+        { encoding: 'utf8', timeout: 5000 }
+      );
+      const lines = result.trim().split('\n');
+      if (lines.length >= 2) {
+        const freeSpace = parseInt(lines[1].trim(), 10);
+        // 必要容量の1.5倍のマージンを確保
+        const requiredWithMargin = requiredBytes * 1.5;
+        return {
+          success: true,
+          freeSpace: freeSpace,
+          isEnough: freeSpace > requiredWithMargin
+        };
+      }
+    }
+    // 非Windows環境またはコマンド失敗時はチェックをスキップ
+    return { success: true, isEnough: true };
+  } catch (error) {
+    // エラー時はチェックせずに続行（保存処理でエラーになる）
+    console.warn('ディスク容量チェックに失敗:', error.message);
+    return { success: true, isEnough: true };
   }
 });
 
