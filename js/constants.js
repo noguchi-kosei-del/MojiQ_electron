@@ -73,7 +73,7 @@ window.MojiQConstants = (function() {
 
     /** @type {Object} 線の太さ */
     const LINE_WIDTHS = {
-        DEFAULT: 3,         // ペンのデフォルト線幅
+        DEFAULT: 2,         // ペンのデフォルト線幅
         MARKER_DEFAULT: 8,  // マーカーのデフォルト線幅
         ERASER_DEFAULT: 5,  // 消しゴムのデフォルトサイズ
         OUTLINE: 3,         // テキストのアウトライン幅

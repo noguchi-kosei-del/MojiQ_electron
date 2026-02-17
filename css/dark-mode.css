@@ -1148,19 +1148,21 @@ body.viewer-mode .viewer-nav-hint.show {
 }
 
 /* 校正チェックパネル */
-body.dark-mode .calibration-toggle-btn {
-    background: #1a2a3d;
-    border-color: #42a5f5;
-    color: #64b5f6;
+body.dark-mode .calibration-toggle-btn,
+body.dark-mode #calibrationToggleBtn {
+    background-color: #1a2a3d !important;
+    border-color: #4a7ab0 !important;
+    color: #90caf9 !important;
 }
 
-body.dark-mode .calibration-toggle-btn:hover {
-    background: #2a3a4d;
-    border-color: #64b5f6;
+body.dark-mode .calibration-toggle-btn:hover,
+body.dark-mode #calibrationToggleBtn:hover {
+    background-color: #2a3a50 !important;
 }
 
-body.dark-mode .calibration-toggle-btn svg {
-    stroke: #64b5f6;
+body.dark-mode .calibration-toggle-btn svg,
+body.dark-mode #calibrationToggleBtn svg {
+    stroke: #90caf9 !important;
 }
 
 body.dark-mode .calibration-breadcrumb {
