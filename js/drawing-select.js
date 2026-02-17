@@ -1840,6 +1840,8 @@ window.MojiQDrawingSelect = (function() {
             case 'nibunakiStamp':
             case 'shibunakiStamp':
             case 'kaigyouStamp':
+            case 'tojiruStamp':
+            case 'hirakuStamp':
                 // 指示スタンプは中心位置とサイズでリサイズ
                 obj.startPos = {
                     x: newX + (orig.startPos.x - origBounds.x) * scaleX,

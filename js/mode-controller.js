@@ -40,6 +40,8 @@ window.MojiQModeController = (function() {
     let nibunakiStampBtn = null;
     let shibunakiStampBtn = null;
     let kaigyouStampBtn = null;
+    let tojiruStampBtn = null;
+    let hirakuStampBtn = null;
     let imageInput = null;
 
     // その他要素
@@ -84,6 +86,8 @@ window.MojiQModeController = (function() {
         nibunakiStampBtn: null,
         shibunakiStampBtn: null,
         kaigyouStampBtn: null,
+        tojiruStampBtn: null,
+        hirakuStampBtn: null,
         imageInputChange: null,
         spaceHandler: null,
         shiftHandler: null,
@@ -129,6 +133,8 @@ window.MojiQModeController = (function() {
         nibunakiStampBtn = elements.nibunakiStampBtn;
         shibunakiStampBtn = elements.shibunakiStampBtn;
         kaigyouStampBtn = elements.kaigyouStampBtn;
+        tojiruStampBtn = elements.tojiruStampBtn;
+        hirakuStampBtn = elements.hirakuStampBtn;
         imageInput = elements.imageInput;
         mojiqCanvas = elements.mojiqCanvas;
         stampContainer = elements.stampContainer;
@@ -473,6 +479,8 @@ window.MojiQModeController = (function() {
         if (mode === 'nibunakiStamp' && nibunakiStampBtn) nibunakiStampBtn.classList.add('active');
         if (mode === 'shibunakiStamp' && shibunakiStampBtn) shibunakiStampBtn.classList.add('active');
         if (mode === 'kaigyouStamp' && kaigyouStampBtn) kaigyouStampBtn.classList.add('active');
+        if (mode === 'tojiruStamp' && tojiruStampBtn) tojiruStampBtn.classList.add('active');
+        if (mode === 'hirakuStamp' && hirakuStampBtn) hirakuStampBtn.classList.add('active');
 
         // スポイトモードのアクティブ状態を更新
         if (window.MojiQCanvasContext) {
@@ -689,6 +697,8 @@ window.MojiQModeController = (function() {
         boundHandlers.nibunakiStampBtn = () => setMode('nibunakiStamp');
         boundHandlers.shibunakiStampBtn = () => setMode('shibunakiStamp');
         boundHandlers.kaigyouStampBtn = () => setMode('kaigyouStamp');
+        boundHandlers.tojiruStampBtn = () => setMode('tojiruStamp');
+        boundHandlers.hirakuStampBtn = () => setMode('hirakuStamp');
         boundHandlers.imgInsertBtn = () => imageInput.click();
 
         if (selectBtn) selectBtn.addEventListener('click', boundHandlers.selectBtn);
@@ -722,6 +732,8 @@ window.MojiQModeController = (function() {
         if (nibunakiStampBtn) nibunakiStampBtn.addEventListener('click', boundHandlers.nibunakiStampBtn);
         if (shibunakiStampBtn) shibunakiStampBtn.addEventListener('click', boundHandlers.shibunakiStampBtn);
         if (kaigyouStampBtn) kaigyouStampBtn.addEventListener('click', boundHandlers.kaigyouStampBtn);
+        if (tojiruStampBtn) tojiruStampBtn.addEventListener('click', boundHandlers.tojiruStampBtn);
+        if (hirakuStampBtn) hirakuStampBtn.addEventListener('click', boundHandlers.hirakuStampBtn);
         imgInsertBtn.addEventListener('click', boundHandlers.imgInsertBtn);
 
         // 画像読み込みイベント（JPEG, PNG, TIF, PDF対応）
@@ -859,6 +871,8 @@ window.MojiQModeController = (function() {
         if (nibunakiStampBtn) nibunakiStampBtn.removeEventListener('click', boundHandlers.nibunakiStampBtn);
         if (shibunakiStampBtn) shibunakiStampBtn.removeEventListener('click', boundHandlers.shibunakiStampBtn);
         if (kaigyouStampBtn) kaigyouStampBtn.removeEventListener('click', boundHandlers.kaigyouStampBtn);
+        if (tojiruStampBtn) tojiruStampBtn.removeEventListener('click', boundHandlers.tojiruStampBtn);
+        if (hirakuStampBtn) hirakuStampBtn.removeEventListener('click', boundHandlers.hirakuStampBtn);
         if (imgInsertBtn) imgInsertBtn.removeEventListener('click', boundHandlers.imgInsertBtn);
         if (imageInput) imageInput.removeEventListener('change', boundHandlers.imageInputChange);
 

@@ -32,7 +32,9 @@ window.MojiQConstants = (function() {
             zenkakuakiStamp: { text: '全角アキ' },
             nibunakiStamp: { text: '半角アキ' },
             shibunakiStamp: { text: '四分アキ' },
-            kaigyouStamp: { text: '改行' }
+            kaigyouStamp: { text: '改行' },
+            tojiruStamp: { text: 'とじる' },
+            hirakuStamp: { text: 'ひらく' }
         },
         // 円形スタンプの定義（済、小文字など）
         CIRCLE_STAMPS: {

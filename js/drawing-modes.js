@@ -1163,6 +1163,10 @@ window.MojiQDrawingModes = (function() {
             case 'kaigyouStamp':   // 改行 (2文字)
                 charCount = 2;
                 break;
+            case 'tojiruStamp':    // とじる (3文字)
+            case 'hirakuStamp':    // ひらく (3文字)
+                charCount = 3;
+                break;
             default:
                 charCount = 2;
         }
@@ -1333,7 +1337,7 @@ window.MojiQDrawingModes = (function() {
         }
 
         // テキスト/スタンプとの間隔（マージン）- 指示スタンプは少し大きめのマージン
-        const instructionStampTypes = ['toruStamp', 'torutsumeStamp', 'torumamaStamp', 'zenkakuakiStamp', 'nibunakiStamp', 'shibunakiStamp', 'kaigyouStamp'];
+        const instructionStampTypes = ['toruStamp', 'torutsumeStamp', 'torumamaStamp', 'zenkakuakiStamp', 'nibunakiStamp', 'shibunakiStamp', 'kaigyouStamp', 'tojiruStamp', 'hirakuStamp'];
         const margin = instructionStampTypes.includes(obj.type) ? 8 : 6;
 
         // 4辺の中点を候補として用意（マージン分離す）

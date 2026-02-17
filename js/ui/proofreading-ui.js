@@ -75,6 +75,8 @@ window.MojiQProofreadingUI = (function() {
             'zenkakuakiStampBtn': '全角アキ',
             'nibunakiStampBtn': '半角アキ',
             'kaigyouStampBtn': '改行',
+            'tojiruStampBtn': 'とじる',
+            'hirakuStampBtn': 'ひらく',
             'labeledRectBtn': '小文字指定',
             'doubleArrowAnnotatedBtn': '字間指示'
         };

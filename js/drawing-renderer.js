@@ -383,6 +383,18 @@ window.MojiQDrawingRenderer = (function() {
                 maxY = obj.startPos.y + kaigyouHeight;
                 break;
 
+            case 'tojiruStamp':
+            case 'hirakuStamp':
+                // とじる・ひらくスタンプ (3文字)
+                const tojiruHirakuSize = obj.size || 28;
+                const tojiruHirakuWidth = tojiruHirakuSize * 2.25 / 2;
+                const tojiruHirakuHeight = tojiruHirakuSize * 0.9 / 2;
+                minX = obj.startPos.x - tojiruHirakuWidth;
+                maxX = obj.startPos.x + tojiruHirakuWidth;
+                minY = obj.startPos.y - tojiruHirakuHeight;
+                maxY = obj.startPos.y + tojiruHirakuHeight;
+                break;
+
             default:
                 if (obj.startPos) {
                     minX = obj.startPos.x;
@@ -693,6 +705,17 @@ window.MojiQDrawingRenderer = (function() {
                 maxY = obj.startPos.y + kaigyouHeight;
                 break;
 
+            case 'tojiruStamp':
+            case 'hirakuStamp':
+                const tojiruHirakuSize2 = obj.size || 28;
+                const tojiruHirakuWidth2 = tojiruHirakuSize2 * 2.25 / 2;
+                const tojiruHirakuHeight2 = tojiruHirakuSize2 * 0.9 / 2;
+                minX = obj.startPos.x - tojiruHirakuWidth2;
+                maxX = obj.startPos.x + tojiruHirakuWidth2;
+                minY = obj.startPos.y - tojiruHirakuHeight2;
+                maxY = obj.startPos.y + tojiruHirakuHeight2;
+                break;
+
             default:
                 if (obj.startPos) {
                     minX = obj.startPos.x;
@@ -924,6 +947,16 @@ window.MojiQDrawingRenderer = (function() {
                 const kaigyouHeightHit = kaigyouSizeHit * 0.9 / 2 + tolerance;
                 hitOnObject = Math.abs(testPos.x - obj.startPos.x) <= kaigyouWidthHit &&
                               Math.abs(testPos.y - obj.startPos.y) <= kaigyouHeightHit;
+                break;
+
+            case 'tojiruStamp':
+            case 'hirakuStamp':
+                // とじる・ひらくスタンプの矩形ヒットテスト
+                const tojiruHirakuSizeHit = obj.size || 28;
+                const tojiruHirakuWidthHit = tojiruHirakuSizeHit * 2.25 / 2 + tolerance;
+                const tojiruHirakuHeightHit = tojiruHirakuSizeHit * 0.9 / 2 + tolerance;
+                hitOnObject = Math.abs(testPos.x - obj.startPos.x) <= tojiruHirakuWidthHit &&
+                              Math.abs(testPos.y - obj.startPos.y) <= tojiruHirakuHeightHit;
                 break;
 
             default:
@@ -2876,6 +2909,26 @@ window.MojiQDrawingRenderer = (function() {
     }
 
     /**
+     * とじるスタンプを描画
+     */
+    function renderTojiruStamp(ctx, obj) {
+        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS
+            ? Constants.STAMP_PARAMS.DEFINITIONS.tojiruStamp
+            : null;
+        renderTextStamp(ctx, obj, def ? def.text : 'とじる');
+    }
+
+    /**
+     * ひらくスタンプを描画
+     */
+    function renderHirakuStamp(ctx, obj) {
+        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS
+            ? Constants.STAMP_PARAMS.DEFINITIONS.hirakuStamp
+            : null;
+        renderTextStamp(ctx, obj, def ? def.text : 'ひらく');
+    }
+
+    /**
      * 引出線を描画
      * トル系スタンプ・アキスタンプの場合は先端に●を描画
      */
@@ -2899,10 +2952,11 @@ window.MojiQDrawingRenderer = (function() {
         ctx.lineWidth = lineWidth;
         ctx.stroke();
 
-        // トル系スタンプ・アキスタンプ・改行スタンプ・写植スタンプ・文字サイズスタンプの場合は先端に●を描画
+        // トル系スタンプ・アキスタンプ・改行スタンプ・とじる/ひらくスタンプ・写植スタンプ・文字サイズスタンプの場合は先端に●を描画
         if (obj.type === 'toruStamp' || obj.type === 'torutsumeStamp' || obj.type === 'torumamaStamp'
             || obj.type === 'zenkakuakiStamp' || obj.type === 'nibunakiStamp' || obj.type === 'shibunakiStamp'
-            || obj.type === 'kaigyouStamp' || obj.type === 'fontLabel' || obj.type === 'text') {
+            || obj.type === 'kaigyouStamp' || obj.type === 'tojiruStamp' || obj.type === 'hirakuStamp'
+            || obj.type === 'fontLabel' || obj.type === 'text') {
             const dotRadius = Math.max(lineWidth, 2); // 線幅に比例した小さめの●
 
             ctx.beginPath();
@@ -3752,6 +3806,12 @@ window.MojiQDrawingRenderer = (function() {
                 break;
             case 'kaigyouStamp':
                 renderKaigyouStamp(ctx, obj);
+                break;
+            case 'tojiruStamp':
+                renderTojiruStamp(ctx, obj);
+                break;
+            case 'hirakuStamp':
+                renderHirakuStamp(ctx, obj);
                 break;
         }
 

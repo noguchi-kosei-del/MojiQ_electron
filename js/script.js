@@ -480,6 +480,8 @@ window.addEventListener('load', () => {
         nibunakiStampBtn: document.getElementById('nibunakiStampBtn'),
         shibunakiStampBtn: document.getElementById('shibunakiStampBtn'),
         kaigyouStampBtn: document.getElementById('kaigyouStampBtn'),
+        tojiruStampBtn: document.getElementById('tojiruStampBtn'),
+        hirakuStampBtn: document.getElementById('hirakuStampBtn'),
 
         fontSizeInput: document.getElementById('fontSizeInput'),
         savePdfBtn: document.getElementById('savePdfBtn'),
@@ -800,6 +802,8 @@ window.addEventListener('load', () => {
         nibunakiStampBtn: elements.nibunakiStampBtn,
         shibunakiStampBtn: elements.shibunakiStampBtn,
         kaigyouStampBtn: elements.kaigyouStampBtn,
+        tojiruStampBtn: elements.tojiruStampBtn,
+        hirakuStampBtn: elements.hirakuStampBtn,
         imageInput: elements.imageInput,
         mojiqCanvas: elements.mojiqCanvas,
         stampContainer: elements.stampContainer,

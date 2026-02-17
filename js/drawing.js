@@ -758,7 +758,8 @@ window.MojiQDrawing = (function() {
         // 指示スタンプモードの処理（ドラッグで指示線を描画可能）
         const instructionStampModes = [
             'toruStamp', 'torutsumeStamp', 'torumamaStamp',
-            'zenkakuakiStamp', 'nibunakiStamp', 'shibunakiStamp', 'kaigyouStamp'
+            'zenkakuakiStamp', 'nibunakiStamp', 'shibunakiStamp', 'kaigyouStamp',
+            'tojiruStamp', 'hirakuStamp'
         ];
         if (instructionStampModes.includes(state.currentMode)) {
             // 描画コンテキストを確実に初期化（色が黒になる不具合を防ぐ）
@@ -1494,7 +1495,8 @@ window.MojiQDrawing = (function() {
                     ctx.restore();
                 } else if ([
                     'toruStamp', 'torutsumeStamp', 'torumamaStamp',
-                    'zenkakuakiStamp', 'nibunakiStamp', 'shibunakiStamp'
+                    'zenkakuakiStamp', 'nibunakiStamp', 'shibunakiStamp',
+                    'kaigyouStamp', 'tojiruStamp', 'hirakuStamp'
                 ].includes(state.currentMode)) {
                     // 指示スタンプのドラッグ中：指示線のプレビューを表示（先端に●）- キャンバス座標
                     const dist = Math.sqrt(Math.pow(canvasPos.x - startPosCanvas.x, 2) + Math.pow(canvasPos.y - startPosCanvas.y, 2));
@@ -2048,7 +2050,9 @@ window.MojiQDrawing = (function() {
                 'zenkakuakiStamp': 2.2,
                 'nibunakiStamp': 2.2,
                 'shibunakiStamp': 2.2,
-                'kaigyouStamp': 2.2
+                'kaigyouStamp': 2.2,
+                'tojiruStamp': 1.8,
+                'hirakuStamp': 1.8
             };
 
             if (instructionStampConfig[state.currentMode] !== undefined) {
