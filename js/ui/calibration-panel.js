@@ -223,9 +223,9 @@ const CalibrationPanel = (() => {
       // 新しいウィンドウ側で直接JSONを読み込む
       const encodedPath = encodeURIComponent(filePath);
 
-      // 別ウィンドウを開く（560x720px）
-      const width = 560;
-      const height = 720;
+      // 別ウィンドウを開く（840x1080px - 1.5倍サイズ）
+      const width = 840;
+      const height = 1080;
       const left = Math.round((screen.width - width) / 2);
       const top = Math.round((screen.height - height) / 2);
       window.open(

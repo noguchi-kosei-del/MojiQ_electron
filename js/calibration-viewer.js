@@ -8,7 +8,8 @@
 
     // 状態
     let currentData = null;
-    let currentTab = 'variation';
+    let allItems = []; // 全アイテムを統合して保持
+    let currentTab = 'both'; // 'correctness' | 'proposal' | 'both'
 
     // DOM要素
     let titleEl, tabsEl, contentEl;
@@ -76,6 +77,17 @@
 
         currentData = data;
 
+        // 全アイテムを統合（variation と simple の両方から）
+        allItems = [];
+        if (currentData.checks) {
+            if (currentData.checks.variation && currentData.checks.variation.items) {
+                allItems = allItems.concat(currentData.checks.variation.items);
+            }
+            if (currentData.checks.simple && currentData.checks.simple.items) {
+                allItems = allItems.concat(currentData.checks.simple.items);
+            }
+        }
+
         // タイトル設定
         if (titleEl && currentData.title) {
             titleEl.textContent = currentData.title;
@@ -112,19 +124,30 @@
 
     /**
      * タブをレンダリング
+     * checkKind で「正誤チェック」(correctness) と「提案チェック」(proposal) に分ける
+     * 両方ある場合は「両方表示」タブも追加
      */
     function renderTabs() {
-        if (!tabsEl || !currentData || !currentData.checks) return;
+        if (!tabsEl || allItems.length === 0) {
+            if (tabsEl) tabsEl.style.display = 'none';
+            return;
+        }
 
-        const checks = currentData.checks;
-        const hasVariation = checks.variation && checks.variation.items && checks.variation.items.length > 0;
-        const hasSimple = checks.simple && checks.simple.items && checks.simple.items.length > 0;
+        // checkKind でアイテムがあるかチェック（全アイテム対象）
+        const hasCorrectness = allItems.some(function(item) {
+            return item.checkKind === 'correctness';
+        });
+        const hasProposal = allItems.some(function(item) {
+            return item.checkKind === 'proposal';
+        });
 
-        // デフォルトタブ選択
-        if (hasVariation) {
-            currentTab = 'variation';
-        } else if (hasSimple) {
-            currentTab = 'simple';
+        // デフォルトタブ選択（両方ある場合は「両方表示」を優先）
+        if (hasCorrectness && hasProposal) {
+            currentTab = 'both';
+        } else if (hasCorrectness) {
+            currentTab = 'correctness';
+        } else if (hasProposal) {
+            currentTab = 'proposal';
         } else {
             tabsEl.style.display = 'none';
             return;
@@ -132,22 +155,34 @@
 
         let html = '';
 
-        if (hasVariation) {
-            html += '<button class="calibration-tab' + (currentTab === 'variation' ? ' active' : '') +
-                    '" data-type="variation" onclick="CalibrationViewer.switchTab(\'variation\')">提案チェック</button>';
+        // 両方表示タブ（両方ある場合のみ）
+        if (hasCorrectness && hasProposal) {
+            html += '<button class="calibration-tab' + (currentTab === 'both' ? ' active' : '') +
+                    '" data-type="both" onclick="CalibrationViewer.switchTab(\'both\')">両方表示</button>';
         }
 
-        if (hasSimple) {
-            html += '<button class="calibration-tab' + (currentTab === 'simple' ? ' active' : '') +
-                    '" data-type="simple" onclick="CalibrationViewer.switchTab(\'simple\')">正誤チェック</button>';
+        // 正誤チェックタブ
+        if (hasCorrectness) {
+            const correctnessCount = allItems.filter(function(item) {
+                return item.checkKind === 'correctness';
+            }).length;
+            html += '<button class="calibration-tab' + (currentTab === 'correctness' ? ' active' : '') +
+                    '" data-type="correctness" onclick="CalibrationViewer.switchTab(\'correctness\')">正誤チェック (' + correctnessCount + ')</button>';
+        }
+
+        // 提案チェックタブ
+        if (hasProposal) {
+            const proposalCount = allItems.filter(function(item) {
+                return item.checkKind === 'proposal';
+            }).length;
+            html += '<button class="calibration-tab' + (currentTab === 'proposal' ? ' active' : '') +
+                    '" data-type="proposal" onclick="CalibrationViewer.switchTab(\'proposal\')">提案チェック (' + proposalCount + ')</button>';
         }
 
         tabsEl.innerHTML = html;
 
-        // 片方だけの場合はタブを非表示
-        if (!hasVariation || !hasSimple) {
-            tabsEl.style.display = 'none';
-        }
+        // タブを表示
+        tabsEl.style.display = 'flex';
     }
 
     /**
@@ -168,24 +203,78 @@
 
     /**
      * テーブルをレンダリング
+     * checkKind でフィルタリングして表示（全アイテム対象）
      */
     function renderTable() {
-        if (!contentEl || !currentData || !currentData.checks || !currentData.checks[currentTab]) {
+        if (!contentEl || allItems.length === 0) {
             showError('データがありません');
             return;
         }
 
-        const checkData = currentData.checks[currentTab];
-        // picked: true の項目のみ表示
-        const items = checkData.items.filter(function(item) {
-            return item.picked === true;
-        });
-
-        if (items.length === 0) {
-            showError('ピックアップされた項目がありません');
+        // 「両方表示」モードの場合は2カラムレイアウト
+        if (currentTab === 'both') {
+            renderBothColumns();
             return;
         }
 
+        // 現在のタブの checkKind に一致する項目を表示（picked関係なく全て）
+        const items = allItems.filter(function(item) {
+            return item.checkKind === currentTab;
+        });
+
+        if (items.length === 0) {
+            var tabName = currentTab === 'correctness' ? '正誤チェック' : '提案チェック';
+            showError('「' + tabName + '」の項目がありません');
+            return;
+        }
+
+        contentEl.innerHTML = renderItemsToHtml(items);
+    }
+
+    /**
+     * 両方表示モード - 2カラムで正誤と提案を並べて表示
+     */
+    function renderBothColumns() {
+        const correctnessItems = allItems.filter(function(item) {
+            return item.checkKind === 'correctness';
+        });
+        const proposalItems = allItems.filter(function(item) {
+            return item.checkKind === 'proposal';
+        });
+
+        let html = '<div class="calibration-dual-columns">';
+
+        // 正誤チェックカラム
+        html += '<div class="calibration-column">';
+        html += '<div class="calibration-column-header correctness-header">正誤チェック (' + correctnessItems.length + ')</div>';
+        html += '<div class="calibration-column-content">';
+        if (correctnessItems.length > 0) {
+            html += renderItemsToHtml(correctnessItems);
+        } else {
+            html += '<div class="calibration-empty">項目がありません</div>';
+        }
+        html += '</div></div>';
+
+        // 提案チェックカラム
+        html += '<div class="calibration-column">';
+        html += '<div class="calibration-column-header proposal-header">提案チェック (' + proposalItems.length + ')</div>';
+        html += '<div class="calibration-column-content">';
+        if (proposalItems.length > 0) {
+            html += renderItemsToHtml(proposalItems);
+        } else {
+            html += '<div class="calibration-empty">項目がありません</div>';
+        }
+        html += '</div></div>';
+
+        html += '</div>';
+
+        contentEl.innerHTML = html;
+    }
+
+    /**
+     * アイテムリストをHTMLに変換
+     */
+    function renderItemsToHtml(items) {
         // カテゴリでグループ化
         const grouped = {};
         items.forEach(function(item) {
@@ -211,9 +300,8 @@
             html += '<table class="calibration-table"><tbody>';
 
             catItems.forEach(function(item, index) {
-                var itemId = category.replace(/[^a-zA-Z0-9]/g, '_') + '_' + index;
                 html += '<tr>';
-                html += '<td class="cal-page">' + escapeHtml(item.page || '') + '</td>';
+                html += '<td class="cal-page">' + formatPage(item.page) + '</td>';
                 html += '<td class="cal-excerpt">' + escapeHtml(item.excerpt || '') + '</td>';
                 html += '<td class="cal-content">' + escapeHtml(item.content || '') + '</td>';
                 html += '<td class="cal-copy">';
@@ -227,7 +315,7 @@
             html += '</tbody></table></div></div>';
         });
 
-        contentEl.innerHTML = html;
+        return html;
     }
 
     /**
@@ -240,6 +328,21 @@
         var colors = ['cal-color-1', 'cal-color-2', 'cal-color-3', 'cal-color-4', 'cal-color-5',
                       'cal-color-6', 'cal-color-7', 'cal-color-8', 'cal-color-9', 'cal-color-10'];
         return colors[(num - 1) % colors.length] || 'cal-color-default';
+    }
+
+    /**
+     * ページ番号を「●●P」形式にフォーマット
+     */
+    function formatPage(page) {
+        if (!page) return '';
+        var pageStr = String(page);
+        // 「●ページ」形式から数字を抽出して「●P」に変換
+        var match = pageStr.match(/^(\d+)/);
+        if (match) {
+            return escapeHtml(match[1]) + 'P';
+        }
+        // 数字がない場合はそのまま表示
+        return escapeHtml(pageStr);
     }
 
     /**
