@@ -828,31 +828,50 @@ body.dark-mode .json-folder-browser-modal {
     background-color: #2a2a2a;
 }
 
-body.dark-mode .json-folder-path-bar {
+body.dark-mode .json-folder-breadcrumb {
     background: #333;
-    color: #aaa;
 }
 
-body.dark-mode .json-folder-tree {
+body.dark-mode .json-folder-crumb {
+    color: #64b5f6;
+}
+
+body.dark-mode .json-folder-crumb:hover {
+    background: #3a3a3a;
+}
+
+body.dark-mode .json-folder-crumb-current {
+    color: #ddd;
+}
+
+body.dark-mode .json-folder-crumb-current:hover {
+    background: transparent;
+}
+
+body.dark-mode .json-folder-crumb-sep {
+    color: #666;
+}
+
+body.dark-mode .json-folder-list {
     background: #252525;
     border-color: #444;
 }
 
-body.dark-mode .json-folder-tree::-webkit-scrollbar {
+body.dark-mode .json-folder-list::-webkit-scrollbar {
     width: 6px;
 }
 
-body.dark-mode .json-folder-tree::-webkit-scrollbar-track {
+body.dark-mode .json-folder-list::-webkit-scrollbar-track {
     background: #333;
     border-radius: 3px;
 }
 
-body.dark-mode .json-folder-tree::-webkit-scrollbar-thumb {
+body.dark-mode .json-folder-list::-webkit-scrollbar-thumb {
     background: #666;
     border-radius: 3px;
 }
 
-body.dark-mode .json-folder-tree::-webkit-scrollbar-thumb:hover {
+body.dark-mode .json-folder-list::-webkit-scrollbar-thumb:hover {
     background: #888;
 }
 
@@ -860,20 +879,24 @@ body.dark-mode .json-folder-item:hover {
     background: #3a3a3a;
 }
 
-body.dark-mode .json-folder-item.folder {
+body.dark-mode .json-folder-folder {
     color: #64b5f6;
 }
 
-body.dark-mode .json-folder-item.file {
-    color: #ddd;
+body.dark-mode .json-folder-folder .json-folder-icon svg {
+    stroke: #64b5f6;
 }
 
-body.dark-mode .json-folder-item.file.json-file {
+body.dark-mode .json-folder-file {
     color: #81c784;
 }
 
-body.dark-mode .json-folder-item.file.json-file:hover {
+body.dark-mode .json-folder-file:hover {
     background: #2a3a2a;
+}
+
+body.dark-mode .json-folder-file .json-folder-icon svg {
+    stroke: #81c784;
 }
 
 /* 検索バー（ダークモード） */
@@ -1290,6 +1313,66 @@ body.dark-mode .cal-content {
 body.dark-mode .calibration-loading,
 body.dark-mode .calibration-empty {
     color: #777;
+}
+
+/* 校正チェック検索バー（ダークモード） */
+body.dark-mode .calibration-search-bar input {
+    background: #333;
+    border-color: #444;
+    color: #ddd;
+}
+
+body.dark-mode .calibration-search-bar input:focus {
+    border-color: #64b5f6;
+    box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
+}
+
+body.dark-mode .calibration-search-bar input::placeholder {
+    color: #777;
+}
+
+body.dark-mode .calibration-search-clear-btn {
+    color: #777;
+}
+
+body.dark-mode .calibration-search-clear-btn:hover {
+    background: #444;
+    color: #aaa;
+}
+
+body.dark-mode .calibration-search-results {
+    background: #252525;
+    border-color: #444;
+}
+
+body.dark-mode .calibration-search-results::-webkit-scrollbar-track {
+    background: #333;
+}
+
+body.dark-mode .calibration-search-results::-webkit-scrollbar-thumb {
+    background: #666;
+}
+
+body.dark-mode .calibration-search-results::-webkit-scrollbar-thumb:hover {
+    background: #888;
+}
+
+body.dark-mode .calibration-search-result-count {
+    color: #999;
+    border-bottom-color: #444;
+}
+
+body.dark-mode .calibration-search-result-name {
+    color: #81c784;
+}
+
+body.dark-mode .calibration-search-result-path {
+    color: #777;
+}
+
+body.dark-mode .calibration-search-highlight {
+    background-color: #5d5d00;
+    color: #fff;
 }
 
 .viewer-close-btn:active {

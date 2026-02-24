@@ -11,16 +11,22 @@ const CalibrationPanel = (() => {
   let currentData = null;
   let currentTab = 'variation';
   let navigationStack = []; // パンくず用
+  let searchTimeout = null;
+  let allJsonFiles = []; // 検索用にキャッシュされたJSONファイル一覧
 
   // DOM要素キャッシュ
   let toggleBtn, modal, browser, breadcrumb, folderList, resultArea, resultTitle, tableArea, tabs, cancelBtn;
+  let searchInput, searchClearBtn, searchResultsContainer;
 
   // イベントリスナー参照（cleanup用）
   let boundHandlers = {
     toggleBtnClick: null,
     cancelBtnClick: null,
     modalClick: null,
-    documentKeydown: null
+    documentKeydown: null,
+    searchInputInput: null,
+    searchInputKeydown: null,
+    searchClearBtnClick: null
   };
 
   /**
@@ -37,6 +43,9 @@ const CalibrationPanel = (() => {
     tableArea = document.getElementById('calibrationTableArea');
     tabs = document.getElementById('calibrationTabs');
     cancelBtn = document.getElementById('calibrationModalCancelBtn');
+    searchInput = document.getElementById('calibrationSearchInput');
+    searchClearBtn = document.getElementById('calibrationSearchClearBtn');
+    searchResultsContainer = document.getElementById('calibrationSearchResults');
 
     if (!toggleBtn || !modal) return;
 
@@ -65,6 +74,46 @@ const CalibrationPanel = (() => {
       }
     };
     document.addEventListener('keydown', boundHandlers.documentKeydown);
+
+    // 検索入力イベント
+    if (searchInput) {
+      boundHandlers.searchInputInput = (e) => {
+        const query = e.target.value.trim();
+
+        // デバウンス処理
+        if (searchTimeout) {
+          clearTimeout(searchTimeout);
+        }
+
+        searchTimeout = setTimeout(() => {
+          performSearch(query);
+        }, 300);
+      };
+      searchInput.addEventListener('input', boundHandlers.searchInputInput);
+
+      // Enterキーで検索
+      boundHandlers.searchInputKeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (searchTimeout) {
+            clearTimeout(searchTimeout);
+          }
+          performSearch(searchInput.value.trim());
+        }
+      };
+      searchInput.addEventListener('keydown', boundHandlers.searchInputKeydown);
+    }
+
+    // 検索クリアボタン
+    if (searchClearBtn) {
+      boundHandlers.searchClearBtnClick = () => {
+        if (searchInput) {
+          searchInput.value = '';
+        }
+        clearSearch();
+      };
+      searchClearBtn.addEventListener('click', boundHandlers.searchClearBtnClick);
+    }
   }
 
   /**
@@ -83,6 +132,12 @@ const CalibrationPanel = (() => {
     modal.style.display = 'flex';
     folderList.innerHTML = '<div class="calibration-loading">読み込み中...</div>';
 
+    // 検索フィールドをリセット
+    if (searchInput) {
+      searchInput.value = '';
+    }
+    clearSearch();
+
     // ブラウザを表示、結果エリアを非表示
     if (browser) browser.style.display = '';
     if (resultArea) resultArea.style.display = 'none';
@@ -91,6 +146,11 @@ const CalibrationPanel = (() => {
       await loadBasePath();
     } else {
       await loadFolder(basePath);
+    }
+
+    // バックグラウンドでJSONファイル一覧をキャッシュ
+    if (basePath) {
+      cacheAllJsonFiles(basePath);
     }
   }
 
@@ -227,9 +287,10 @@ const CalibrationPanel = (() => {
 
       // 別ウィンドウを開く（840x1080px - 1.5倍サイズ）
       const width = 840;
-      const height = 1080;
+      const height = Math.min(1080, screen.availHeight - 50);
       const left = Math.round((screen.width - width) / 2);
-      const top = Math.round((screen.height - height) / 2);
+      // ウィンドウのタイトルバーが画面外に出ないよう、最小値を50pxに設定
+      const top = Math.max(50, Math.round((screen.availHeight - height) / 2));
       window.open(
         `calibration-viewer.html?file=${encodedPath}`,
         '_blank',
@@ -323,11 +384,170 @@ const CalibrationPanel = (() => {
   }
 
   /**
+   * 全てのJSONファイルを再帰的に取得してキャッシュ
+   * @param {string} dirPath - ディレクトリパス
+   */
+  async function cacheAllJsonFiles(dirPath) {
+    allJsonFiles = [];
+    await collectJsonFilesRecursive(dirPath);
+  }
+
+  /**
+   * 再帰的にJSONファイルを収集
+   * @param {string} dirPath - ディレクトリパス
+   */
+  async function collectJsonFilesRecursive(dirPath) {
+    try {
+      const result = await window.electronAPI.listCalibrationDirectory(dirPath);
+      if (!result.success) return;
+
+      for (const item of result.items) {
+        if (item.isDirectory) {
+          await collectJsonFilesRecursive(item.path);
+        } else if (item.isFile && item.name.toLowerCase().endsWith('.json')) {
+          // 相対パスを計算
+          const relativePath = item.path.replace(basePath, '').replace(/^[\\\/]/, '');
+          allJsonFiles.push({
+            name: item.name,
+            path: item.path,
+            relativePath: relativePath
+          });
+        }
+      }
+    } catch (error) {
+      console.error('ファイル収集エラー:', error);
+    }
+  }
+
+  /**
+   * 検索を実行
+   * @param {string} query - 検索クエリ
+   */
+  function performSearch(query) {
+    if (!query) {
+      clearSearch();
+      return;
+    }
+
+    // 検索クエリを正規化（小文字に変換）
+    const normalizedQuery = query.toLowerCase();
+
+    // ファイル名で検索（部分一致）
+    const results = allJsonFiles.filter(file => {
+      return file.name.toLowerCase().includes(normalizedQuery) ||
+             file.relativePath.toLowerCase().includes(normalizedQuery);
+    });
+
+    displaySearchResults(results, query);
+  }
+
+  /**
+   * 検索結果を表示
+   * @param {Array} results - 検索結果
+   * @param {string} query - 検索クエリ（ハイライト用）
+   */
+  function displaySearchResults(results, query) {
+    if (!searchResultsContainer) return;
+
+    // フォルダツリーを非表示、検索結果を表示
+    folderList.style.display = 'none';
+    breadcrumb.style.display = 'none';
+    searchResultsContainer.style.display = 'block';
+    searchResultsContainer.innerHTML = '';
+
+    if (results.length === 0) {
+      searchResultsContainer.innerHTML = '<div class="calibration-empty">検索結果がありません</div>';
+      return;
+    }
+
+    // 結果件数を表示
+    const countEl = document.createElement('div');
+    countEl.className = 'calibration-search-result-count';
+    countEl.textContent = `${results.length}件のJSONファイルが見つかりました`;
+    searchResultsContainer.appendChild(countEl);
+
+    // 検索結果を表示
+    results.forEach(file => {
+      const itemEl = document.createElement('div');
+      itemEl.className = 'calibration-item calibration-file calibration-search-result-item';
+
+      // アイコン
+      const icon = document.createElement('span');
+      icon.className = 'calibration-icon';
+      icon.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+      itemEl.appendChild(icon);
+
+      // ファイル名（ハイライト）
+      const nameEl = document.createElement('span');
+      nameEl.className = 'calibration-search-result-name';
+      nameEl.innerHTML = highlightMatch(file.name, query);
+      itemEl.appendChild(nameEl);
+
+      // 相対パス
+      const pathEl = document.createElement('div');
+      pathEl.className = 'calibration-search-result-path';
+      pathEl.innerHTML = highlightMatch(file.relativePath, query);
+      itemEl.appendChild(pathEl);
+
+      // クリックイベント
+      itemEl.addEventListener('click', async () => {
+        await openFile(file.path);
+      });
+
+      searchResultsContainer.appendChild(itemEl);
+    });
+  }
+
+  /**
+   * 検索クエリに一致する部分をハイライト
+   * @param {string} text - テキスト
+   * @param {string} query - 検索クエリ
+   * @returns {string} ハイライトされたHTML
+   */
+  function highlightMatch(text, query) {
+    if (!query) return escapeHtml(text);
+
+    const lowerText = text.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    const index = lowerText.indexOf(lowerQuery);
+
+    if (index === -1) {
+      return escapeHtml(text);
+    }
+
+    const before = text.substring(0, index);
+    const match = text.substring(index, index + query.length);
+    const after = text.substring(index + query.length);
+
+    return escapeHtml(before) + '<mark class="calibration-search-highlight">' + escapeHtml(match) + '</mark>' + escapeHtml(after);
+  }
+
+  /**
+   * 検索をクリア
+   */
+  function clearSearch() {
+    if (searchResultsContainer) {
+      searchResultsContainer.style.display = 'none';
+      searchResultsContainer.innerHTML = '';
+    }
+    if (folderList) {
+      folderList.style.display = 'block';
+    }
+    if (breadcrumb) {
+      breadcrumb.style.display = 'flex';
+    }
+  }
+
+  /**
    * ルートに戻る
    */
   function goToRoot() {
     navigationStack = [];
     currentData = null;
+    clearSearch();
+    if (searchInput) {
+      searchInput.value = '';
+    }
     loadFolder(basePath);
   }
 
@@ -359,15 +579,29 @@ const CalibrationPanel = (() => {
    * イベントリスナーをクリーンアップ
    */
   function cleanup() {
+    // 検索タイムアウトをクリア
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+      searchTimeout = null;
+    }
+
     if (toggleBtn) toggleBtn.removeEventListener('click', boundHandlers.toggleBtnClick);
     if (cancelBtn) cancelBtn.removeEventListener('click', boundHandlers.cancelBtnClick);
     if (modal) modal.removeEventListener('click', boundHandlers.modalClick);
     document.removeEventListener('keydown', boundHandlers.documentKeydown);
+    if (searchInput) {
+      searchInput.removeEventListener('input', boundHandlers.searchInputInput);
+      searchInput.removeEventListener('keydown', boundHandlers.searchInputKeydown);
+    }
+    if (searchClearBtn) searchClearBtn.removeEventListener('click', boundHandlers.searchClearBtnClick);
 
     // 参照をクリア
     for (const key in boundHandlers) {
       boundHandlers[key] = null;
     }
+
+    // キャッシュをクリア
+    allJsonFiles = [];
   }
 
   // DOMContentLoaded で初期化

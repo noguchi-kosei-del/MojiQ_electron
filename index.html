@@ -418,14 +418,17 @@
                 <input type="text" id="jsonFolderSearchInput" placeholder="JSONファイルを検索..." autocomplete="off">
                 <button id="jsonFolderSearchClearBtn" class="json-search-clear-btn" title="クリア">&times;</button>
             </div>
-            <div class="json-folder-path-bar" style="display: none;">
-                <span id="jsonFolderCurrentPath">読み込み中...</span>
-            </div>
-            <div id="jsonFolderSearchResults" class="json-folder-search-results" style="display: none;">
-                <!-- 検索結果がここに表示される -->
-            </div>
-            <div id="jsonFolderTree" class="json-folder-tree">
-                <!-- フォルダツリーがここに動的に生成される -->
+            <!-- フォルダブラウザ -->
+            <div class="json-folder-browser" id="jsonFolderBrowser">
+                <div class="json-folder-breadcrumb" id="jsonFolderBreadcrumb">
+                    <span class="json-folder-crumb json-folder-crumb-root" onclick="MojiQJsonFolderBrowser.goToRoot()">TOP</span>
+                </div>
+                <div id="jsonFolderSearchResults" class="json-folder-search-results" style="display: none;">
+                    <!-- 検索結果がここに表示される -->
+                </div>
+                <div id="jsonFolderList" class="json-folder-list">
+                    <div class="json-folder-loading">読み込み中...</div>
+                </div>
             </div>
             <div class="modal-actions">
                 <button id="jsonFolderBrowserCancelBtn">閉じる</button>
@@ -439,10 +442,17 @@
             <div class="modal-header">
                 <span>校正チェックjsonを選択してください</span>
             </div>
+            <div class="calibration-search-bar">
+                <input type="text" id="calibrationSearchInput" placeholder="JSONファイルを検索..." autocomplete="off">
+                <button id="calibrationSearchClearBtn" class="calibration-search-clear-btn" title="クリア">&times;</button>
+            </div>
             <!-- フォルダブラウザ -->
             <div class="calibration-browser" id="calibrationBrowser">
                 <div class="calibration-breadcrumb" id="calibrationBreadcrumb">
                     <span class="calibration-crumb calibration-crumb-root" onclick="CalibrationPanel.goToRoot()">TOP</span>
+                </div>
+                <div id="calibrationSearchResults" class="calibration-search-results" style="display: none;">
+                    <!-- 検索結果がここに表示される -->
                 </div>
                 <div class="calibration-folder-list" id="calibrationFolderList">
                     <div class="calibration-loading">読み込み中...</div>
@@ -794,7 +804,7 @@
     <div id="stampContainer"></div>
     <div class="add-font-row">
         <button id="gdriveJsonBrowserBtn"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5a1 1 0 011-1h4l2 2h6a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1V5z"/></svg> 作品仕様を読み込み</button>
-        <button id="calibrationToggleBtn" class="calibration-toggle-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> 校正チェック</button>
+        <button id="calibrationToggleBtn" class="calibration-toggle-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><polyline points="3,6 4,7 6,5"/><polyline points="3,12 4,13 6,11"/><polyline points="3,18 4,19 6,17"/></svg> 校正チェック</button>
     </div>
 </div>
             </div>
