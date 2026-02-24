@@ -190,23 +190,44 @@ function extractVersionFromFilename(filename) {
   return null;
 }
 
-// 起動時に更新をチェック
+// 起動時に更新をチェック（バックグラウンド実行、タイムアウト付き）
 async function checkForUpdates() {
   const currentVersion = app.getVersion();
   console.log('[MojiQ] 現在のバージョン:', currentVersion);
 
-  // フォルダ存在確認
-  if (!fs.existsSync(UPDATE_FOLDER)) {
+  // ネットワークドライブアクセスにタイムアウトを設ける（3秒）
+  const UPDATE_CHECK_TIMEOUT = 3000;
+
+  // フォルダ存在確認（非同期 + タイムアウト）
+  let folderExists = false;
+  try {
+    folderExists = await Promise.race([
+      fs.promises.access(UPDATE_FOLDER, fs.constants.R_OK).then(() => true).catch(() => false),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('タイムアウト')), UPDATE_CHECK_TIMEOUT))
+    ]);
+  } catch (err) {
+    console.log('[MojiQ] 更新フォルダへのアクセスがタイムアウトしました');
+    return;
+  }
+
+  if (!folderExists) {
     console.log('[MojiQ] 更新フォルダが見つかりません:', UPDATE_FOLDER);
     return;
   }
 
-  // フォルダ内のファイル一覧取得
+  // フォルダ内のファイル一覧取得（非同期 + タイムアウト）
   let files;
   try {
-    files = fs.readdirSync(UPDATE_FOLDER);
+    files = await Promise.race([
+      fs.promises.readdir(UPDATE_FOLDER),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('タイムアウト')), UPDATE_CHECK_TIMEOUT))
+    ]);
   } catch (err) {
-    console.error('[MojiQ] 更新フォルダの読み込みエラー:', err);
+    if (err.message === 'タイムアウト') {
+      console.log('[MojiQ] 更新フォルダの読み込みがタイムアウトしました');
+    } else {
+      console.error('[MojiQ] 更新フォルダの読み込みエラー:', err);
+    }
     return;
   }
 
@@ -288,7 +309,7 @@ function updateSplashProgress(progress) {
 
 function createWindow() {
   // QA対策 #46: 画面サイズに応じてウィンドウサイズを調整
-  const { width: adjustedWidth, height: adjustedHeight } = adjustWindowSizeToScreen(1400, 900);
+  const { width: adjustedWidth, height: adjustedHeight } = adjustWindowSizeToScreen(1400, 1000);
 
   mainWindow = new BrowserWindow({
     width: adjustedWidth,
@@ -529,7 +550,9 @@ ipcMain.handle('save-file', async (event, filePath, base64Data) => {
     }
   }
 
-  const tempFilePath = filePath + '.tmp.' + Date.now();
+  // 一時ファイル名にランダム文字列を追加（同時保存操作時の衝突防止）
+  const randomSuffix = Math.random().toString(36).substring(2, 10);
+  const tempFilePath = filePath + '.tmp.' + Date.now() + '-' + randomSuffix;
   try {
     const buffer = Buffer.from(base64Data, 'base64');
     fs.writeFileSync(tempFilePath, buffer);
@@ -1014,7 +1037,6 @@ function isImageFile(filePath) {
 // コマンドライン引数からファイルパスとページ番号を取得（Windows用・複数ファイル対応）
 // 検版ビューワー連携: --page オプションで初期ページ番号を指定可能
 function getFilesFromArgs(args) {
-  console.log('[MojiQ] getFilesFromArgs called with:', args);
   const files = [];
   let pageNum = null;
   let hasPageFlag = false;
@@ -1022,19 +1044,16 @@ function getFilesFromArgs(args) {
   // 最初の引数はアプリ自体のパス、2番目以降がファイルパス
   for (let i = 1; i < args.length; i++) {
     const arg = args[i];
-    console.log(`[MojiQ] arg[${i}]:`, arg);
 
     // --page オプションの検出
     if (arg === '--page') {
       hasPageFlag = true;
-      console.log('[MojiQ] Found --page flag');
       // 次の引数が数値ならページ番号として取得
       if (i + 1 < args.length) {
         const nextArg = args[i + 1];
         const parsed = parseInt(nextArg, 10);
         if (!isNaN(parsed) && parsed > 0) {
           pageNum = parsed;
-          console.log('[MojiQ] Parsed pageNum from next arg:', pageNum);
           i++; // 次の引数をスキップ
         }
       }
@@ -1050,7 +1069,6 @@ function getFilesFromArgs(args) {
     const numericArg = parseInt(arg, 10);
     if (hasPageFlag && pageNum === null && !isNaN(numericArg) && numericArg > 0 && arg === String(numericArg)) {
       pageNum = numericArg;
-      console.log('[MojiQ] Parsed pageNum from standalone arg:', pageNum);
       continue;
     }
 
@@ -1060,7 +1078,6 @@ function getFilesFromArgs(args) {
     }
   }
 
-  console.log('[MojiQ] getFilesFromArgs result:', { files, pageNum });
   return { files, pageNum };
 }
 
@@ -1069,7 +1086,6 @@ function getFilesFromArgs(args) {
 // レンダラー側でストリーミング読み込み＆圧縮処理を行う
 // pageNum: 検版ビューワー連携用の初期ページ番号
 function openFilesInApp(filePaths, pageNum = null) {
-  console.log('[MojiQ] openFilesInApp called with pageNum:', pageNum);
   if (!filePaths || filePaths.length === 0) return;
 
   // 対応ファイルのみフィルタ
@@ -1086,8 +1102,6 @@ function openFilesInApp(filePaths, pageNum = null) {
         // PDFのみの場合は最初の1つを開く
         const filePath = pdfFiles[0];
         const fileName = path.basename(filePath);
-        // 検版ビューワー連携: initialPageを追加
-        console.log('[MojiQ] Sending file-opened-path with initialPage:', pageNum);
         mainWindow.webContents.send('file-opened-path', { path: filePath, name: fileName, initialPage: pageNum });
       } else if (imageFiles.length > 0) {
         // 画像ファイルがある場合は複数まとめて送信
@@ -1114,35 +1128,34 @@ initialPageNumber = argsResult.pageNum;
 
 // アプリの準備ができたらウィンドウを作成
 app.whenReady().then(async () => {
-  // 起動時に更新をチェック
-  await checkForUpdates();
-
-  // スプラッシュウィンドウを先に表示
+  // スプラッシュウィンドウを先に表示（更新チェックは後でバックグラウンド実行）
   createSplashWindow();
 
-  // 少し待ってからスプラッシュを表示（描画完了を待つ）
-  await new Promise(resolve => setTimeout(resolve, 100));
-
-  // 進捗アニメーション開始
+  // 進捗アニメーション開始（スプラッシュ表示を即座に開始）
   updateSplashProgress(10);
 
   // メインウィンドウを作成（バックグラウンドで）
   createWindow();
   updateSplashProgress(30);
 
+  // 更新チェックをバックグラウンドで実行（起動をブロックしない）
+  checkForUpdates().catch(err => {
+    console.log('[MojiQ] 更新チェックでエラーが発生しました:', err.message);
+  });
+
   // ウィンドウの読み込み完了後にファイルを開く
   mainWindow.webContents.on('did-finish-load', async () => {
     updateSplashProgress(60);
 
-    // 少し待ってから進捗を更新（UIの読み込み完了を待つ）
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // 短い待機で進捗を更新（UIの安定化のための最小限の待機）
+    await new Promise(resolve => setTimeout(resolve, 100));
     updateSplashProgress(80);
 
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 50));
     updateSplashProgress(100);
 
-    // 完了後、少し待ってからメインウィンドウを表示
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // 完了後、短い待機でメインウィンドウを表示
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // スプラッシュを閉じてメインウィンドウを表示
     if (splashWindow && !splashWindow.isDestroyed()) {

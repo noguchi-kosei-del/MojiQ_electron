@@ -109,30 +109,37 @@ window.MojiQPageManager = (function() {
         const currentOperationId = ++undoRedoOperationId;
 
         try {
-            await new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => {
-                    // 新しい操作が開始されていた場合は描画をスキップ
-                    if (currentOperationId !== undoRedoOperationId) {
+            // タイムアウト付きで画像読み込み（5秒でタイムアウト）
+            await Promise.race([
+                new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        // 新しい操作が開始されていた場合は描画をスキップ
+                        if (currentOperationId !== undoRedoOperationId) {
+                            resolve();
+                            return;
+                        }
+                        ctx.clearRect(0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
+                        ctx.drawImage(img, 0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
                         resolve();
-                        return;
-                    }
-                    ctx.clearRect(0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
-                    ctx.drawImage(img, 0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
-                    resolve();
-                };
-                img.onerror = (err) => {
-                    console.warn('Undo image load failed:', err);
-                    // BUG-002修正: エラーをrejectで伝播
-                    reject(new Error('Undo画像の読み込みに失敗しました'));
-                };
-                img.src = prevData;
-            }).catch((err) => {
-                // エラーをログに記録するが、処理は継続
+                    };
+                    img.onerror = (err) => {
+                        console.warn('Undo image load failed:', err);
+                        reject(new Error('Undo画像の読み込みに失敗しました'));
+                    };
+                    img.src = prevData;
+                }),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Undo処理がタイムアウトしました')), 5000)
+                )
+            ]).catch((err) => {
                 console.error('Undo処理中にエラーが発生:', err);
             });
         } finally {
-            isUndoRedoInProgress = false;
+            // 現在の操作が最新の場合のみフラグをリセット（競合防止）
+            if (currentOperationId === undoRedoOperationId) {
+                isUndoRedoInProgress = false;
+            }
         }
         updatePageControls();
     }
@@ -172,30 +179,37 @@ window.MojiQPageManager = (function() {
         const currentOperationId = ++undoRedoOperationId;
 
         try {
-            await new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => {
-                    // 新しい操作が開始されていた場合は描画をスキップ
-                    if (currentOperationId !== undoRedoOperationId) {
+            // タイムアウト付きで画像読み込み（5秒でタイムアウト）
+            await Promise.race([
+                new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        // 新しい操作が開始されていた場合は描画をスキップ
+                        if (currentOperationId !== undoRedoOperationId) {
+                            resolve();
+                            return;
+                        }
+                        ctx.clearRect(0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
+                        ctx.drawImage(img, 0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
                         resolve();
-                        return;
-                    }
-                    ctx.clearRect(0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
-                    ctx.drawImage(img, 0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
-                    resolve();
-                };
-                img.onerror = (err) => {
-                    console.warn('Redo image load failed:', err);
-                    // BUG-002修正: エラーをrejectで伝播
-                    reject(new Error('Redo画像の読み込みに失敗しました'));
-                };
-                img.src = popped;
-            }).catch((err) => {
-                // エラーをログに記録するが、処理は継続
+                    };
+                    img.onerror = (err) => {
+                        console.warn('Redo image load failed:', err);
+                        reject(new Error('Redo画像の読み込みに失敗しました'));
+                    };
+                    img.src = popped;
+                }),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Redo処理がタイムアウトしました')), 5000)
+                )
+            ]).catch((err) => {
                 console.error('Redo処理中にエラーが発生:', err);
             });
         } finally {
-            isUndoRedoInProgress = false;
+            // 現在の操作が最新の場合のみフラグをリセット（競合防止）
+            if (currentOperationId === undoRedoOperationId) {
+                isUndoRedoInProgress = false;
+            }
         }
 
         updatePageControls();

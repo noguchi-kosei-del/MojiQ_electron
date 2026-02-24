@@ -392,7 +392,16 @@ function initWindowControlsAndMenuBar() {
                     window.electronAPI.saveCompletedQuit();
                 } catch (error) {
                     console.error('保存中にエラーが発生しました:', error);
-                    // エラー時は終了しない（ユーザーが再度操作できるように）
+                    // エラー時はユーザーに通知（終了しない）
+                    if (window.electronAPI && window.electronAPI.showMessageDialog) {
+                        await window.electronAPI.showMessageDialog({
+                            type: 'error',
+                            title: '保存エラー',
+                            message: '保存中にエラーが発生しました。\n' + (error.message || error)
+                        });
+                    } else if (window.MojiQModal && window.MojiQModal.showAlert) {
+                        window.MojiQModal.showAlert('保存中にエラーが発生しました。\n' + (error.message || error), '保存エラー');
+                    }
                 }
             } else {
                 // PDF Managerが利用できない場合は、そのまま終了

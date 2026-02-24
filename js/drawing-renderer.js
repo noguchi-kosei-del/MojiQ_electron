@@ -2839,93 +2839,32 @@ window.MojiQDrawingRenderer = (function() {
     }
 
     /**
-     * トルスタンプを描画（後方互換エイリアス）
+     * テキストスタンプのフォールバックテキスト定義
+     * Constants.STAMP_PARAMS.DEFINITIONSが利用できない場合のフォールバック
      */
-    function renderToruStamp(ctx, obj) {
-        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS
-            ? Constants.STAMP_PARAMS.DEFINITIONS.toruStamp
-            : null;
-        renderTextStamp(ctx, obj, def ? def.text : 'トル');
-    }
+    const TEXT_STAMP_FALLBACKS = {
+        toruStamp: 'トル',
+        torutsumeStamp: 'トルツメ',
+        torumamaStamp: 'トルママ',
+        zenkakuakiStamp: '全角アキ',
+        nibunakiStamp: '半角アキ',
+        shibunakiStamp: '四分アキ',
+        kaigyouStamp: '改行',
+        tojiruStamp: 'とじる',
+        hirakuStamp: 'ひらく'
+    };
 
     /**
-     * トルツメスタンプを描画（後方互換エイリアス）
+     * 汎用テキストスタンプ描画関数
+     * @param {CanvasRenderingContext2D} ctx - キャンバスコンテキスト
+     * @param {Object} obj - 描画オブジェクト
+     * @param {string} stampType - スタンプタイプ（例: 'toruStamp'）
      */
-    function renderTorutsumeStamp(ctx, obj) {
-        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS
-            ? Constants.STAMP_PARAMS.DEFINITIONS.torutsumeStamp
-            : null;
-        renderTextStamp(ctx, obj, def ? def.text : 'トルツメ');
-    }
-
-    /**
-     * トルママスタンプを描画（後方互換エイリアス）
-     */
-    function renderTorumamaStamp(ctx, obj) {
-        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS
-            ? Constants.STAMP_PARAMS.DEFINITIONS.torumamaStamp
-            : null;
-        renderTextStamp(ctx, obj, def ? def.text : 'トルママ');
-    }
-
-    /**
-     * 全角アキスタンプを描画（後方互換エイリアス）
-     */
-    function renderZenkakuakiStamp(ctx, obj) {
-        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS
-            ? Constants.STAMP_PARAMS.DEFINITIONS.zenkakuakiStamp
-            : null;
-        renderTextStamp(ctx, obj, def ? def.text : '全角アキ');
-    }
-
-    /**
-     * 半角アキスタンプを描画（後方互換エイリアス）
-     */
-    function renderNibunakiStamp(ctx, obj) {
-        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS
-            ? Constants.STAMP_PARAMS.DEFINITIONS.nibunakiStamp
-            : null;
-        renderTextStamp(ctx, obj, def ? def.text : '半角アキ');
-    }
-
-    /**
-     * 四分アキスタンプを描画（後方互換エイリアス）
-     */
-    function renderShibunakiStamp(ctx, obj) {
-        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS
-            ? Constants.STAMP_PARAMS.DEFINITIONS.shibunakiStamp
-            : null;
-        renderTextStamp(ctx, obj, def ? def.text : '四分アキ');
-    }
-
-    /**
-     * 改行スタンプを描画（後方互換エイリアス）
-     */
-    function renderKaigyouStamp(ctx, obj) {
-        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS
-            ? Constants.STAMP_PARAMS.DEFINITIONS.kaigyouStamp
-            : null;
-        renderTextStamp(ctx, obj, def ? def.text : '改行');
-    }
-
-    /**
-     * とじるスタンプを描画
-     */
-    function renderTojiruStamp(ctx, obj) {
-        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS
-            ? Constants.STAMP_PARAMS.DEFINITIONS.tojiruStamp
-            : null;
-        renderTextStamp(ctx, obj, def ? def.text : 'とじる');
-    }
-
-    /**
-     * ひらくスタンプを描画
-     */
-    function renderHirakuStamp(ctx, obj) {
-        const def = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS
-            ? Constants.STAMP_PARAMS.DEFINITIONS.hirakuStamp
-            : null;
-        renderTextStamp(ctx, obj, def ? def.text : 'ひらく');
+    function renderGenericTextStamp(ctx, obj, stampType) {
+        const definitions = Constants && Constants.STAMP_PARAMS && Constants.STAMP_PARAMS.DEFINITIONS;
+        const def = definitions ? definitions[stampType] : null;
+        const fallbackText = TEXT_STAMP_FALLBACKS[stampType] || stampType;
+        renderTextStamp(ctx, obj, def ? def.text : fallbackText);
     }
 
     /**
@@ -3787,31 +3726,15 @@ window.MojiQDrawingRenderer = (function() {
                 renderRubyStamp(ctx, obj);
                 break;
             case 'toruStamp':
-                renderToruStamp(ctx, obj);
-                break;
             case 'torutsumeStamp':
-                renderTorutsumeStamp(ctx, obj);
-                break;
             case 'torumamaStamp':
-                renderTorumamaStamp(ctx, obj);
-                break;
             case 'zenkakuakiStamp':
-                renderZenkakuakiStamp(ctx, obj);
-                break;
             case 'nibunakiStamp':
-                renderNibunakiStamp(ctx, obj);
-                break;
             case 'shibunakiStamp':
-                renderShibunakiStamp(ctx, obj);
-                break;
             case 'kaigyouStamp':
-                renderKaigyouStamp(ctx, obj);
-                break;
             case 'tojiruStamp':
-                renderTojiruStamp(ctx, obj);
-                break;
             case 'hirakuStamp':
-                renderHirakuStamp(ctx, obj);
+                renderGenericTextStamp(ctx, obj, obj.type);
                 break;
         }
 

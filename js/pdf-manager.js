@@ -61,9 +61,50 @@ window.MojiQPdfManager = (function() {
 
     // 単一ページ表示用レンダリングキャッシュ（LRU方式）
     let singlePageCache = null;              // PageRenderLRUCache インスタンス
-    const SINGLE_PAGE_CACHE_MAX = 30;        // 最大キャッシュページ数（高解像度画像を含むPDF対応のため拡大）
     let prefetchAbortController = null;      // プリフェッチ中断制御
     let isPrefetching = false;               // プリフェッチ実行中フラグ
+    let prefetchTimerId = null;              // プリフェッチスケジュールタイマーID
+
+    /**
+     * 利用可能なメモリに基づいて最適なキャッシュサイズを計算
+     * @returns {number} キャッシュサイズ（5-30）
+     */
+    function getOptimalCacheSize() {
+        // デフォルトはメモリ効率重視で15ページ
+        let cacheSize = 15;
+
+        try {
+            // performance.memory APIが利用可能な場合（Chromium系）
+            if (performance.memory && performance.memory.jsHeapSizeLimit) {
+                const heapLimit = performance.memory.jsHeapSizeLimit;
+                // 1GB以上: 30ページ、512MB以上: 20ページ、それ以下: 10ページ
+                if (heapLimit >= 1024 * 1024 * 1024) {
+                    cacheSize = 30;
+                } else if (heapLimit >= 512 * 1024 * 1024) {
+                    cacheSize = 20;
+                } else {
+                    cacheSize = 10;
+                }
+            }
+
+            // navigator.deviceMemory APIが利用可能な場合
+            if (navigator.deviceMemory) {
+                // デバイスメモリ8GB以上: 30ページ、4GB以上: 20ページ、それ以下: 10ページ
+                if (navigator.deviceMemory >= 8) {
+                    cacheSize = Math.max(cacheSize, 30);
+                } else if (navigator.deviceMemory >= 4) {
+                    cacheSize = Math.max(cacheSize, 20);
+                } else {
+                    cacheSize = Math.min(cacheSize, 10);
+                }
+            }
+        } catch (e) {
+            console.warn('[MojiQ] メモリ情報取得に失敗、デフォルトキャッシュサイズを使用:', e);
+        }
+
+        // 最小5ページ、最大30ページ
+        return Math.max(5, Math.min(cacheSize, 30));
+    }
 
     // 上書き保存用: 最後に保存/読み込んだファイルパス（Electron環境のみ）
     let currentSaveFilePath = null;
@@ -273,16 +314,12 @@ window.MojiQPdfManager = (function() {
 
                 if (objects.length > 0) {
                     totalAnnotations += objects.length;
-                    console.log('[MojiQ PdfManager] ページ ' + pageNum + ': ' + objects.length + '件の注釈を読み込みました');
                 }
             } catch (e) {
                 console.warn('[MojiQ PdfManager] ページ ' + pageNum + ' の注釈読み込みに失敗:', e);
             }
         }
 
-        if (totalAnnotations > 0) {
-            console.log('[MojiQ PdfManager] 合計 ' + totalAnnotations + '件の注釈を読み込みました');
-        }
     }
 
     /**
@@ -479,6 +516,11 @@ window.MojiQPdfManager = (function() {
      * プリフェッチを中断
      */
     function cancelPrefetch() {
+        // スケジュールタイマーをクリア（多重実行防止）
+        if (prefetchTimerId) {
+            clearTimeout(prefetchTimerId);
+            prefetchTimerId = null;
+        }
         if (prefetchAbortController) {
             prefetchAbortController.abort();
             prefetchAbortController = null;
@@ -496,13 +538,20 @@ window.MojiQPdfManager = (function() {
         // 見開きモードではプリフェッチしない（独自キャッシュがある）
         if (SpreadState.isSpreadViewMode()) return;
 
-        // 既存のプリフェッチをキャンセル
+        // 既存のプリフェッチをキャンセル（タイマーも含む）
         cancelPrefetch();
+
+        // 既にプリフェッチ実行中の場合はスキップ（多重実行防止）
+        if (isPrefetching) {
+            return;
+        }
+
         prefetchAbortController = new AbortController();
         const signal = prefetchAbortController.signal;
 
         // 少し待ってから開始（ユーザーの連続ナビゲーションを考慮）
-        setTimeout(() => {
+        prefetchTimerId = setTimeout(() => {
+            prefetchTimerId = null;
             if (signal.aborted) return;
             prefetchAdjacentPages(currentPage, containerWidth, containerHeight, signal);
         }, 50);  // 50msに短縮（高解像度PDF対応）
@@ -755,8 +804,9 @@ window.MojiQPdfManager = (function() {
             standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/standard_fonts/'
         };
 
-        // ページレンダリングキャッシュを初期化
-        singlePageCache = new PageRenderLRUCache(SINGLE_PAGE_CACHE_MAX);
+        // ページレンダリングキャッシュを初期化（メモリに応じた動的サイズ）
+        const cacheSize = getOptimalCacheSize();
+        singlePageCache = new PageRenderLRUCache(cacheSize);
 
         setupEventListeners();
         setupDragAndDrop();
@@ -1063,10 +1113,6 @@ window.MojiQPdfManager = (function() {
      * ヘッダーボタンを有効化
      */
     function enableHeaderButtons() {
-        // 保存ボタンは描画があるまで無効のまま（updateSaveButtonStateで制御）
-        // const savePdfBtn = document.getElementById('savePdfBtn');
-        // if (savePdfBtn) savePdfBtn.disabled = false;
-
         // 背景透過スライダーを有効化
         const bgOpacitySlider = document.getElementById('bgOpacitySlider');
         if (bgOpacitySlider) bgOpacitySlider.disabled = false;
@@ -1776,16 +1822,41 @@ window.MojiQPdfManager = (function() {
      * 背景透過モードがオンの場合は透過PDFとして保存
      */
     /**
+     * 保存処理に必要なタイムアウトを計算（ページ数・描画オブジェクト数に応じて動的調整）
+     * @returns {number} タイムアウト値（ミリ秒）
+     */
+    function calculateSaveTimeout() {
+        const baseTimeout = window.MojiQConstants?.SAVE?.LOCK_TIMEOUT_MS || 60000;
+        const pageCount = state?.totalPages || 1;
+
+        // 描画オブジェクト数をカウント
+        let totalObjects = 0;
+        if (state && state.pageDrawings) {
+            for (const pageNum in state.pageDrawings) {
+                const drawings = state.pageDrawings[pageNum];
+                if (Array.isArray(drawings)) {
+                    totalObjects += drawings.length;
+                }
+            }
+        }
+
+        // ベース60秒 + ページ数×3秒 + オブジェクト数×500ms
+        // 最小60秒、最大10分
+        const calculatedTimeout = baseTimeout + (pageCount * 3000) + (totalObjects * 500);
+        return Math.min(Math.max(calculatedTimeout, 60000), 600000);
+    }
+
+    /**
      * 保存ロックを取得（QA対策 #42, #52, #54）
      * @returns {boolean} ロック取得成功
      */
     function acquireSaveLock() {
         const now = Date.now();
-        const timeout = window.MojiQConstants?.SAVE?.LOCK_TIMEOUT_MS || 60000;
+        const timeout = calculateSaveTimeout();
 
         // タイムアウトしたロックは解除
         if (saveOperation.isLocked && (now - saveOperation.lockTime) > timeout) {
-            console.warn('[MojiQ] 保存ロックがタイムアウトしました。強制解除します。');
+            console.warn('[MojiQ] 保存ロックがタイムアウトしました（' + Math.round(timeout / 1000) + '秒）。強制解除します。');
             saveOperation.isLocked = false;
         }
 
@@ -2656,11 +2727,6 @@ window.MojiQPdfManager = (function() {
             };
             bgOpacitySlider.addEventListener('wheel', boundHandlers.bgOpacityWheel, { passive: false });
         }
-
-        // リサイズ時の再レンダリングは無効化（キャンバスサイズ固定のため）
-        // window.addEventListener('resize', MojiQUtils.debounce(() => {
-        //     if (state.pdfDocs.length > 0) renderPage(state.currentPageNum);
-        // }, 300));
     }
 
     /**
@@ -2721,6 +2787,7 @@ window.MojiQPdfManager = (function() {
 
         window.removeEventListener('mojiq:open-pdf', boundHandlers.openPdfHandler);
         window.removeEventListener('mojiq:save-pdf', boundHandlers.savePdfHandler);
+        window.removeEventListener('mojiq:save-pdf-as', boundHandlers.saveAsNewHandler);
         // MojiQEventsの登録解除
         if (boundHandlers.redrawUnsubscribe) {
             boundHandlers.redrawUnsubscribe();
@@ -2750,6 +2817,22 @@ window.MojiQPdfManager = (function() {
             canvasArea.removeEventListener('drop', boundHandlers.canvasAreaDrop);
         }
 
+        // ImageBitmapキャッシュの解放（GPUメモリリーク防止）
+        for (const key in imageBitmapCache) {
+            if (imageBitmapCache[key] && typeof imageBitmapCache[key].close === 'function') {
+                imageBitmapCache[key].close();
+            }
+        }
+        imageBitmapCache = {};
+
+        // singlePageCacheの解放
+        if (singlePageCache) {
+            singlePageCache.clear();
+        }
+
+        // プリフェッチのキャンセル
+        cancelPrefetch();
+
         // 参照をクリア
         for (const key in boundHandlers) {
             boundHandlers[key] = null;
@@ -2770,7 +2853,6 @@ window.MojiQPdfManager = (function() {
      * @param {number|null} initialPage - 初期表示ページ番号（検版ビューワー連携用、省略時は1ページ目）
      */
     async function loadPdfFromPath(filePath, fileName, initialPage = null) {
-        console.log('[MojiQ PdfManager] loadPdfFromPath called with initialPage:', initialPage);
         // 処理中はファイルオープンを無視
         if (isProcessing) return;
 
@@ -2954,9 +3036,7 @@ window.MojiQPdfManager = (function() {
             state.totalPages = state.pageMapping.length;
             // 検版ビューワー連携: 初期ページ番号が指定されている場合はそのページから開始
             // ページ番号が範囲外の場合は1ページ目にフォールバック
-            console.log('[MojiQ PdfManager] initialPage:', initialPage, 'totalPages:', state.totalPages);
             const startPage = (initialPage && initialPage >= 1 && initialPage <= state.totalPages) ? initialPage : 1;
-            console.log('[MojiQ PdfManager] Calculated startPage:', startPage);
             state.currentPageNum = startPage;
             state.pageDrawingHistory = {};
             state.pageRedoHistory = {};

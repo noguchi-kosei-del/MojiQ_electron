@@ -251,12 +251,6 @@ window.MojiQConstants = (function() {
         DEFAULT: 1.0
     };
 
-    /** @type {Object} ビュー回転設定 */
-    const VIEW_ROTATION = {
-        STEP: 90,                       // 回転ステップ（度）
-        OPTIONS: [0, 90, 180, 270]      // 有効な回転値
-    };
-
     // ========================================
     // 描画モード
     // ========================================
@@ -337,9 +331,6 @@ window.MojiQConstants = (function() {
 
         // ズーム
         ZOOM,
-
-        // ビュー回転
-        VIEW_ROTATION,
 
         // モード
         MODES,
