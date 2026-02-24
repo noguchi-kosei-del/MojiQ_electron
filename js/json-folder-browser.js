@@ -169,7 +169,8 @@ window.MojiQJsonFolderBrowser = (function() {
             cacheAllJsonFiles(basePath);
         } catch (error) {
             console.error('フォルダの読み込みに失敗:', error);
-            folderTree.innerHTML = '<div class="json-folder-loading">読み込みに失敗しました: ' + error.message + '</div>';
+            // BUG-005修正: XSS対策 - エラーメッセージをサニタイズ
+            folderTree.innerHTML = '<div class="json-folder-loading">読み込みに失敗しました: ' + escapeHtml(error.message) + '</div>';
         }
     }
 
@@ -350,7 +351,8 @@ window.MojiQJsonFolderBrowser = (function() {
         const result = await window.electronAPI.listDirectory(dirPath);
 
         if (!result.success) {
-            container.innerHTML = '<div class="json-folder-loading">エラー: ' + result.error + '</div>';
+            // BUG-005修正: XSS対策 - エラーメッセージをサニタイズ
+            container.innerHTML = '<div class="json-folder-loading">エラー: ' + escapeHtml(result.error) + '</div>';
             return;
         }
 

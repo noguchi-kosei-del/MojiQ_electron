@@ -131,7 +131,8 @@ const CalibrationPanel = (() => {
     try {
       const result = await window.electronAPI.listCalibrationDirectory(dirPath);
       if (!result.success) {
-        folderList.innerHTML = `<div class="calibration-empty">エラー: ${result.error}</div>`;
+        // BUG-005修正: XSS対策 - エラーメッセージをサニタイズ
+        folderList.innerHTML = `<div class="calibration-empty">エラー: ${escapeHtml(result.error)}</div>`;
         return;
       }
 
@@ -139,7 +140,8 @@ const CalibrationPanel = (() => {
       renderFolderList(result.items);
       updateBreadcrumb();
     } catch (error) {
-      folderList.innerHTML = `<div class="calibration-empty">エラー: ${error.message}</div>`;
+      // BUG-005修正: XSS対策 - エラーメッセージをサニタイズ
+      folderList.innerHTML = `<div class="calibration-empty">エラー: ${escapeHtml(error.message)}</div>`;
     }
   }
 

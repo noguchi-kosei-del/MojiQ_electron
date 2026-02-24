@@ -241,6 +241,12 @@ function initWindowControlsAndMenuBar() {
             slideMenuOverlay.addEventListener('click', closeSlideMenu);
         }
 
+        // スライドメニュー閉じるボタン
+        const slideMenuCloseBtn = document.getElementById('slideMenuCloseBtn');
+        if (slideMenuCloseBtn) {
+            slideMenuCloseBtn.addEventListener('click', closeSlideMenu);
+        }
+
         // メニュー項目のクリック処理
         const slideMenuItems = document.querySelectorAll('.slide-menu-item');
         slideMenuItems.forEach(item => {

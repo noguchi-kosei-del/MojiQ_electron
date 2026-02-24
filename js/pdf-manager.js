@@ -245,8 +245,10 @@ window.MojiQPdfManager = (function() {
      * @param {PDFDocumentProxy} pdf - PDFドキュメント
      */
     async function loadPdfAnnotationsForAllPages(pdf) {
-        const containerWidth = fixedContainerWidth;
-        const containerHeight = fixedContainerHeight;
+        // BUG-006修正: fixedContainerWidth/Heightのnullチェック
+        // nullの場合はデフォルト値を使用（A4サイズ相当）
+        const containerWidth = fixedContainerWidth || 595;
+        const containerHeight = fixedContainerHeight || 842;
 
         let totalAnnotations = 0;
 

@@ -568,7 +568,12 @@ ipcMain.handle('save-file', async (event, filePath, base64Data) => {
 ipcMain.handle('check-disk-space', async (event, filePath, requiredBytes) => {
   try {
     if (process.platform === 'win32') {
-      const drive = path.parse(filePath).root.charAt(0);
+      const drive = path.parse(filePath).root.charAt(0).toUpperCase();
+      // BUG-004修正: コマンドインジェクション対策 - ドライブレターの検証
+      if (!/^[A-Z]$/.test(drive)) {
+        console.warn('無効なドライブレター:', drive);
+        return { success: true, isEnough: true };
+      }
       const { execSync } = require('child_process');
       const result = execSync(
         `wmic logicaldisk where "DeviceID='${drive}:'" get FreeSpace`,
@@ -837,6 +842,10 @@ ipcMain.handle('get-file-size', async (event, filePath) => {
 // ElectronのIPCはArrayBufferを直接シリアライズ可能
 ipcMain.handle('read-file-binary', async (event, filePath) => {
   try {
+    // BUG-011修正: パストラバーサル対策 - パスの安全性チェック
+    if (!isPathSafe(filePath)) {
+      return { success: false, error: '不正なファイルパスです' };
+    }
     const data = fs.readFileSync(filePath);
     // BufferをUint8Arrayとして返す（IPCで直接転送可能）
     return { success: true, data: new Uint8Array(data) };

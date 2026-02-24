@@ -76,7 +76,10 @@ window.MojiQPrintManager = (function() {
                     link.download = 'print.pdf';
                     link.click();
                 }
-                URL.revokeObjectURL(url);
+                // BUG-012修正: Blob URLの無効化を遅延実行（印刷ウィンドウが使用する時間を確保）
+                setTimeout(() => {
+                    URL.revokeObjectURL(url);
+                }, 10000);  // 10秒後に無効化
             }
         } catch (error) {
             showLoadingOverlay(false);

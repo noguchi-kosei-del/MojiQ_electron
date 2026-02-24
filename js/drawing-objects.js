@@ -1000,7 +1000,7 @@ window.MojiQDrawingObjects = (function() {
          * 単一オブジェクトを復元（画像はBase64からHTMLImageElementに）
          */
         deserializeObject: function(obj) {
-            return new Promise((resolve) => {
+            return new Promise((resolve, reject) => {
                 if (obj.type === 'image' && obj.imageDataUrl) {
                     const img = new Image();
                     img.onload = () => {
@@ -1008,9 +1008,13 @@ window.MojiQDrawingObjects = (function() {
                         delete obj.imageDataUrl;
                         resolve(obj);
                     };
-                    img.onerror = () => {
-                        console.warn('画像の復元に失敗:', obj.id);
-                        resolve(obj);
+                    img.onerror = (err) => {
+                        // BUG-003修正: エラーをログに記録し、画像なしでオブジェクトを返す
+                        console.warn('画像の復元に失敗:', obj.id, err);
+                        // 画像データが破損している場合はimageDataUrlを保持したまま返す
+                        // これにより、後で再試行や別の処理が可能
+                        obj._imageLoadFailed = true;
+                        resolve(obj);  // アプリケーションの継続のためresolveを維持
                     };
                     img.src = obj.imageDataUrl;
                 } else {

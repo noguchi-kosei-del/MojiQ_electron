@@ -143,6 +143,9 @@ window.MojiQStore = (function() {
             const key = keys[i];
             if (!(key in current) || current[key] === null || typeof current[key] !== 'object') {
                 current[key] = {};
+            } else if (Array.isArray(current[key])) {
+                // BUG-013修正: 配列型の場合は上書きしない（配列を保護）
+                // 配列の中の要素にアクセスする場合はそのまま進む
             }
             current = current[key];
         }

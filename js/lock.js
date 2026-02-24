@@ -2,6 +2,11 @@
 
 const AppLock = {
     /**
+     * 圧縮処理中かどうかのフラグ
+     */
+    _isCompressing: false,
+
+    /**
      * 初期化：アプリ全体をロック状態にする
      */
     init: function() {
@@ -9,6 +14,95 @@ const AppLock = {
         document.body.classList.add('app-locked');
         // 初回起動時はサイドバー・ツールバーを完全非表示
         document.body.classList.add('app-pre-load');
+    },
+
+    /**
+     * 圧縮処理中のメニューロック
+     * ハンバーガーメニューと読み込みボタンを無効化する
+     * （ウィンドウコントロールとドラッグ領域は有効のまま）
+     */
+    lockMenuForCompression: function() {
+        this._isCompressing = true;
+
+        // ハンバーガーボタンを無効化
+        const hamburgerBtn = document.getElementById('hamburgerBtn');
+        if (hamburgerBtn) {
+            hamburgerBtn.disabled = true;
+            hamburgerBtn.style.opacity = '0.5';
+            hamburgerBtn.style.pointerEvents = 'none';
+        }
+
+        // スライドメニューが開いている場合は閉じる
+        const slideMenu = document.getElementById('slideMenu');
+        const slideMenuOverlay = document.getElementById('slideMenuOverlay');
+        if (slideMenu) {
+            slideMenu.classList.remove('open');
+        }
+        if (slideMenuOverlay) {
+            slideMenuOverlay.classList.remove('show');
+        }
+
+        // PDF読み込みボタン（ラベル）を無効化
+        const pdfUploadLabel = document.querySelector('label[for="pdfUpload"]');
+        if (pdfUploadLabel) {
+            pdfUploadLabel.style.opacity = '0.5';
+            pdfUploadLabel.style.pointerEvents = 'none';
+        }
+
+        // PDF読み込みinputを無効化
+        const pdfUploadInput = document.getElementById('pdfUpload');
+        if (pdfUploadInput) {
+            pdfUploadInput.disabled = true;
+        }
+
+        // カスタムメニューバーを無効化
+        const customMenuBar = document.getElementById('customMenuBar');
+        if (customMenuBar) {
+            customMenuBar.style.opacity = '0.5';
+            customMenuBar.style.pointerEvents = 'none';
+        }
+    },
+
+    /**
+     * 圧縮処理後のメニューロック解除
+     */
+    unlockMenuAfterCompression: function() {
+        this._isCompressing = false;
+
+        // ハンバーガーボタンを有効化
+        const hamburgerBtn = document.getElementById('hamburgerBtn');
+        if (hamburgerBtn) {
+            hamburgerBtn.disabled = false;
+            hamburgerBtn.style.opacity = '';
+            hamburgerBtn.style.pointerEvents = '';
+        }
+
+        // PDF読み込みボタン（ラベル）を有効化
+        const pdfUploadLabel = document.querySelector('label[for="pdfUpload"]');
+        if (pdfUploadLabel) {
+            pdfUploadLabel.style.opacity = '';
+            pdfUploadLabel.style.pointerEvents = '';
+        }
+
+        // PDF読み込みinputを有効化
+        const pdfUploadInput = document.getElementById('pdfUpload');
+        if (pdfUploadInput) {
+            pdfUploadInput.disabled = false;
+        }
+
+        // カスタムメニューバーを有効化
+        const customMenuBar = document.getElementById('customMenuBar');
+        if (customMenuBar) {
+            customMenuBar.style.opacity = '';
+            customMenuBar.style.pointerEvents = '';
+        }
+    },
+
+    /**
+     * 圧縮処理中かどうかを返す
+     */
+    isCompressing: function() {
+        return this._isCompressing;
     },
 
     /**
@@ -71,3 +165,6 @@ document.addEventListener('DOMContentLoaded', AppLock.init);
 window.unlockApp = AppLock.unlock;
 window.showAppSidebars = AppLock.showSidebars;
 window.resetToInitial = AppLock.resetToInitial;
+window.lockMenuForCompression = AppLock.lockMenuForCompression.bind(AppLock);
+window.unlockMenuAfterCompression = AppLock.unlockMenuAfterCompression.bind(AppLock);
+window.isAppCompressing = AppLock.isCompressing.bind(AppLock);

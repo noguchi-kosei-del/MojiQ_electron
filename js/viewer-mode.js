@@ -332,6 +332,10 @@ window.MojiQViewerMode = (function() {
             const PdfManager = window.MojiQPdfManager;
             const isLeftBinding = PdfManager && PdfManager.isSpreadViewMode() &&
                                   PdfManager.getSpreadBindingDirection() === 'left';
+            // ユーザー設定による反転（通常モードと同じロジック）
+            const isUserInverted = window.MojiQSettings && window.MojiQSettings.getArrowKeyInverted();
+            // 両方の反転を組み合わせる（XOR: 一方だけtrueなら反転）
+            const shouldInvert = isLeftBinding !== isUserInverted;
 
             const isCtrlOrMeta = e.ctrlKey || e.metaKey;
 
@@ -340,16 +344,16 @@ window.MojiQViewerMode = (function() {
                                  e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
                 e.preventDefault();
                 if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-                    if (isLeftBinding) {
-                        goToPage(1); // 左綴じ: 最初のページ
+                    if (shouldInvert) {
+                        goToPage(1); // 反転: 最初のページ
                     } else {
-                        goToPage(state.totalPages); // 右綴じ: 最後のページ
+                        goToPage(state.totalPages); // 通常: 最後のページ
                     }
                 } else {
-                    if (isLeftBinding) {
-                        goToPage(state.totalPages); // 左綴じ: 最後のページ
+                    if (shouldInvert) {
+                        goToPage(state.totalPages); // 反転: 最後のページ
                     } else {
-                        goToPage(1); // 右綴じ: 最初のページ
+                        goToPage(1); // 通常: 最初のページ
                     }
                 }
                 return;
@@ -362,35 +366,35 @@ window.MojiQViewerMode = (function() {
                 case 'ArrowLeft':
                 case 'ArrowUp':
                     e.preventDefault();
-                    if (isLeftBinding) {
-                        navigatePage(-1); // 左綴じ: 左キーで前ページ
+                    if (shouldInvert) {
+                        navigatePage(-1); // 反転: 前ページ
                     } else {
-                        navigatePage(1); // 右綴じ: 左キーで次ページ
+                        navigatePage(1); // 通常: 次ページ
                     }
                     break;
                 case 'ArrowRight':
                 case 'ArrowDown':
                     e.preventDefault();
-                    if (isLeftBinding) {
-                        navigatePage(1); // 左綴じ: 右キーで次ページ
+                    if (shouldInvert) {
+                        navigatePage(1); // 反転: 次ページ
                     } else {
-                        navigatePage(-1); // 右綴じ: 右キーで前ページ
+                        navigatePage(-1); // 通常: 前ページ
                     }
                     break;
                 case 'Home':
                     e.preventDefault();
-                    if (isLeftBinding) {
-                        goToPage(1); // 左綴じ: 最初のページ
+                    if (shouldInvert) {
+                        goToPage(1); // 反転: 最初のページ
                     } else {
-                        goToPage(state.totalPages); // 右綴じ: 最初のページ
+                        goToPage(state.totalPages); // 通常: 最後のページ
                     }
                     break;
                 case 'End':
                     e.preventDefault();
-                    if (isLeftBinding) {
-                        goToPage(state.totalPages); // 左綴じ: 最後のページ
+                    if (shouldInvert) {
+                        goToPage(state.totalPages); // 反転: 最後のページ
                     } else {
-                        goToPage(1); // 右綴じ: 最後のページ
+                        goToPage(1); // 通常: 最初のページ
                     }
                     break;
             }

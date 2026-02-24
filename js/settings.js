@@ -159,8 +159,12 @@ window.MojiQSettings = (function() {
 
     /**
      * ショートカット取得
+     * BUG-016修正: 設定が未初期化の場合は自動的に読み込む
      */
     function getShortcut(id) {
+        if (!settings) {
+            load();
+        }
         if (settings && settings.shortcuts && settings.shortcuts[id]) {
             return settings.shortcuts[id];
         }
@@ -185,8 +189,12 @@ window.MojiQSettings = (function() {
 
     /**
      * スクロール方向取得
+     * BUG-016修正: 設定が未初期化の場合は自動的に読み込む
      */
     function getScrollDirection() {
+        if (!settings) {
+            load();
+        }
         return (settings && settings.scroll && settings.scroll.direction) || 'normal';
     }
 
@@ -203,8 +211,12 @@ window.MojiQSettings = (function() {
 
     /**
      * パネルの選択時閉じる設定を取得
+     * BUG-016修正: 設定が未初期化の場合は自動的に読み込む
      */
     function getPanelCloseOnSelect() {
+        if (!settings) {
+            load();
+        }
         return (settings && settings.panel && settings.panel.closeOnSelect) || false;
     }
 
@@ -221,8 +233,13 @@ window.MojiQSettings = (function() {
 
     /**
      * 方向キー反転設定を取得
+     * BUG-016修正: 設定が未初期化の場合は自動的に読み込む
      */
     function getArrowKeyInverted() {
+        // 設定が未初期化の場合は読み込む（タイミング問題対策）
+        if (!settings) {
+            load();
+        }
         return (settings && settings.arrowKey && settings.arrowKey.inverted) || false;
     }
 
@@ -241,8 +258,12 @@ window.MojiQSettings = (function() {
      * ツール別線幅を取得
      * @param {string} toolName - ツール名 (draw, marker, eraser, line, arrow, etc.)
      * @returns {number} - 線幅
+     * BUG-016修正: 設定が未初期化の場合は自動的に読み込む
      */
     function getToolLineWidth(toolName) {
+        if (!settings) {
+            load();
+        }
         if (settings && settings.toolLineWidths && settings.toolLineWidths[toolName] !== undefined) {
             return settings.toolLineWidths[toolName];
         }
@@ -265,8 +286,12 @@ window.MojiQSettings = (function() {
     /**
      * 全ツールの線幅を取得
      * @returns {Object} - ツール別線幅オブジェクト
+     * BUG-016修正: 設定が未初期化の場合は自動的に読み込む
      */
     function getAllToolLineWidths() {
+        if (!settings) {
+            load();
+        }
         return settings && settings.toolLineWidths
             ? settings.toolLineWidths
             : DEFAULT_SETTINGS.toolLineWidths;
@@ -274,8 +299,12 @@ window.MojiQSettings = (function() {
 
     /**
      * 全ショートカット取得
+     * BUG-016修正: 設定が未初期化の場合は自動的に読み込む
      */
     function getAllShortcuts() {
+        if (!settings) {
+            load();
+        }
         return settings ? settings.shortcuts : DEFAULT_SETTINGS.shortcuts;
     }
 

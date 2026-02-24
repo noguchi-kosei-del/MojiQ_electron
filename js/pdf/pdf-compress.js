@@ -120,11 +120,23 @@ window._MojiQPdfCompress = (function() {
      * @returns {Promise<{data: Uint8Array|null, originalData: Uint8Array|null, wasCompressed: boolean, wasOptimized: boolean, cancelled: boolean}>}
      */
     async function checkAndCompressPdf(file, options) {
+        // 圧縮処理中はメニューをロック（ハンバーガー、読み込みボタンを無効化）
+        if (typeof window.lockMenuForCompression === 'function') {
+            window.lockMenuForCompression();
+        }
+
         // 大きなファイルの読み込み前にプログレスバーを表示
         options.showProgress('ファイルを読み込んでいます...');
         await options.nextFrame();
 
         return new Promise(function(resolve, reject) {
+            // メニューロック解除用のヘルパー関数
+            function unlockMenu() {
+                if (typeof window.unlockMenuAfterCompression === 'function') {
+                    window.unlockMenuAfterCompression();
+                }
+            }
+
             var fileReader = new FileReader();
 
             // 大きなファイルの場合、FileReaderの進捗イベントを利用
@@ -146,6 +158,7 @@ window._MojiQPdfCompress = (function() {
                     // 500MB以上: Canvas経由の圧縮処理
                     var userConfirmed = await MojiQModal.showConfirm('PDFのサイズが非常に大きいため圧縮処理をします。\n処理に時間がかかる場合があります。続行しますか？');
                     if (!userConfirmed) {
+                        unlockMenu();
                         resolve({ data: null, originalData: null, wasCompressed: false, wasOptimized: false, cancelled: true });
                         return;
                     }
@@ -160,9 +173,11 @@ window._MojiQPdfCompress = (function() {
                             updateProgress: options.updateProgress
                         });
                         options.hideProgress();
+                        unlockMenu();
                         resolve({ data: compressedData, originalData: typedarray, wasCompressed: true, wasOptimized: false, cancelled: false });
                     } catch (err) {
                         options.hideProgress();
+                        unlockMenu();
                         MojiQModal.showAlert('圧縮処理に失敗しました。元のPDFで読み込みます。', 'エラー');
                         resolve({ data: typedarray, originalData: typedarray, wasCompressed: false, wasOptimized: false, cancelled: false });
                     }
@@ -180,6 +195,7 @@ window._MojiQPdfCompress = (function() {
                             });
 
                             options.hideProgress();
+                            unlockMenu();
 
                             if (result.success) {
                                 resolve({ data: result.data, originalData: result.data, wasCompressed: false, wasOptimized: true, cancelled: false });
@@ -188,16 +204,19 @@ window._MojiQPdfCompress = (function() {
                             }
                         } else {
                             options.hideProgress();
+                            unlockMenu();
                             resolve({ data: typedarray, originalData: typedarray, wasCompressed: false, wasOptimized: false, cancelled: false });
                         }
                     } catch (err) {
                         options.hideProgress();
+                        unlockMenu();
                         resolve({ data: typedarray, originalData: typedarray, wasCompressed: false, wasOptimized: false, cancelled: false });
                     }
                 }
             };
             fileReader.onerror = function() {
                 options.hideProgress();
+                unlockMenu();
                 reject(new Error('ファイルの読み込みに失敗しました'));
             };
             fileReader.readAsArrayBuffer(file);

@@ -94,6 +94,8 @@ window.MojiQPageManager = (function() {
 
         // フォールバック: ページ履歴からのundo
         const mapItem = state.pageMapping[state.currentPageNum - 1];
+        // BUG-007修正: mapItemのnullチェック
+        if (!mapItem) return;
         const pageKey = getPageKey(mapItem);
         if (!state.pageDrawingHistory[pageKey] || state.pageDrawingHistory[pageKey].length <= 1) return;
         const popped = state.pageDrawingHistory[pageKey].pop();
@@ -119,11 +121,15 @@ window.MojiQPageManager = (function() {
                     ctx.drawImage(img, 0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
                     resolve();
                 };
-                img.onerror = () => {
-                    console.warn('Undo image load failed');
-                    resolve();  // エラーでも処理を継続
+                img.onerror = (err) => {
+                    console.warn('Undo image load failed:', err);
+                    // BUG-002修正: エラーをrejectで伝播
+                    reject(new Error('Undo画像の読み込みに失敗しました'));
                 };
                 img.src = prevData;
+            }).catch((err) => {
+                // エラーをログに記録するが、処理は継続
+                console.error('Undo処理中にエラーが発生:', err);
             });
         } finally {
             isUndoRedoInProgress = false;
@@ -178,11 +184,15 @@ window.MojiQPageManager = (function() {
                     ctx.drawImage(img, 0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
                     resolve();
                 };
-                img.onerror = () => {
-                    console.warn('Redo image load failed');
-                    resolve();  // エラーでも処理を継続
+                img.onerror = (err) => {
+                    console.warn('Redo image load failed:', err);
+                    // BUG-002修正: エラーをrejectで伝播
+                    reject(new Error('Redo画像の読み込みに失敗しました'));
                 };
                 img.src = popped;
+            }).catch((err) => {
+                // エラーをログに記録するが、処理は継続
+                console.error('Redo処理中にエラーが発生:', err);
             });
         } finally {
             isUndoRedoInProgress = false;
@@ -247,6 +257,12 @@ window.MojiQPageManager = (function() {
                 // 右ページ（右綴じでは先のページ）を基準にする。なければ左ページ
                 effectivePageNum = currentSpread.rightPage || currentSpread.leftPage || state.currentPageNum;
             }
+        }
+        // BUG-010修正: effectivePageNumが数値であることを確認
+        if (typeof effectivePageNum === 'string') {
+            // spread_X形式の場合は数値に変換（フォールバック: 1）
+            const numMatch = effectivePageNum.match(/\d+/);
+            effectivePageNum = numMatch ? parseInt(numMatch[0], 10) + 1 : 1;
         }
 
         // 現在のページのPDFサイズを取得（キャンバスサイズではなく、元のPDFのサイズを使用）
@@ -630,10 +646,15 @@ window.MojiQPageManager = (function() {
             }
 
             if (targetPage !== state.currentPageNum) {
-                await MojiQPdfManager.renderPage(targetPage);
-                // 方向キー操作時にページ番号バブルを表示
-                if (window.MojiQNavigation && MojiQNavigation.showBubbleTemporarily) {
-                    MojiQNavigation.showBubbleTemporarily(targetPage);
+                // BUG-008修正: try-catchでrenderPage()をラップ
+                try {
+                    await MojiQPdfManager.renderPage(targetPage);
+                    // 方向キー操作時にページ番号バブルを表示
+                    if (window.MojiQNavigation && MojiQNavigation.showBubbleTemporarily) {
+                        MojiQNavigation.showBubbleTemporarily(targetPage);
+                    }
+                } catch (err) {
+                    console.error('ページナビゲーション中にエラーが発生:', err);
                 }
             }
         });

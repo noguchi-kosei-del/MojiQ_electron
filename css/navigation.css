@@ -258,19 +258,18 @@ input[type="range"]#pageSlider::-webkit-slider-thumb {
     top: 24px;
 }
 
-/* ハンバーガーメニューの×変形 */
-.hamburger-btn.active .hamburger-line:nth-child(1) {
-    top: 17px;
-    transform: rotate(45deg);
+/* ハンバーガーメニューは×に変形しない（常にハンバーガーのまま） */
+/* .hamburger-btn.active での変形は無効化 */
+
+/* ポップアップ展開中はハンバーガーボタンをグレーアウト */
+.hamburger-btn.active {
+    opacity: 0.4;
+    pointer-events: none;
+    cursor: default;
 }
 
-.hamburger-btn.active .hamburger-line:nth-child(2) {
-    opacity: 0;
-}
-
-.hamburger-btn.active .hamburger-line:nth-child(3) {
-    top: 17px;
-    transform: rotate(-45deg);
+.hamburger-btn.active .hamburger-line {
+    background-color: #999;
 }
 
 /* スライドメニュー */
@@ -293,12 +292,41 @@ input[type="range"]#pageSlider::-webkit-slider-thumb {
 }
 
 .slide-menu-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     padding: 16px 24px;
     font-size: 16px;
     font-weight: bold;
     color: #333;
     border-bottom: 1px solid #e0e0e0;
     background-color: #fafafa;
+}
+
+/* スライドメニュー閉じるボタン */
+.slide-menu-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    color: #666;
+    transition: color 0.2s, background-color 0.2s;
+}
+
+.slide-menu-close-btn:hover {
+    color: #333;
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+.slide-menu-close-btn svg {
+    width: 16px;
+    height: 16px;
 }
 
 .slide-menu-content {
