@@ -32,7 +32,7 @@ function toggleProofreadingMode() {
             if (enabled) {
                 instructionIcon.style.display = 'none';
                 proofreadingIcon.style.display = 'block';
-                headerBtn.title = '校正モード';
+                headerBtn.title = '校正チェックモード';
             } else {
                 instructionIcon.style.display = 'block';
                 proofreadingIcon.style.display = 'none';
@@ -48,7 +48,13 @@ function toggleProofreadingMode() {
 function enterProofreadingMode() {
     document.body.classList.add('proofreading-mode');
 
-    // 校正パネルを表示
+    // ページバーの状態を同期（user-hidden → hidden）
+    const pageBar = document.querySelector('.bottom-nav-bar');
+    if (pageBar && pageBar.classList.contains('user-hidden')) {
+        pageBar.classList.add('hidden');
+    }
+
+    // 校正パネルを表示（ボタン状態も同期される）
     if (window.ProofreadingPanel) {
         ProofreadingPanel.show();
     }
@@ -60,17 +66,97 @@ function enterProofreadingMode() {
             ProofreadingPanel.renderCheckData(data);
         }
     }
+
+    // ヘッダーボタンのグレーアウト切替
+    updateHeaderButtonModeState(true);
 }
 
 /**
  * 校正モードから出る
  */
 function exitProofreadingMode() {
+    // ページバーの状態を同期（hidden → user-hidden）
+    const pageBar = document.querySelector('.bottom-nav-bar');
+    if (pageBar) {
+        const isHidden = pageBar.classList.contains('hidden');
+        if (isHidden) {
+            pageBar.classList.add('user-hidden');
+            // サイドバーのボタン状態も更新
+            const sidebarBtn = document.getElementById('navBarToggleBtn');
+            if (sidebarBtn) {
+                const hideIcon = sidebarBtn.querySelector('.nav-toggle-hide');
+                const showIcon = sidebarBtn.querySelector('.nav-toggle-show');
+                if (hideIcon) hideIcon.style.display = 'none';
+                if (showIcon) showIcon.style.display = '';
+                sidebarBtn.title = 'ページバーを表示';
+                sidebarBtn.classList.add('hidden-state');
+            }
+            localStorage.setItem('mojiq_pagebar_hidden', 'true');
+        } else {
+            pageBar.classList.remove('user-hidden');
+            // サイドバーのボタン状態も更新
+            const sidebarBtn = document.getElementById('navBarToggleBtn');
+            if (sidebarBtn) {
+                const hideIcon = sidebarBtn.querySelector('.nav-toggle-hide');
+                const showIcon = sidebarBtn.querySelector('.nav-toggle-show');
+                if (hideIcon) hideIcon.style.display = '';
+                if (showIcon) showIcon.style.display = 'none';
+                sidebarBtn.title = 'ページバーを隠す';
+                sidebarBtn.classList.remove('hidden-state');
+            }
+            localStorage.setItem('mojiq_pagebar_hidden', 'false');
+        }
+        // 校正モード用のhiddenクラスを削除
+        pageBar.classList.remove('hidden');
+    }
+
+    // テキストレイヤーのサイドバーボタン状態を同期
+    if (window.MojiQTextLayerManager) {
+        const textLayerBtn = document.getElementById('textLayerBtn');
+        const textLayerSlash = document.getElementById('textLayerSlash');
+        const isTextHidden = MojiQTextLayerManager.isHidden();
+        if (textLayerBtn) {
+            if (isTextHidden) {
+                textLayerBtn.title = 'コメントテキスト表示 (Ctrl+T) - 非表示中';
+                textLayerBtn.classList.add('hidden-state');
+                if (textLayerSlash) textLayerSlash.style.display = '';
+            } else {
+                textLayerBtn.title = 'コメントテキスト非表示 (Ctrl+T)';
+                textLayerBtn.classList.remove('hidden-state');
+                if (textLayerSlash) textLayerSlash.style.display = 'none';
+            }
+        }
+    }
+
     document.body.classList.remove('proofreading-mode');
 
     // 校正パネルを非表示
     if (window.ProofreadingPanel) {
         ProofreadingPanel.hide();
+    }
+
+    // ヘッダーボタンのグレーアウト切替
+    updateHeaderButtonModeState(false);
+}
+
+/**
+ * ヘッダーボタンのモード状態を更新
+ * @param {boolean} isProofreadingMode - 校正モードかどうか
+ */
+function updateHeaderButtonModeState(isProofreadingMode) {
+    const specBtn = document.getElementById('headerGdriveJsonBtn');
+    const calibrationBtn = document.getElementById('headerCalibrationBtn');
+
+    if (specBtn && calibrationBtn) {
+        if (isProofreadingMode) {
+            // 校正モード: 作品仕様ボタンをグレーアウト
+            specBtn.classList.add('mode-disabled');
+            calibrationBtn.classList.remove('mode-disabled');
+        } else {
+            // 指示入れモード: 校正チェックボタンをグレーアウト
+            specBtn.classList.remove('mode-disabled');
+            calibrationBtn.classList.add('mode-disabled');
+        }
     }
 }
 
@@ -148,6 +234,9 @@ function initWindowControlsAndMenuBar() {
             originalCalibrationBtn.click();
         });
     }
+
+    // 初期状態（指示入れモード）でボタンの状態を設定
+    updateHeaderButtonModeState(false);
 
     // --- カスタムメニューバー ---
     if (customMenuBar) {
@@ -1035,6 +1124,10 @@ window.addEventListener('load', () => {
     if (window.electronAPI && window.electronAPI.isElectron) {
         MojiQJsonFolderBrowser.init({
             onJsonFileSelect: (data, fileName) => {
+                // 読み込み結果のフラグ
+                let loadedPreset = false;
+                let loadedChecks = false;
+
                 // MojiQStampsの既存のプリセット読み込みロジックを再利用
                 // presetDataでラップされている形式にも対応
                 const presetData = data.presetData || data;
@@ -1074,6 +1167,52 @@ window.addEventListener('load', () => {
 
                 if (sizes.length > 0 || fonts.length > 0) {
                     MojiQStamps.appendStampButtons(sizes, fonts);
+                    loadedPreset = true;
+                }
+
+                // 校正チェックデータの読み込み（checks が含まれている場合）
+                if (data.checks && window.MojiQStore) {
+                    // タイトル生成
+                    const fileNameWithoutExt = fileName.replace('.json', '');
+                    const workName = data.work || '';
+                    const title = workName ? workName + ' ' + fileNameWithoutExt : fileNameWithoutExt;
+
+                    const jsonData = {
+                        title: title,
+                        checks: data.checks
+                    };
+
+                    // Storeに保存（校正モード用）
+                    window.MojiQStore.set('proofreadingMode.currentData', jsonData);
+                    window.MojiQStore.set('proofreadingMode.jsonLoaded', true);
+
+                    // 校正モードメニュー項目を有効化
+                    const menuItem = document.getElementById('proofreadingModeMenuItem');
+                    if (menuItem) {
+                        menuItem.classList.remove('disabled');
+                    }
+
+                    // 校正パネルにデータを表示
+                    if (window.ProofreadingPanel) {
+                        ProofreadingPanel.renderCheckData(jsonData);
+                    }
+
+                    loadedChecks = true;
+                }
+
+                // 読み込み完了ダイアログを表示
+                if (window.MojiQModal) {
+                    let message = '';
+                    if (loadedPreset && loadedChecks) {
+                        message = '作品仕様と校正情報を読み込みました';
+                    } else if (loadedChecks) {
+                        message = '校正情報を読み込みました';
+                    } else if (loadedPreset) {
+                        message = '作品仕様を読み込みました';
+                    } else {
+                        message = 'JSONファイルを読み込みました';
+                    }
+                    MojiQModal.showAlert(message, '読み込み完了');
                 }
             }
         });

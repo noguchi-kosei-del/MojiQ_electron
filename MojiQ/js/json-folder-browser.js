@@ -306,10 +306,7 @@ window.MojiQJsonFolderBrowser = (function() {
             // モーダルを閉じる
             closeModal();
 
-            // 読み込み成功モーダルを表示
-            MojiQModal.showAlert('JSONファイルを読み込みました', '読み込み完了');
-
-            // コールバックでデータを渡す
+            // コールバックでデータを渡す（ダイアログはコールバック側で表示）
             if (onJsonFileSelectCallback) {
                 onJsonFileSelectCallback(result.data, fileName);
             }

@@ -313,6 +313,11 @@ const CalibrationPanel = (() => {
 
       // モーダルを閉じる
       closeModal();
+
+      // 読み込み完了ダイアログを表示
+      if (jsonData && window.MojiQModal) {
+        MojiQModal.showAlert('校正情報を読み込みました', '読み込み完了');
+      }
     } catch (error) {
       alert('ファイルの読み込みに失敗しました: ' + error.message);
     }

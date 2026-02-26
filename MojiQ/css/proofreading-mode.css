@@ -70,6 +70,14 @@ body.proofreading-mode.pdf-loaded .bottom-nav-bar {
     transform: translateX(-50%);
     width: 70%;
     max-width: 600px;
+    transition: opacity 0.2s, visibility 0.2s;
+}
+
+/* ページバー非表示状態 */
+body.proofreading-mode.pdf-loaded .bottom-nav-bar.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
 }
 
 /* 通常モードで非表示にする要素 */
@@ -396,37 +404,55 @@ body.proofreading-mode #proofEyedropperBtn svg {
 .proofreading-check-header {
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: 8px;
-    padding: 12px 12px;
+    padding: 10px 12px;
     user-select: none;
     font-weight: 700;
-    font-size: 16px;
+    font-size: 14px;
     flex-shrink: 0;
     border-bottom: 1px solid;
+    cursor: pointer;
+    transition: background-color 0.15s;
 }
 
 .proofreading-check-header.correctness-header {
-    background: #fff;
+    background-color: #fff;
     color: #c62828;
     border-bottom-color: #ffcdd2;
 }
 
+.proofreading-check-header.correctness-header:hover {
+    background-color: #fef5f5;
+}
+
 .proofreading-check-header.proposal-header {
-    background: #fff;
+    background-color: #fff;
     color: #2e7d32;
     border-bottom-color: #c8e6c9;
 }
 
+.proofreading-check-header.proposal-header:hover {
+    background-color: #f5fef5;
+}
+
+.proofreading-check-toggle {
+    font-size: 10px;
+    transition: transform 0.2s;
+    flex-shrink: 0;
+}
+
+.proofreading-check-section.collapsed .proofreading-check-toggle {
+    transform: rotate(-90deg);
+}
+
 .proofreading-check-title {
     flex: 1;
-    text-align: center;
 }
 
 .proofreading-check-count {
     font-size: 12px;
     opacity: 0.8;
-    display: none;
+    flex-shrink: 0;
 }
 
 .proofreading-check-content {
@@ -456,8 +482,107 @@ body.proofreading-mode #proofEyedropperBtn svg {
     background: #a0a0a0;
 }
 
+/* 折りたたみ時のセクション - flex: 0 でヘッダーのみ表示 */
+.proofreading-check-section.collapsed {
+    flex: 0 0 auto;
+    min-height: auto;
+}
+
 .proofreading-check-section.collapsed .proofreading-check-content {
     display: none;
+}
+
+/* 折りたたみ時のヘッダー - ボーダー下線を非表示 */
+.proofreading-check-section.collapsed .proofreading-check-header {
+    border-bottom: none;
+}
+
+/* =====================================================
+   表示オプションボタンセクション（アイコンのみ横並び）
+   ===================================================== */
+
+.proofreading-options-section {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 8px 12px;
+    flex-shrink: 0;
+}
+
+.proofreading-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #666;
+    transition: color 0.15s;
+}
+
+.proofreading-icon-btn:hover {
+    color: #1976d2;
+    background: transparent;
+}
+
+.proofreading-icon-btn.active {
+    color: #e53935;
+    background: transparent;
+}
+
+.proofreading-icon-btn.active:hover {
+    color: #c62828;
+    background: transparent;
+}
+
+.proofreading-icon-btn svg {
+    flex-shrink: 0;
+}
+
+/* ページバーボタンのアイコン切り替え */
+.proofreading-icon-btn .proof-nav-hide {
+    display: none;
+}
+
+.proofreading-icon-btn.active .proof-nav-show {
+    display: none;
+}
+
+.proofreading-icon-btn.active .proof-nav-hide {
+    display: block;
+}
+
+/* テキストレイヤーボタンの斜線 */
+.proofreading-icon-btn .proof-text-slash {
+    display: none;
+}
+
+.proofreading-icon-btn.active .proof-text-slash {
+    display: block;
+}
+
+/* ダークモード */
+body.dark-mode .proofreading-icon-btn {
+    color: #888;
+}
+
+body.dark-mode .proofreading-icon-btn:hover {
+    color: #64b5f6;
+    background: transparent;
+}
+
+body.dark-mode .proofreading-icon-btn.active {
+    color: #ef5350;
+    background: transparent;
+}
+
+body.dark-mode .proofreading-icon-btn.active:hover {
+    color: #f44336;
+    background: transparent;
 }
 
 .proofreading-check-empty {
@@ -671,19 +796,30 @@ body.proofreading-mode #proofEyedropperBtn svg {
     cursor: not-allowed;
 }
 
-/* モード切替による表示制御 */
-/* 通常モード: 作品仕様ボタン表示、校正チェックボタン非表示 */
+/* モード切替によるグレーアウト制御 */
+/* 両方のボタンを常に表示 */
 .header-calibration-btn {
-    display: none;
+    display: flex;
 }
 
-/* 校正モード: 作品仕様ボタン非表示、校正チェックボタン表示 */
-body.proofreading-mode .header-spec-btn {
-    display: none !important;
+/* 通常モード（指示入れモード）: 校正チェックボタンをグレーアウト */
+.header-calibration-btn.mode-disabled {
+    opacity: 0.4;
+    pointer-events: none;
 }
 
-body.proofreading-mode .header-calibration-btn {
-    display: flex !important;
+.header-calibration-btn.mode-disabled svg {
+    stroke: #999 !important;
+}
+
+/* 校正モード: 作品仕様ボタンをグレーアウト */
+body.proofreading-mode .header-spec-btn.mode-disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+body.proofreading-mode .header-spec-btn.mode-disabled svg {
+    stroke: #999 !important;
 }
 
 /* 元の位置のボタンを非表示（サイドバー内） */
@@ -713,6 +849,12 @@ body.dark-mode .header-calibration-btn:hover svg {
 body.dark-mode .header-spec-btn:disabled svg,
 body.dark-mode .header-calibration-btn:disabled svg {
     stroke: #666;
+}
+
+/* ダークモード mode-disabled状態 */
+body.dark-mode .header-spec-btn.mode-disabled svg,
+body.dark-mode .header-calibration-btn.mode-disabled svg {
+    stroke: #555 !important;
 }
 
 /* =====================================================
@@ -751,15 +893,23 @@ body.dark-mode .proofreading-line-width-input {
 }
 
 body.dark-mode .proofreading-check-header.correctness-header {
-    background: #2a2a2a;
+    background-color: #2a2a2a;
     color: #ef9a9a;
     border-bottom-color: #5a2525;
 }
 
+body.dark-mode .proofreading-check-header.correctness-header:hover {
+    background-color: #352a2a;
+}
+
 body.dark-mode .proofreading-check-header.proposal-header {
-    background: #2a2a2a;
+    background-color: #2a2a2a;
     color: #81c784;
     border-bottom-color: #2e5a30;
+}
+
+body.dark-mode .proofreading-check-header.proposal-header:hover {
+    background-color: #2a352a;
 }
 
 /* 校正モード時のツールバーボーダー（ダークモード） */

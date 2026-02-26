@@ -376,10 +376,19 @@ const ProofreadingPanel = (() => {
 
     /**
      * ページ番号を「●●P」形式にフォーマット
+     * 対応フォーマット: "3巻 6ページ", "3巻1P", "25P", "25ページ", "25"
      */
     function formatPage(page) {
         if (!page) return '';
         const pageStr = String(page);
+
+        // 「〇〇ページ」または「〇〇P」のパターンを探す
+        const pageMatch = pageStr.match(/(\d+)\s*(?:ページ|P)/i);
+        if (pageMatch) {
+            return escapeHtml(pageMatch[1]) + 'P';
+        }
+
+        // フォールバック: 先頭の数字を使用
         const match = pageStr.match(/^(\d+)/);
         if (match) {
             return escapeHtml(match[1]) + 'P';
@@ -434,15 +443,22 @@ const ProofreadingPanel = (() => {
 
     /**
      * 指定ページへジャンプ
+     * 対応フォーマット: "3巻 6ページ", "3巻1P", "25P", "25ページ", "25"
      */
     function jumpToPage(pageStr) {
         if (!pageStr) return;
 
-        // ページ番号を抽出
-        const match = String(pageStr).match(/^(\d+)/);
-        if (!match) return;
+        const str = String(pageStr);
 
-        const pageNum = parseInt(match[1], 10);
+        // 「〇〇ページ」または「〇〇P」のパターンを探す
+        let pageMatch = str.match(/(\d+)\s*(?:ページ|P)/i);
+        if (!pageMatch) {
+            // フォールバック: 先頭の数字を使用
+            pageMatch = str.match(/^(\d+)/);
+        }
+        if (!pageMatch) return;
+
+        const pageNum = parseInt(pageMatch[1], 10);
         if (isNaN(pageNum) || pageNum < 1) return;
 
         // ページ移動（goToPageは1-indexedを期待）
@@ -494,6 +510,16 @@ const ProofreadingPanel = (() => {
                 renderCheckData(data);
             }
         }
+
+        // ボタン状態を同期（モード切替時の状態引き継ぎ）
+        updateTextLayerButtonState();
+        updatePageBarButtonState();
+
+        // DOM更新後も再度更新（確実に反映させる）
+        setTimeout(() => {
+            updateTextLayerButtonState();
+            updatePageBarButtonState();
+        }, 50);
     }
 
     /**
@@ -521,6 +547,18 @@ const ProofreadingPanel = (() => {
     }
 
     /**
+     * チェックセクション（正誤/提案）の折りたたみをトグル
+     * @param {string} sectionType - 'correctness' または 'proposal'
+     */
+    function toggleCheckSection(sectionType) {
+        const sectionId = sectionType === 'correctness' ? 'correctnessSection' : 'proposalSection';
+        const section = document.getElementById(sectionId);
+        if (section) {
+            section.classList.toggle('collapsed');
+        }
+    }
+
+    /**
      * パネルの折りたたみをトグル
      */
     function toggleCollapse() {
@@ -543,19 +581,94 @@ const ProofreadingPanel = (() => {
         }
     }
 
+    /**
+     * ページバーの表示/非表示をトグル
+     */
+    function togglePageBar() {
+        const pageBar = document.querySelector('.bottom-nav-bar');
+        const btn = document.getElementById('proofTogglePageBarBtn');
+
+        if (pageBar) {
+            const isHidden = pageBar.classList.toggle('hidden');
+            updatePageBarButtonStateInternal(isHidden);
+        }
+    }
+
+    /**
+     * ページバーボタンの状態を更新（内部用）
+     * CSSクラスでアイコン切り替えを行う
+     */
+    function updatePageBarButtonStateInternal(isHidden) {
+        const btn = document.getElementById('proofTogglePageBarBtn');
+        if (!btn) return;
+
+        // activeクラスでアイコン切り替え（CSSで制御）
+        btn.classList.toggle('active', isHidden);
+        btn.title = isHidden ? 'ページバーを表示' : 'ページバーを隠す';
+    }
+
+    /**
+     * ページバーボタンの状態を同期（モード切替時用）
+     */
+    function updatePageBarButtonState() {
+        const pageBar = document.querySelector('.bottom-nav-bar');
+        // hidden（校正モード用）または user-hidden（指示入れモード用）どちらかがあれば非表示状態
+        const isHidden = pageBar ? (pageBar.classList.contains('hidden') || pageBar.classList.contains('user-hidden')) : false;
+        updatePageBarButtonStateInternal(isHidden);
+    }
+
+    /**
+     * コメントテキストレイヤーの表示/非表示をトグル
+     * 非表示時: 赤色 + 斜線表示（指示入れモードと同様）
+     */
+    function toggleTextLayer() {
+        // MojiQTextLayerManagerを使用してトグル
+        if (window.MojiQTextLayerManager) {
+            MojiQTextLayerManager.toggle();
+        }
+
+        // ボタン状態を更新
+        updateTextLayerButtonState();
+    }
+
+    /**
+     * テキストレイヤーボタンの状態を更新
+     * CSSクラスで斜線切り替えを行う
+     */
+    function updateTextLayerButtonState() {
+        const btn = document.getElementById('proofToggleTextLayerBtn');
+        if (!btn) return;
+
+        const isHidden = window.MojiQTextLayerManager ? MojiQTextLayerManager.isHidden() : false;
+
+        // activeクラスで斜線切り替え（CSSで制御）
+        btn.classList.toggle('active', isHidden);
+        btn.title = isHidden ? 'コメントテキスト表示' : 'コメントテキスト非表示';
+    }
+
     // DOMContentLoadedで初期化
     document.addEventListener('DOMContentLoaded', init);
 
     // 公開API
-    return {
+    const api = {
         show,
         hide,
         toggleSection,
         toggleCategory,
+        toggleCheckSection,
         jumpToPage,
         copyContent,
         renderCheckData,
         onEyedropperColorPicked,
-        toggleCollapse
+        toggleCollapse,
+        togglePageBar,
+        toggleTextLayer,
+        updateTextLayerButtonState,
+        updatePageBarButtonState
     };
+
+    // windowオブジェクトに登録（script.jsからのアクセス用）
+    window.ProofreadingPanel = api;
+
+    return api;
 })();
