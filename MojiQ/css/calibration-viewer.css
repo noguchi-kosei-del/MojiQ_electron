@@ -1,0 +1,472 @@
+/**
+ * calibration-viewer.css - 校正チェックビューワー専用スタイル
+ * 別ウィンドウで表示されるJSONビューワー用
+ */
+
+/* ========================================= */
+/* ベーススタイル                            */
+/* ========================================= */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    background: #fff;
+    color: #333;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ========================================= */
+/* ヘッダー                                  */
+/* ========================================= */
+
+.viewer-header {
+    background: #f5f7fa;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 12px 16px;
+    flex-shrink: 0;
+}
+
+.viewer-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ========================================= */
+/* タブ                                      */
+/* ========================================= */
+
+.calibration-tabs {
+    display: flex;
+    gap: 4px;
+}
+
+.calibration-tab {
+    flex: 1;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #666;
+    transition: all 0.15s ease;
+}
+
+.calibration-tab:hover {
+    background: #e3f2fd;
+}
+
+.calibration-tab.active {
+    background: #1976d2;
+    color: white;
+    border-color: #1565c0;
+}
+
+/* ========================================= */
+/* コンテンツエリア                          */
+/* ========================================= */
+
+.viewer-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+}
+
+.viewer-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.viewer-content::-webkit-scrollbar-track {
+    background: #f0f0f0;
+    border-radius: 4px;
+}
+
+.viewer-content::-webkit-scrollbar-thumb {
+    background: #c0c0c0;
+    border-radius: 4px;
+}
+
+.viewer-content::-webkit-scrollbar-thumb:hover {
+    background: #a0a0a0;
+}
+
+/* ========================================= */
+/* カテゴリ                                  */
+/* ========================================= */
+
+.calibration-category {
+    margin-bottom: 8px;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #e0e0e0;
+}
+
+.calibration-category.collapsed .calibration-category-body {
+    display: none;
+}
+
+.calibration-category.collapsed .calibration-category-toggle {
+    transform: rotate(-90deg);
+}
+
+.calibration-category-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: #f5f7fa;
+    cursor: pointer;
+    font-size: 12px;
+    user-select: none;
+}
+
+.calibration-category-header:hover {
+    background: #eceff1;
+}
+
+.calibration-category-toggle {
+    font-size: 10px;
+    color: #666;
+    transition: transform 0.15s ease;
+    flex-shrink: 0;
+}
+
+.calibration-category-name {
+    font-weight: 600;
+    color: #333;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.calibration-category-count {
+    color: #999;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+/* ========================================= */
+/* テーブル                                  */
+/* ========================================= */
+
+.calibration-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.calibration-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: top;
+}
+
+.calibration-table tr:last-child td {
+    border-bottom: none;
+}
+
+.cal-page {
+    width: 50px;
+    text-align: center;
+    font-weight: 600;
+    color: #666;
+    white-space: nowrap;
+}
+
+.cal-excerpt {
+    width: 100px;
+    color: #333;
+    word-break: break-all;
+}
+
+.cal-content {
+    color: #d32f2f;
+    word-break: break-all;
+}
+
+.cal-copy {
+    width: 32px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.cal-copy-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.cal-copy-btn:hover {
+    background: #e0e0e0;
+    color: #333;
+}
+
+.cal-copy-btn.copied {
+    color: #27ae60;
+}
+
+/* ========================================= */
+/* カテゴリカラー（左ボーダー）               */
+/* ========================================= */
+
+.cal-color-1 .calibration-category-header { border-left: 4px solid #3498db; }
+.cal-color-2 .calibration-category-header { border-left: 4px solid #27ae60; }
+.cal-color-3 .calibration-category-header { border-left: 4px solid #e67e22; }
+.cal-color-4 .calibration-category-header { border-left: 4px solid #9b59b6; }
+.cal-color-5 .calibration-category-header { border-left: 4px solid #1abc9c; }
+.cal-color-6 .calibration-category-header { border-left: 4px solid #e91e63; }
+.cal-color-7 .calibration-category-header { border-left: 4px solid #3f51b5; }
+.cal-color-8 .calibration-category-header { border-left: 4px solid #e74c3c; }
+.cal-color-9 .calibration-category-header { border-left: 4px solid #f1c40f; }
+.cal-color-10 .calibration-category-header { border-left: 4px solid #95a5a6; }
+.cal-color-default .calibration-category-header { border-left: 4px solid #bdbdbd; }
+
+/* ========================================= */
+/* 2カラムレイアウト（両方表示モード）        */
+/* ========================================= */
+
+.calibration-dual-columns {
+    display: flex;
+    gap: 12px;
+    height: 100%;
+}
+
+.calibration-column {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.calibration-column-header {
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.calibration-column-header.correctness-header {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.calibration-column-header.proposal-header {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+
+.calibration-column-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.calibration-column-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.calibration-column-content::-webkit-scrollbar-track {
+    background: #f0f0f0;
+    border-radius: 3px;
+}
+
+.calibration-column-content::-webkit-scrollbar-thumb {
+    background: #c0c0c0;
+    border-radius: 3px;
+}
+
+.calibration-column-content::-webkit-scrollbar-thumb:hover {
+    background: #a0a0a0;
+}
+
+/* 2カラム時のカテゴリ調整 */
+.calibration-dual-columns .calibration-category {
+    margin-bottom: 6px;
+}
+
+.calibration-dual-columns .calibration-category-header {
+    padding: 6px 10px;
+    font-size: 11px;
+}
+
+.calibration-dual-columns .calibration-table {
+    font-size: 11px;
+}
+
+.calibration-dual-columns .calibration-table td {
+    padding: 4px 6px;
+}
+
+.calibration-dual-columns .cal-page {
+    width: 40px;
+}
+
+.calibration-dual-columns .cal-excerpt {
+    width: 80px;
+}
+
+/* ========================================= */
+/* エラー・空状態                            */
+/* ========================================= */
+
+.calibration-empty {
+    padding: 32px;
+    text-align: center;
+    color: #999;
+    font-size: 13px;
+}
+
+/* ========================================= */
+/* ダークモード                              */
+/* ========================================= */
+
+body.dark-mode {
+    background: #1e1e1e;
+    color: #ddd;
+}
+
+body.dark-mode .viewer-header {
+    background: #2a2a2a;
+    border-bottom-color: #444;
+}
+
+body.dark-mode .viewer-title {
+    color: #ddd;
+}
+
+body.dark-mode .calibration-tab {
+    background: #333;
+    border-color: #444;
+    color: #aaa;
+}
+
+body.dark-mode .calibration-tab:hover {
+    background: #1a2a3d;
+}
+
+body.dark-mode .calibration-tab.active {
+    background: #1565c0;
+    color: white;
+    border-color: #1976d2;
+}
+
+body.dark-mode .viewer-content::-webkit-scrollbar-track {
+    background: #333;
+}
+
+body.dark-mode .viewer-content::-webkit-scrollbar-thumb {
+    background: #666;
+}
+
+body.dark-mode .viewer-content::-webkit-scrollbar-thumb:hover {
+    background: #888;
+}
+
+body.dark-mode .calibration-category {
+    border-color: #444;
+}
+
+body.dark-mode .calibration-category-header {
+    background: #333;
+}
+
+body.dark-mode .calibration-category-header:hover {
+    background: #3a3a3a;
+}
+
+body.dark-mode .calibration-category-name {
+    color: #ddd;
+}
+
+body.dark-mode .calibration-table td {
+    border-bottom-color: #333;
+}
+
+body.dark-mode .cal-page {
+    color: #aaa;
+}
+
+body.dark-mode .cal-excerpt {
+    color: #ccc;
+}
+
+body.dark-mode .cal-content {
+    color: #ef9a9a;
+}
+
+body.dark-mode .calibration-empty {
+    color: #777;
+}
+
+body.dark-mode .cal-copy-btn {
+    color: #888;
+}
+
+body.dark-mode .cal-copy-btn:hover {
+    background: #444;
+    color: #ddd;
+}
+
+body.dark-mode .cal-copy-btn.copied {
+    color: #2ecc71;
+}
+
+/* 2カラムレイアウト ダークモード */
+body.dark-mode .calibration-column {
+    border-color: #444;
+}
+
+body.dark-mode .calibration-column-header {
+    border-bottom-color: #444;
+}
+
+body.dark-mode .calibration-column-header.correctness-header {
+    background: #3d2020;
+    color: #ef9a9a;
+}
+
+body.dark-mode .calibration-column-header.proposal-header {
+    background: #1a2a3d;
+    color: #90caf9;
+}
+
+body.dark-mode .calibration-column-content::-webkit-scrollbar-track {
+    background: #333;
+}
+
+body.dark-mode .calibration-column-content::-webkit-scrollbar-thumb {
+    background: #666;
+}
+
+body.dark-mode .calibration-column-content::-webkit-scrollbar-thumb:hover {
+    background: #888;
+}

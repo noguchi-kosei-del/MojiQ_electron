@@ -1,0 +1,561 @@
+/* ========================================= */
+/* stamps.css - スタンプ・パレット */
+/* ========================================= */
+
+/* ========================================= */
+/* 統合された校正指示スタンプエリア */
+/* ========================================= */
+#proofreading-instruction-area {
+    margin-bottom: 10px;
+    position: relative;
+}
+
+/* 校正指示スタンプのトグルボタン */
+.proofreading-instruction-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: bold;
+    color: #c62828;
+    background: #fff;
+    border: 2px solid #ef9a9a;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.proofreading-instruction-toggle-btn:hover {
+    background: #ffebee;
+    border-color: #e57373;
+}
+
+.proofreading-instruction-toggle-btn.active {
+    background: #fff;
+    border-color: #c62828;
+    color: #c62828;
+}
+
+.proofreading-instruction-toggle-btn .toggle-arrow {
+    font-size: 10px;
+    transition: transform 0.2s ease;
+    transform: rotate(90deg);
+}
+
+.proofreading-instruction-toggle-btn.open .toggle-arrow {
+    transform: rotate(-90deg);
+}
+
+.proofreading-instruction-toggle-btn .toggle-label {
+    flex-shrink: 0;
+}
+
+.proofreading-instruction-toggle-btn .selected-proofreading-display {
+    flex: 1;
+    text-align: center;
+    font-size: 11px;
+    padding: 2px 6px;
+    margin: 0 8px;
+    background: transparent;
+    border: 1px solid #c62828;
+    border-radius: 4px;
+    display: none;
+    color: #c62828;
+}
+
+.proofreading-instruction-toggle-btn .selected-proofreading-display.visible {
+    display: inline-block;
+}
+
+/* 校正指示スタンプのドロップダウン（左側にフロート展開） */
+.proofreading-instruction-dropdown {
+    position: absolute;
+    right: 100%;
+    top: 0;
+    width: 250px;
+    margin-right: 8px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateX(20px);
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.2s;
+    z-index: 100;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 8px;
+}
+
+.proofreading-instruction-dropdown.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(0);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* 校正指示スタンプ内のセクション */
+.proofreading-section {
+    margin-bottom: 8px;
+}
+
+.proofreading-section:last-child {
+    margin-bottom: 0;
+}
+
+.proofreading-section-label {
+    font-size: 11px;
+    font-weight: bold;
+    color: #666;
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #eee;
+}
+
+/* 指示スタンプのスクロールボックス */
+.instruction-stamp-scroll {
+    max-height: 84px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px;
+    background: #fafafa;
+    border-radius: 4px;
+}
+
+.instruction-stamp-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.instruction-stamp-scroll::-webkit-scrollbar-track {
+    background: #e0e0e0;
+    border-radius: 3px;
+}
+
+.instruction-stamp-scroll::-webkit-scrollbar-thumb {
+    background: #bdbdbd;
+    border-radius: 3px;
+}
+
+.instruction-stamp-scroll::-webkit-scrollbar-thumb:hover {
+    background: #9e9e9e;
+}
+
+.instruction-stamp-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+}
+
+.instruction-stamp-buttons .stamp-btn {
+    width: 100%;
+    height: 38px;
+    padding: 2px;
+    font-size: 10px;
+    font-weight: bold;
+    color: #c62828;
+    background: #fff;
+    border: 2px solid #ef9a9a;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: center;
+    line-height: 1.2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.instruction-stamp-buttons .stamp-btn:hover {
+    background: #ffebee;
+    border-color: #e57373;
+}
+
+.instruction-stamp-buttons .stamp-btn.active {
+    background: #fff;
+    border-color: #c62828;
+    box-shadow: 0 0 0 2px rgba(198, 40, 40, 0.3);
+}
+
+/* 校正記号スタンプのスクロールボックス */
+.proofreading-symbol-scroll {
+    max-height: 92px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px;
+    background: #fafafa;
+    border-radius: 4px;
+}
+
+.proofreading-symbol-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.proofreading-symbol-scroll::-webkit-scrollbar-track {
+    background: #e0e0e0;
+    border-radius: 3px;
+}
+
+.proofreading-symbol-scroll::-webkit-scrollbar-thumb {
+    background: #bdbdbd;
+    border-radius: 3px;
+}
+
+.proofreading-symbol-scroll::-webkit-scrollbar-thumb:hover {
+    background: #9e9e9e;
+}
+
+.proofreading-symbol-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+}
+
+.proofreading-symbol-buttons .symbol-btn {
+    width: 100%;
+    height: 42px;
+    padding: 4px;
+    font-size: 11px;
+    font-weight: bold;
+    color: #c62828;
+    background: #fff;
+    border: 2px solid #ef9a9a;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: center;
+    line-height: 1.2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+.proofreading-symbol-buttons .symbol-btn:hover {
+    background: #ffebee;
+    border-color: #e57373;
+}
+
+.proofreading-symbol-buttons .symbol-btn.active {
+    background: #ffebee;
+    border-color: #c62828;
+    box-shadow: 0 0 0 2px rgba(198, 40, 40, 0.3);
+}
+
+.proofreading-symbol-buttons .symbol-btn .symbol-icon {
+    font-size: 16px;
+    line-height: 1;
+    margin-bottom: 2px;
+}
+
+.proofreading-symbol-buttons .symbol-btn .symbol-label {
+    font-size: 9px;
+    color: #666;
+}
+
+/* 縦ツールバーの校正記号ボタンを非表示（サイドバーに移動） */
+#chevronBtn,
+#lshapeBtn,
+#zshapeBtn,
+#bracketBtn {
+    display: none;
+}
+
+/* スタンプトグルエリア */
+.stamp-toggle-area {
+    position: relative;
+    margin-bottom: 10px;
+}
+
+/* スタンプトグルボタン */
+.stamp-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: bold;
+    color: #1565c0;
+    background: #fff;
+    border: 2px solid #90caf9;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.stamp-toggle-btn:hover {
+    background: #e3f2fd;
+    border-color: #64b5f6;
+}
+
+.stamp-toggle-btn.active {
+    background: #fff;
+    border-color: #1565c0;
+}
+
+.stamp-toggle-btn .toggle-arrow {
+    font-size: 10px;
+    transition: transform 0.2s ease;
+    transform: rotate(90deg);
+}
+
+.stamp-toggle-btn.open .toggle-arrow {
+    transform: rotate(-90deg);
+}
+
+.stamp-toggle-btn .toggle-label {
+    flex-shrink: 0;
+}
+
+.stamp-toggle-btn .selected-stamp-display {
+    flex: 1;
+    text-align: center;
+    font-size: 11px;
+    padding: 2px 6px;
+    margin: 0 8px;
+    background: transparent;
+    border: 1px solid #1565c0;
+    border-radius: 4px;
+    display: none;
+}
+
+.stamp-toggle-btn .selected-stamp-display.visible {
+    display: inline-block;
+}
+
+/* スタンプドロップダウン（左側にフロート展開） */
+.stamp-dropdown {
+    position: absolute;
+    right: 100%;
+    top: 0;
+    width: 228px;
+    margin-right: 8px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateX(20px);
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.2s;
+    z-index: 100;
+}
+
+.stamp-dropdown.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(0);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* スタンプセクション - ドロップダウン内のスクロールボックス */
+.stamp-section {
+    max-height: 150px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 8px;
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* フォントセクション - ドロップダウン内のスクロールボックス */
+.font-section {
+    max-height: 150px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 8px;
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* スタンプセクション・フォントセクションのスクロールバー */
+.stamp-section::-webkit-scrollbar,
+.font-section::-webkit-scrollbar {
+    width: 6px;
+}
+
+.stamp-section::-webkit-scrollbar-track,
+.font-section::-webkit-scrollbar-track {
+    background: #e0e0e0;
+    border-radius: 3px;
+}
+
+.stamp-section::-webkit-scrollbar-thumb,
+.font-section::-webkit-scrollbar-thumb {
+    background: #bdbdbd;
+    border-radius: 3px;
+}
+
+.stamp-section::-webkit-scrollbar-thumb:hover,
+.font-section::-webkit-scrollbar-thumb:hover {
+    background: #9e9e9e;
+}
+
+.stamp-palette {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+/* 文字サイズスタンプは4列 */
+.stamp-section .stamp-palette {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+/* フォント指定（枠線）スタンプは1列 */
+.font-section .stamp-palette {
+    grid-template-columns: 1fr;
+}
+
+/* セクション内の編集・削除ボタン */
+.section-delete-btn,
+.section-edit-btn {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #f8f8f8;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-top: 8px;
+}
+
+.section-delete-btn:hover {
+    background-color: #ffebee;
+    border-color: #ef9a9a;
+    color: #c62828;
+}
+
+.section-edit-btn:hover {
+    background-color: #fff9c4;
+    border-color: #fbc02d;
+    color: #f57f17;
+}
+
+.section-delete-btn.active-delete {
+    background-color: #ffcdd2;
+    color: #c62828;
+    border-color: #c62828;
+    font-weight: bold;
+}
+
+.section-edit-btn.active-edit {
+    background-color: #fff9c4;
+    color: #f57f17;
+    border-color: #fbc02d;
+    font-weight: bold;
+}
+
+.section-edit-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #f5f5f5;
+    border-color: #e0e0e0;
+    color: #bdbdbd;
+}
+
+/* セクション内のアクションボタン行 */
+.section-action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 8px;
+    background-color: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+}
+
+/* 3列レイアウト（フォント用：追加・編集・削除） */
+.section-action-row.triple {
+    grid-template-columns: 1fr 1fr 1fr;
+}
+
+.section-action-row .section-add-btn,
+.section-action-row .section-edit-btn,
+.section-action-row .section-delete-btn {
+    margin-top: 0;
+}
+
+/* 追加ボタンのスタイル */
+.section-add-btn {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #f8f8f8;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.section-add-btn:hover {
+    background-color: #e3f2fd;
+    border-color: #42a5f5;
+    color: #1565c0;
+}
+
+.stamp-palette .stamp-btn {
+    width: 100%;
+    padding: 6px 4px;
+    font-size: 11px;
+    font-weight: 400;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.stamp-btn.font-type {
+    padding-left: 6px;
+    text-align: left;
+}
+
+.color-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 6px;
+    border: 1px solid rgba(0,0,0,0.2);
+}
+
+/* フォント追加・編集・削除ボタン行 */
+.add-font-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+}
+
+.add-font-row #addSizeBtn,
+.add-font-row #addFontBtn,
+.add-font-row #gdriveJsonBrowserBtn,
+.add-font-row #calibrationToggleBtn {
+    grid-column: 1 / -1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+}
+
+.add-font-row #addSizeBtn svg,
+.add-font-row #addFontBtn svg,
+.add-font-row #gdriveJsonBrowserBtn svg,
+.add-font-row #calibrationToggleBtn svg {
+    vertical-align: middle;
+    flex-shrink: 0;
+}

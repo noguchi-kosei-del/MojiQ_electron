@@ -1,0 +1,523 @@
+/* ========================================= */
+/* header.css - ヘッダー & メニューバー */
+/* ========================================= */
+
+/* --- ヘッダー & タブ --- */
+.app-mode-switcher {
+    height: 40px;
+    background: #f0f0f0;
+    display: flex;
+    align-items: center;
+    padding: 0 0 0 15px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 9999;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.app-mode-switcher .logo {
+    color: #333;
+    font-weight: bold;
+    margin-right: 8px;
+    font-size: 16px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    padding: 2px;
+}
+
+.app-mode-switcher .logo img {
+    height: 18px;
+    width: 18px;
+    display: block;
+    border-radius: 3px;
+}
+
+/* ヘッダー区切り線 */
+.header-divider {
+    width: 1px;
+    height: 20px;
+    background-color: #ccc;
+    margin: 0 8px;
+}
+
+/* カスタムメニューバー */
+.custom-menu-bar {
+    display: none; /* ファイル・編集・表示メニューを非表示 */
+    align-items: center;
+    height: 100%;
+    margin-right: 10px;
+}
+
+.custom-menu-bar .menu-item {
+    position: relative;
+    height: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.custom-menu-bar .menu-label {
+    padding: 4px 10px;
+    font-size: 13px;
+    color: #333;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.15s;
+}
+
+.custom-menu-bar .menu-label:hover,
+.custom-menu-bar .menu-item.open .menu-label {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.custom-menu-bar .menu-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 200px;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-5px);
+    transition: opacity 0.15s, transform 0.15s, visibility 0s linear 0.15s;
+    z-index: 10000;
+}
+
+.custom-menu-bar .menu-item.open .menu-dropdown {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    transition: opacity 0.15s, transform 0.15s;
+}
+
+.custom-menu-bar .menu-dropdown-item {
+    padding: 8px 12px;
+    font-size: 13px;
+    color: #333;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.1s;
+}
+
+.custom-menu-bar .menu-dropdown-item:hover {
+    background-color: #e8e8e8;
+}
+
+/* disabled状態のメニュー項目 */
+.custom-menu-bar .menu-dropdown-item.disabled {
+    color: #999;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.custom-menu-bar .menu-dropdown-item.disabled:hover {
+    background-color: transparent;
+}
+
+.custom-menu-bar .menu-dropdown-item.disabled .shortcut {
+    color: #bbb;
+}
+
+.custom-menu-bar .menu-dropdown-item:first-child {
+    border-radius: 4px 4px 0 0;
+}
+
+.custom-menu-bar .menu-dropdown-item:last-child {
+    border-radius: 0 0 4px 4px;
+}
+
+.custom-menu-bar .menu-dropdown-item .shortcut {
+    font-size: 11px;
+    color: #888;
+    margin-left: 20px;
+}
+
+.custom-menu-bar .menu-dropdown-divider {
+    height: 1px;
+    background: #ddd;
+    margin: 4px 0;
+}
+
+/* ドラッグ領域（タイトルバー代わり） */
+.titlebar-drag-region {
+    flex: 1;
+    height: 100%;
+    -webkit-app-region: drag;
+    app-region: drag;
+}
+
+/* ウィンドウコントロールボタン */
+.window-controls {
+    display: none;
+    align-items: flex-start;
+    height: 100%;
+    margin-left: 8px;
+    margin-right: 4px;
+    margin-top: -1px;
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+}
+
+.window-control-btn {
+    width: 28px;
+    height: 20px;
+    border: 1px solid #ccc;
+    border-top: none;
+    border-right: none;
+    background: transparent !important;
+    color: #333;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.1s;
+    outline: none;
+}
+
+.window-control-btn.close-btn {
+    width: 36px;
+    border-right: 1px solid #ccc;
+}
+
+.window-control-btn:hover,
+.window-control-btn:focus:hover,
+.window-control-btn:active:hover,
+.window-control-btn:focus-visible:hover {
+    background-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+.window-control-btn:focus,
+.window-control-btn:active,
+.window-control-btn:focus-visible {
+    background: transparent !important;
+    outline: none;
+    box-shadow: none;
+}
+
+.window-control-btn.close-btn:hover,
+.window-control-btn.close-btn:focus:hover,
+.window-control-btn.close-btn:active:hover,
+.window-control-btn.close-btn:focus-visible:hover {
+    background-color: #e81123 !important;
+    color: #fff;
+}
+
+/* Electron環境でのレイアウト調整 */
+body.electron-app .hamburger-btn {
+    margin-right: 0;
+}
+
+body.electron-app .app-mode-switcher {
+    padding-right: 0;
+}
+
+/* PDFファイル名表示 */
+.pdf-filename {
+    color: #666;
+    font-size: 16px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 12px;
+    border-radius: 6px;
+}
+
+.pdf-filename:not(:empty) {
+    background-color: #e0e0e0;
+}
+
+/* モードタブ */
+.mode-tabs {
+    display: flex;
+    gap: 5px;
+    height: 100%;
+    align-items: flex-end;
+}
+
+.mode-tab {
+    background: #37474f;
+    color: #b0bec5;
+    border: none;
+    border-radius: 8px 8px 0 0;
+    padding: 0 16px;
+    font-size: 12px;
+    cursor: pointer;
+    height: 32px;
+    margin-bottom: 0;
+    transition: all 0.2s;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+}
+
+.mode-tab:hover {
+    background: #455a64;
+    color: #fff;
+}
+
+.mode-tab.active {
+    background: #f0f0f0;
+    color: #263238;
+    height: 36px;
+}
+
+.mode-tab:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* --- 編集操作ボタン（左側） --- */
+.header-edit-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: transparent;
+    margin-left: 8px;
+}
+
+.header-edit-actions.menu-locked {
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+/* --- ヘッダーアクションボタン（右側） --- */
+.header-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-evenly;
+    gap: 8px;
+    background: transparent;
+}
+
+.header-actions.menu-locked {
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+/* ファイル入力を非表示 */
+.header-actions input[type="file"] {
+    display: none;
+}
+
+.header-icon-btn,
+label.header-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px !important;
+    height: 28px;
+    padding: 0;
+    margin: 0;
+    border: none;
+    border-radius: 5px;
+    background: transparent !important;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: background 0.2s;
+    outline: none;
+    flex-shrink: 0;
+}
+
+.header-icon-btn:hover,
+label.header-icon-btn:hover {
+    background: transparent !important;
+}
+
+.header-icon-btn:focus,
+.header-icon-btn:active,
+.header-icon-btn:focus-visible,
+label.header-icon-btn:focus,
+label.header-icon-btn:active,
+label.header-icon-btn:focus-visible {
+    background: transparent !important;
+    outline: none;
+    box-shadow: none;
+}
+
+.header-icon-btn svg,
+label.header-icon-btn svg {
+    width: 19px;
+    height: 19px;
+    stroke: #333;
+    transition: stroke 0.2s;
+}
+
+.header-icon-btn:hover svg,
+label.header-icon-btn:hover svg {
+    stroke: #1976d2;
+}
+
+#workspaceFlipBtn:hover {
+    color: #1976d2;
+}
+
+/* ページ編集ドロップダウン専用スタイル */
+.spread-binding-dropdown {
+    width: 200px;
+}
+
+.binding-option {
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+
+.binding-option .binding-check {
+    position: absolute;
+    right: 12px;
+    color: #1976d2;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.binding-option.selected .binding-check {
+    opacity: 1;
+}
+
+/* PDF読み込み前のグレーロック状態 */
+.header-icon-btn.pdf-required.locked,
+label.header-icon-btn.pdf-required.locked {
+    opacity: 0.3;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.header-icon-btn.pdf-required.locked svg,
+label.header-icon-btn.pdf-required.locked svg {
+    stroke: #999;
+}
+
+/* メニュー展開時のグレーロック状態 */
+.header-icon-btn.menu-lockable.menu-locked,
+button.header-icon-btn.menu-lockable.menu-locked,
+label.header-icon-btn.menu-lockable.menu-locked,
+.logo.menu-lockable.menu-locked,
+.custom-menu-bar.menu-lockable.menu-locked {
+    opacity: 0.3;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.header-icon-btn.menu-lockable.menu-locked svg,
+button.header-icon-btn.menu-lockable.menu-locked svg,
+label.header-icon-btn.menu-lockable.menu-locked svg {
+    stroke: #999;
+}
+
+/* disabled状態のボタン（元に戻す/やり直し/全消去など） */
+.header-icon-btn:disabled,
+button.header-icon-btn:disabled {
+    opacity: 0.3;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.header-icon-btn:disabled svg,
+button.header-icon-btn:disabled svg {
+    stroke: #999;
+}
+
+/* --- ヘッダーズームコントロール --- */
+.header-zoom-control {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: 8px;
+    padding: 0 4px;
+}
+
+.header-zoom-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    margin: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.header-zoom-btn:hover {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.header-zoom-btn:active {
+    background: rgba(0, 0, 0, 0.12);
+}
+
+.header-zoom-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke: #555;
+    transition: stroke 0.15s;
+}
+
+.header-zoom-btn:hover svg {
+    stroke: #333;
+}
+
+.header-zoom-label {
+    font-size: 13px;
+    color: #333;
+    min-width: 42px;
+    text-align: center;
+    user-select: none;
+}
+
+/* ズームボタン disabled状態 */
+.header-zoom-btn:disabled {
+    opacity: 0.3;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.header-zoom-btn:disabled svg {
+    stroke: #999;
+}
+
+.header-zoom-control.pdf-required[disabled] {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.header-zoom-control.pdf-required[disabled] .header-zoom-label {
+    color: #999;
+}
+
+/* メニュー展開時のロック状態 */
+.header-zoom-control.menu-lockable.menu-locked {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.header-zoom-btn.menu-lockable.menu-locked {
+    pointer-events: none;
+}
+
+.header-zoom-control.menu-lockable.menu-locked .header-zoom-label {
+    color: #999;
+}
+
+.header-zoom-btn.menu-lockable.menu-locked svg {
+    stroke: #999;
+}
+

@@ -1,0 +1,121 @@
+{
+  "name": "mojiq",
+  "version": "2.0.6",
+  "description": "MojiQ",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --enable-logging",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win --dir && node scripts/set-icon.js && electron-builder --win --prepackaged dist/win-unpacked",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "pack": "electron-builder --dir"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "rcedit": "^5.0.2"
+  },
+  "build": {
+    "appId": "com.mojiq.app",
+    "productName": "MojiQ",
+    "directories": {
+      "output": "dist"
+    },
+    "fileAssociations": [
+      {
+        "ext": "pdf",
+        "name": "PDF Document",
+        "description": "PDF Document",
+        "mimeType": "application/pdf",
+        "role": "Viewer",
+        "icon": "logo/pdf-icons/MojiQ-pdf_256.ico"
+      },
+      {
+        "ext": "jpg",
+        "name": "JPEG Image",
+        "description": "JPEG Image",
+        "mimeType": "image/jpeg",
+        "role": "Viewer",
+        "icon": "logo/pdf-icons/MojiQ-jpeg_256.ico"
+      },
+      {
+        "ext": "jpeg",
+        "name": "JPEG Image",
+        "description": "JPEG Image",
+        "mimeType": "image/jpeg",
+        "role": "Viewer",
+        "icon": "logo/pdf-icons/MojiQ-jpeg_256.ico"
+      }
+    ],
+    "files": [
+      "electron/**/*",
+      "index.html",
+      "calibration-viewer.html",
+      "css/**/*",
+      "js/**/*",
+      "logo/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "logo/MojiQ_icon.ico",
+      "signAndEditExecutable": false
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "logo/MojiQ_logo.png",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "logo/MojiQ_logo.png",
+      "category": "Office"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "logo/MojiQ_icon.ico",
+      "uninstallerIcon": "logo/MojiQ_icon.ico",
+      "installerHeaderIcon": "logo/MojiQ_icon.ico",
+      "artifactName": "${productName} Setup ${version}.${ext}",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MojiQ"
+    },
+    "portable": {
+      "artifactName": "${productName}.${ext}",
+      "requestExecutionLevel": "user"
+    },
+    "extraResources": [
+      {
+        "from": "logo/MojiQ_icon.ico",
+        "to": "icon.ico"
+      }
+    ]
+  },
+  "dependencies": {
+    "pdf-to-printer": "^5.6.1"
+  }
+}

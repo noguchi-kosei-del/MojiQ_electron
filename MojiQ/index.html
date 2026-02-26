@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MojiQ</title>
+
+    <!-- PDF/ドキュメント処理ライブラリ（ローカルバンドル） -->
+    <script src="js/vendor/pdf.min.js" defer></script>
+    <script src="js/vendor/pdf.worker.min.js" defer></script>
+    <script src="js/vendor/jspdf.umd.min.js" defer></script>
+    <script src="js/vendor/pdf-lib.min.js" defer></script>
+    
+    <link rel="icon" href="logo/MojiQ_favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/simulator.css">
+    <link rel="stylesheet" href="css/history-panel.css">
+    <link rel="stylesheet" href="css/proofreading-mode.css">
+</head>
+<body class="mode-mojiq">
+
+    <nav class="app-mode-switcher">
+        <div class="logo menu-lockable">
+            <img src="logo/MojiQ_icon.png" alt="MojiQ">
+        </div>
+
+        <button id="hamburgerBtn" class="hamburger-btn" title="メニュー">
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+        </button>
+
+        <div class="header-divider"></div>
+
+        <!-- モード切替ボタン（指示入れモード / 校正モード） -->
+        <button id="proofreadingModeBtn" class="header-icon-btn menu-lockable" title="指示入れモード">
+            <!-- 指示入れモードアイコン（フキダシ） -->
+            <svg class="mode-icon instruction-mode-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <!-- 校正モードアイコン（チェックリスト） -->
+            <svg class="mode-icon proofreading-mode-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+                <rect x="9" y="3" width="6" height="4" rx="1"/>
+                <path d="M9 12l2 2 4-4"/>
+            </svg>
+        </button>
+
+        <div class="header-divider"></div>
+
+        <!-- カスタムメニューバー -->
+        <div class="custom-menu-bar menu-lockable" id="customMenuBar">
+            <div class="menu-item" data-menu="file">
+                <span class="menu-label">ファイル</span>
+                <div class="menu-dropdown">
+                    <div class="menu-dropdown-item" data-action="open-pdf">PDFを開く<span class="shortcut">Ctrl+O</span></div>
+                    <div class="menu-dropdown-item" data-action="save-pdf">PDFを保存<span class="shortcut">Ctrl+S</span></div>
+                    <div class="menu-dropdown-item" data-action="save-pdf-as">名前を付けて保存<span class="shortcut">Ctrl+Shift+S</span></div>
+                    <div class="menu-dropdown-divider"></div>
+                    <div class="menu-dropdown-item" data-action="print">印刷<span class="shortcut">Ctrl+P</span></div>
+                    <div class="menu-dropdown-divider"></div>
+                    <div class="menu-dropdown-item" data-action="quit">終了<span class="shortcut">Ctrl+Q</span></div>
+                </div>
+            </div>
+            <div class="menu-item" data-menu="edit">
+                <span class="menu-label">編集</span>
+                <div class="menu-dropdown">
+                    <div class="menu-dropdown-item" data-action="undo">元に戻す<span class="shortcut">Ctrl+Z</span></div>
+                    <div class="menu-dropdown-item" data-action="redo">やり直し<span class="shortcut">Ctrl+Y</span></div>
+                    <div class="menu-dropdown-divider"></div>
+                    <div class="menu-dropdown-item" data-action="cut">切り取り<span class="shortcut">Ctrl+X</span></div>
+                    <div class="menu-dropdown-item" data-action="paste">貼り付け<span class="shortcut">Ctrl+V</span></div>
+                    <div class="menu-dropdown-divider"></div>
+                    <div class="menu-dropdown-item" data-action="clear-all">すべてクリア</div>
+                </div>
+            </div>
+            <div class="menu-item" data-menu="view">
+                <span class="menu-label">表示</span>
+                <div class="menu-dropdown">
+                    <div class="menu-dropdown-item" data-action="zoom-in">拡大<span class="shortcut">Ctrl++</span></div>
+                    <div class="menu-dropdown-item" data-action="zoom-out">縮小<span class="shortcut">Ctrl+-</span></div>
+                    <div class="menu-dropdown-item" data-action="zoom-100">100%<span class="shortcut">Ctrl+0</span></div>
+                    <div class="menu-dropdown-item" data-action="zoom-fit">ウィンドウに合わせる</div>
+                    <div class="menu-dropdown-divider"></div>
+                    <div class="menu-dropdown-item disabled" data-action="toggle-proofreading-mode" id="proofreadingModeMenuItem">校正モード<span class="menu-check" id="proofreadingModeCheck" style="display:none;">✓</span></div>
+                    <div class="menu-dropdown-divider"></div>
+                    <div class="menu-dropdown-item" data-action="toggle-text-layer">コメントテキスト表示/非表示<span class="shortcut">Ctrl+T</span></div>
+                    <div class="menu-dropdown-divider"></div>
+                    <div class="menu-dropdown-item" data-action="toggle-devtools">開発者ツール<span class="shortcut">F12</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ズームコントロール -->
+        <div class="header-zoom-control pdf-required menu-lockable" disabled>
+            <button id="zoomInBtn" class="header-zoom-btn pdf-required menu-lockable" title="拡大" disabled>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="16"/>
+                    <line x1="8" y1="12" x2="16" y2="12"/>
+                </svg>
+            </button>
+            <span id="zoomLabel" class="header-zoom-label">100%</span>
+            <button id="zoomOutBtn" class="header-zoom-btn pdf-required menu-lockable" title="縮小" disabled>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="8" y1="12" x2="16" y2="12"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="header-divider"></div>
+
+        <!-- 編集操作ボタン（左側） -->
+        <div class="header-edit-actions">
+            <button id="undoBtn" class="header-icon-btn pdf-required menu-lockable" title="元に戻す" disabled>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 7h11a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5H6"/>
+                    <polyline points="8 11 4 7 8 3"/>
+                </svg>
+            </button>
+            <button id="redoBtn" class="header-icon-btn pdf-required menu-lockable" title="やり直し" disabled>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 7H9a5 5 0 0 0-5 5v0a5 5 0 0 0 5 5h9"/>
+                    <polyline points="16 11 20 7 16 3"/>
+                </svg>
+            </button>
+            <button id="clearBtn" class="header-icon-btn pdf-required menu-lockable" title="描画を全消去" disabled>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9"/>
+                    <line x1="9" y1="9" x2="15" y2="15"/>
+                    <line x1="15" y1="9" x2="9" y2="15"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- ドラッグ領域（タイトルバー代わり） -->
+        <div class="titlebar-drag-region" id="titlebarDragRegion"></div>
+
+        <div class="pdf-filename" id="pdfFileNameDisplay" title=""></div>
+
+        <!-- タブは統合されました -->
+
+        <div class="header-actions">
+            <!-- 作品仕様読み込み / 校正チェックボタン（ヘッダー用、モードで切替） -->
+            <button id="headerGdriveJsonBtn" class="header-icon-btn header-spec-btn pdf-required" title="作品仕様を読み込み" disabled>
+                <svg width="24" height="24" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5a1 1 0 011-1h4l2 2h6a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1V5z"/></svg>
+            </button>
+            <button id="headerCalibrationBtn" class="header-icon-btn header-calibration-btn pdf-required" title="校正チェック" disabled>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><polyline points="3,6 4,7 6,5"/><polyline points="3,12 4,13 6,11"/><polyline points="3,18 4,19 6,17"/></svg>
+            </button>
+            <label for="pdfUpload" class="header-icon-btn menu-lockable" title="PDF/JPEG読込">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <path d="M12 18v-6"/>
+                    <path d="M9 15l3-3 3 3"/>
+                </svg>
+            </label>
+            <input type="file" id="pdfUpload" accept="application/pdf,image/jpeg,.jpg,.jpeg" multiple>
+            <button id="savePdfBtn" class="header-icon-btn pdf-required menu-lockable" title="PDF保存" disabled>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                    <polyline points="17 21 17 13 7 13 7 21"/>
+                    <polyline points="7 3 7 8 15 8"/>
+                </svg>
+            </button>
+            <!-- ページ編集ボタン -->
+            <button id="spreadViewBtn" class="header-icon-btn pdf-required menu-lockable" title="ページ編集" disabled>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <!-- 開いた本のアイコン -->
+                    <!-- 左ページ -->
+                    <path d="M12 5c-1.5-1-3.5-1.5-5.5-1.5S3 4 2 5v13c1-.8 2.5-1.2 4.5-1.2s4 .4 5.5 1.2"/>
+                    <!-- 右ページ -->
+                    <path d="M12 5c1.5-1 3.5-1.5 5.5-1.5S21 4 22 5v13c-1-.8-2.5-1.2-4.5-1.2s-4 .4-5.5 1.2"/>
+                    <!-- 中央の綴じ部分 -->
+                    <line x1="12" y1="5" x2="12" y2="18"/>
+                </svg>
+            </button>
+            <!-- 閲覧モードボタン -->
+            <button id="viewerModeBtn" class="header-icon-btn pdf-required menu-lockable" title="閲覧モード" disabled>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <!-- モニター画面 -->
+                    <rect x="2" y="4" width="20" height="14" rx="2" ry="2"/>
+                    <!-- スタンド支柱 -->
+                    <line x1="12" y1="18" x2="12" y2="21"/>
+                    <!-- スタンド台座 -->
+                    <line x1="8" y1="21" x2="16" y2="21"/>
+                </svg>
+            </button>
+            <!-- 印刷ボタン -->
+            <button id="printPdfBtn" class="header-icon-btn pdf-required menu-lockable" title="印刷" disabled>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <!-- プリンター本体（用紙の上まで） -->
+                    <path d="M4 15V10a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v5"/>
+                    <!-- 上部の用紙トレイ -->
+                    <path d="M6 9V4h12v5"/>
+                    <!-- 下部の出力用紙 -->
+                    <rect x="6" y="15" width="12" height="6" rx="0.5"/>
+                    <!-- 本体右側のボタン -->
+                    <line x1="17" y1="12" x2="17" y2="12" stroke-width="2.5" stroke-linecap="round"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- ウィンドウコントロールボタン（Electron用） -->
+        <div class="window-controls" id="windowControls">
+            <button class="window-control-btn" id="minimizeBtn" title="最小化">
+                <svg width="12" height="12" viewBox="0 0 12 12">
+                    <rect x="1" y="5.5" width="10" height="1" fill="currentColor"/>
+                </svg>
+            </button>
+            <button class="window-control-btn" id="maximizeBtn" title="最大化">
+                <svg width="12" height="12" viewBox="0 0 12 12">
+                    <rect x="1.5" y="1.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1"/>
+                </svg>
+            </button>
+            <button class="window-control-btn close-btn" id="closeBtn" title="閉じる">
+                <svg width="10" height="10" viewBox="0 0 12 12">
+                    <path d="M2 2 L10 10 M10 2 L2 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </button>
+        </div>
+    </nav>
+
+    <div id="slideMenu" class="slide-menu">
+        <div class="slide-menu-header">
+            <span>メニュー</span>
+            <button id="slideMenuCloseBtn" class="slide-menu-close-btn" title="閉じる">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <path d="M4 4L12 12M12 4L4 12"/>
+                </svg>
+            </button>
+        </div>
+        <div class="slide-menu-content">
+            <a href="https://hyper-coast-743.notion.site/2aa34ea373ba80cbbbf3d5e5ab94f893?pvs=74" class="slide-menu-item" target="_blank">
+                <svg class="external-link-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+                </svg>
+                校正のやり方
+            </a>
+            <a href="https://hyper-coast-743.notion.site/2e734ea373ba8009a6b3efbf43c9e1e0" class="slide-menu-item" target="_blank">
+                <svg class="external-link-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+                </svg>
+                校正記号の入れ方/読み方
+            </a>
+        </div>
+        <!-- 下部設定ボタン -->
+        <div class="slide-menu-bottom">
+            <button id="workspaceFlipBtn" class="slide-menu-icon-btn pdf-required" title="ワークスペース反転" disabled>
+                <span id="workspaceFlipIcon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1">
+                        <polygon points="2,12 10,4 10,20" fill="currentColor" stroke="currentColor"/>
+                        <polygon points="22,12 14,4 14,20" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                </span>
+            </button>
+            <button id="darkModeHeaderBtn" class="slide-menu-icon-btn" title="ダークモード切り替え">
+                <span id="darkModeHeaderIcon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" overflow="visible">
+                        <circle cx="12" cy="12" r="5"/>
+                        <line x1="12" y1="1" x2="12" y2="3"/>
+                        <line x1="12" y1="21" x2="12" y2="23"/>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                        <line x1="1" y1="12" x2="3" y2="12"/>
+                        <line x1="21" y1="12" x2="23" y2="12"/>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                    </svg>
+                </span>
+            </button>
+            <button id="settingsBtn" class="slide-menu-icon-btn" title="環境設定">
+                <span id="settingsIcon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                </span>
+            </button>
+            <button id="homeBtn" class="slide-menu-icon-btn pdf-required" title="ホーム画面に戻る" disabled>
+                <span id="homeIcon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                        <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                </span>
+            </button>
+        </div>
+    </div>
+    <div id="slideMenuOverlay" class="slide-menu-overlay"></div>
+
+
+    <!-- ページ編集ドロップダウンメニュー（見開き＋削除） -->
+    <div id="spreadBindingDropdown" class="page-edit-dropdown spread-binding-dropdown">
+        <div class="page-edit-dropdown-content">
+            <button id="bindingRightBtn" class="page-edit-dropdown-item binding-option" data-binding="right">
+                <span class="dropdown-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H5a2 2 0 00-2 2v8a2 2 0 002 2h9"/><path d="M14 3v12"/><path d="M7 9h4"/><path d="M9 7l-2 2 2 2"/></svg></span>
+                <span>見開き（右綴じ）</span>
+                <span class="binding-check">✓</span>
+            </button>
+            <button id="bindingLeftBtn" class="page-edit-dropdown-item binding-option" data-binding="left">
+                <span class="dropdown-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3h9a2 2 0 012 2v8a2 2 0 01-2 2H4"/><path d="M4 3v12"/><path d="M7 9h4"/><path d="M9 7l2 2-2 2"/></svg></span>
+                <span>見開き（左綴じ）</span>
+                <span class="binding-check">✓</span>
+            </button>
+            <button id="dropdownDeletePage" class="page-edit-dropdown-item danger">
+                <span class="dropdown-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h12"/><path d="M7 5V3h4v2"/><path d="M5 5l1 10h6l1-10"/></svg></span>
+                <span>現在のページを削除</span>
+            </button>
+        </div>
+    </div>
+    <div id="spreadBindingDropdownOverlay" class="page-edit-dropdown-overlay"></div>
+
+    <!-- PDF保存ドロップダウンメニュー（上書き保存＋名前を付けて保存） -->
+    <div id="savePdfDropdown" class="page-edit-dropdown save-pdf-dropdown">
+        <div class="page-edit-dropdown-content">
+            <button id="overwriteSaveBtn" class="page-edit-dropdown-item save-option" disabled>
+                <span class="dropdown-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></span>
+                <span>上書き保存</span>
+            </button>
+            <button id="saveAsNewBtn" class="page-edit-dropdown-item save-option">
+                <span class="dropdown-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></span>
+                <span>名前を付けて保存</span>
+            </button>
+        </div>
+    </div>
+    <div id="savePdfDropdownOverlay" class="page-edit-dropdown-overlay"></div>
+
+    <div id="textModal" class="modal-overlay" tabindex="-1">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>テキストを入力</span>
+                <label class="tategaki-switch">
+                    <input type="checkbox" id="modalVerticalCheck"> 縦書き
+                </label>
+            </div>
+            <textarea id="modalTextInput" placeholder="ここにテキストを入力..." tabindex="0" maxlength="50000"></textarea>
+            <div style="font-size:11px; color:#666; text-align:right;">Enterで改行</div>
+            <div id="modalFontSizeRow" style="display:none; margin-top:8px; align-items:center; gap:8px;">
+                <label for="modalFontSizeInput" style="font-size:13px; color:#333;">文字サイズ:</label>
+                <input type="number" id="modalFontSizeInput" min="8" max="100" value="12" style="width:60px; padding:4px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px;">
+                <span style="font-size:12px; color:#666;">pt</span>
+            </div>
+            <div class="modal-actions">
+                <button id="modalCancelBtn">キャンセル</button>
+                <button id="modalOkBtn" class="active">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="fontModal" class="modal-overlay">
+        <div class="modal-content" style="width: 300px;">
+            <div class="modal-header"><span>カスタムフォント追加</span></div>
+            <label style="margin-top:10px;">フォント名（表示ラベル）</label>
+            <input type="text" id="modalFontNameInput" placeholder="例: 太ゴシック" style="margin-bottom:15px;">
+            <label>枠線の色指定</label>
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:20px;">
+                <input type="color" id="modalFontColorInput" value="#ff0000" style="width:50px; height:40px; padding:0; border:none;">
+            </div>
+            <div class="modal-actions">
+                <button id="fontModalCancelBtn">キャンセル</button>
+                <button id="fontModalAddBtn" class="active" style="background-color:#2196f3; color:white;">登録</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 汎用プロンプトモーダル -->
+    <div id="promptModal" class="modal-overlay" tabindex="-1">
+        <div class="modal-content" style="width: 320px;">
+            <div class="modal-header"><span id="promptModalTitle">入力</span></div>
+            <label id="promptModalLabel" style="margin-top:10px; display:block;"></label>
+            <input type="text" id="promptModalInput" style="margin-top:8px; margin-bottom:15px; width:100%; box-sizing:border-box; padding:8px; border:1px solid #ccc; border-radius:4px;" tabindex="0">
+            <div class="modal-actions">
+                <button id="promptModalCancelBtn">キャンセル</button>
+                <button id="promptModalOkBtn" class="active" style="background-color:#2196f3; color:white;">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 一文字ラベル入力モーダル -->
+    <div id="singleCharModal" class="modal-overlay" tabindex="-1">
+        <div class="modal-content" style="width: 240px;">
+            <div class="modal-header"><span>小文字を入力（1文字）</span></div>
+            <input type="text" id="singleCharInput" maxlength="1" style="margin-top:12px; margin-bottom:15px; width:100%; box-sizing:border-box; padding:12px; border:1px solid #ccc; border-radius:4px; font-size:24px; text-align:center;" tabindex="0" placeholder="A">
+            <div class="modal-actions">
+                <button id="singleCharCancelBtn">キャンセル</button>
+                <button id="singleCharOkBtn" class="active" style="background-color:#2196f3; color:white;">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 汎用確認ダイアログモーダル -->
+    <div id="confirmModal" class="modal-overlay" tabindex="-1">
+        <div class="modal-content" style="width: 340px;">
+            <div class="modal-header"><span id="confirmModalTitle">確認</span></div>
+            <p id="confirmModalMessage" style="margin:15px 0; line-height:1.5; white-space:pre-wrap;"></p>
+            <div class="modal-actions">
+                <button id="confirmModalCancelBtn">キャンセル</button>
+                <button id="confirmModalOkBtn" class="active" style="background-color:#2196f3; color:white;">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 透過PDF保存設定モーダル（現在は未使用 - サイドバースライダーで直接制御） -->
+    <div id="transparentPdfModal" class="modal-overlay" tabindex="-1">
+        <div class="modal-content" style="width: 360px;">
+            <div class="modal-header"><span>透過PDF保存設定</span></div>
+            <div class="transparent-pdf-settings">
+                <label style="margin-top: 10px;">背景の透明度</label>
+                <div class="opacity-slider-container">
+                    <input type="range" id="modalBgOpacitySlider" min="0" max="100" value="0" step="5">
+                    <span id="modalBgOpacityValue" class="opacity-value">0%</span>
+                </div>
+                <div class="opacity-preview">
+                    <div id="opacityPreviewBox" class="opacity-preview-box">
+                        <div class="preview-bg-layer"></div>
+                        <div class="preview-drawing-layer">描画</div>
+                    </div>
+                    <div class="opacity-labels">
+                        <span>0% = 完全透明</span>
+                        <span>100% = 不透明</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="transparentPdfCancelBtn">キャンセル</button>
+                <button id="transparentPdfSaveBtn" class="active" style="background-color:#26c6da; color:white;">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JSONフォルダブラウザモーダル -->
+    <div id="jsonFolderBrowserModal" class="modal-overlay">
+        <div class="modal-content json-folder-browser-modal">
+            <div class="modal-header">
+                <span>作品仕様jsonを選択してください</span>
+            </div>
+            <div class="json-folder-search-bar">
+                <input type="text" id="jsonFolderSearchInput" placeholder="JSONファイルを検索..." autocomplete="off">
+                <button id="jsonFolderSearchClearBtn" class="json-search-clear-btn" title="クリア">&times;</button>
+            </div>
+            <!-- フォルダブラウザ -->
+            <div class="json-folder-browser" id="jsonFolderBrowser">
+                <div class="json-folder-breadcrumb" id="jsonFolderBreadcrumb">
+                    <span class="json-folder-crumb json-folder-crumb-root" onclick="MojiQJsonFolderBrowser.goToRoot()">TOP</span>
+                </div>
+                <div id="jsonFolderSearchResults" class="json-folder-search-results" style="display: none;">
+                    <!-- 検索結果がここに表示される -->
+                </div>
+                <div id="jsonFolderList" class="json-folder-list">
+                    <div class="json-folder-loading">読み込み中...</div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="jsonFolderBrowserCancelBtn">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 校正チェックモーダル -->
+    <div id="calibrationModal" class="modal-overlay">
+        <div class="modal-content calibration-modal">
+            <div class="modal-header">
+                <span>校正チェックjsonを選択してください</span>
+            </div>
+            <div class="calibration-search-bar">
+                <input type="text" id="calibrationSearchInput" placeholder="JSONファイルを検索..." autocomplete="off">
+                <button id="calibrationSearchClearBtn" class="calibration-search-clear-btn" title="クリア">&times;</button>
+            </div>
+            <!-- フォルダブラウザ -->
+            <div class="calibration-browser" id="calibrationBrowser">
+                <div class="calibration-breadcrumb" id="calibrationBreadcrumb">
+                    <span class="calibration-crumb calibration-crumb-root" onclick="CalibrationPanel.goToRoot()">TOP</span>
+                </div>
+                <div id="calibrationSearchResults" class="calibration-search-results" style="display: none;">
+                    <!-- 検索結果がここに表示される -->
+                </div>
+                <div class="calibration-folder-list" id="calibrationFolderList">
+                    <div class="calibration-loading">読み込み中...</div>
+                </div>
+            </div>
+            <!-- チェック結果表示エリア -->
+            <div class="calibration-result" id="calibrationResult" style="display:none;">
+                <div class="calibration-result-header">
+                    <span class="calibration-result-title" id="calibrationResultTitle"></span>
+                    <button class="calibration-back-btn" onclick="CalibrationPanel.goBack()">戻る</button>
+                </div>
+                <!-- タブ切り替え -->
+                <div class="calibration-tabs" id="calibrationTabs">
+                    <button class="calibration-tab active" data-type="variation" onclick="CalibrationPanel.switchTab('variation')">提案チェック</button>
+                    <button class="calibration-tab" data-type="simple" onclick="CalibrationPanel.switchTab('simple')">正誤チェック</button>
+                </div>
+                <div class="calibration-table-wrapper" id="calibrationTableArea">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="calibrationModalCancelBtn">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="sim-textModal" class="modal-overlay">
+        <div style="background:white; padding:20px; border-radius:16px; width:320px; display:flex; flex-direction:column; gap:10px; box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+            <strong style="color:#333;">テキスト入力 (Sim)</strong>
+            <textarea id="sim-modalTextInput" rows="5" style="width:100%; resize:vertical; border:1px solid #ccc; padding:8px; border-radius:8px;" maxlength="50000"></textarea>
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button id="sim-modalCancelBtn">キャンセル</button>
+                <button id="sim-modalOkBtn" class="active">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 印刷設定モーダル -->
+    <div id="printModal" class="modal-overlay" tabindex="-1">
+        <div class="modal-content print-modal-content">
+            <div class="modal-header"><span>印刷設定</span></div>
+
+            <div class="print-settings">
+                <div class="print-setting-row">
+                    <label class="print-setting-label">プリンター:</label>
+                    <select id="printerSelect" class="print-select">
+                        <option value="">読み込み中...</option>
+                    </select>
+                </div>
+
+                <div class="print-setting-row">
+                    <label class="print-setting-label">部数:</label>
+                    <input type="number" id="printCopies" min="1" max="999" value="1" class="print-input-number">
+                </div>
+
+                <div class="print-setting-row">
+                    <label class="print-setting-label">ページ範囲:</label>
+                    <div class="print-page-range-options">
+                        <label class="print-radio-label"><input type="radio" name="pageRange" value="all" checked> すべて</label>
+                        <label class="print-radio-label"><input type="radio" name="pageRange" value="custom"> 指定:</label>
+                        <input type="text" id="customPageRange" placeholder="例: 1-3,5" class="print-input-text" disabled>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions print-modal-actions">
+                <button id="printModalCancelBtn">キャンセル</button>
+                <button id="printModalSystemBtn" class="print-system-btn">システムダイアログ</button>
+                <button id="printModalOkBtn" class="active">印刷</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 読み込みプログレスオーバーレイ（PDF読み込み・見開き変換共通） -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="loading-title" id="loadingTitle">読み込み中...</div>
+            <div class="loading-progress-container">
+                <div class="loading-progress-bar">
+                    <div class="loading-progress-fill" id="loadingProgressFill"></div>
+                </div>
+                <div class="loading-progress-text" id="loadingProgressText">0 / 0 ページ</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-container">
+
+        <div class="sidebar left" id="leftSidebar">
+            <div class="sidebar-header">
+                <button class="sidebar-toggle-btn" id="leftSidebarToggle" title="サイドバーを折り畳む">»</button>
+            </div>
+            <div class="sidebar-content">
+
+            <div id="ui-group-mojiq-left" class="ui-group">
+                <input type="file" id="imageInput" accept="image/*,.tif,.tiff,application/pdf,.pdf" style="display:none;">
+
+                <h3 style="margin: 0 0 8px 0;">カラー</h3>
+                <div class="color-grid" id="colorPalette">
+                    <button class="color-swatch" style="background-color: #000000;" data-color="#000000" title="黒"></button>
+                    <button class="color-swatch" style="background-color: #ff0000;" data-color="#ff0000" title="赤"></button>
+                    <button class="color-swatch" style="background-color: #0000ff;" data-color="#0000ff" title="青"></button>
+                    <button class="color-swatch" style="background-color: #ffff00;" data-color="#ffff00" title="マーカー黄"></button>
+                    <button id="rainbowColorSwatch" class="color-swatch" style="background-color: transparent; border: 2px dashed #ccc;" data-color="" title="カスタムカラー"></button>
+                </div>
+                <div id="rainbowPicker" style="
+                    width: 100%;
+                    height: 20px;
+                    margin: 8px 0;
+                    border-radius: 4px;
+                    cursor: crosshair;
+                    background: linear-gradient(to right,
+                        #ff0000, #ff8000, #ffff00, #80ff00,
+                        #00ff00, #00ff80, #00ffff, #0080ff,
+                        #0000ff, #8000ff, #ff00ff, #ff0080, #ff0000);
+                    border: 1px solid #ccc;
+                " title="クリックで色を選択"></div>
+                <input type="color" id="colorPicker" value="#ff0000" style="display:none;">
+
+                <!-- QA対策 #25,#26: 線幅の範囲制限 (1-20px) -->
+                <label>線の太さ <input type="number" id="lineWidthInput" min="1" max="20" step="0.5" value="3" style="width:50px; font-weight:bold; color:#1976d2; font-size:12px; text-align:center;">px</label>
+                <input type="range" id="lineWidth" min="1" max="20" step="0.5" value="3">
+
+                <label>背景透過度 <input type="number" id="bgOpacityInput" min="0" max="100" step="1" value="100" style="width:50px; font-weight:bold; color:#26c6da; font-size:12px; text-align:center;">%</label>
+                <input type="range" id="bgOpacitySlider" min="0" max="100" value="100" class="bg-opacity-sidebar-slider" disabled>
+
+                <!-- QA対策 #27,#28: フォントサイズの範囲制限 (1-500pt) -->
+                <label id="fontSizeLabel">文字サイズ (pt)</label>
+                <input type="number" id="fontSizeInput" min="1" max="500" value="12" style="font-weight:bold; font-size:14px;">
+
+
+                <div id="scaleDisplay" style="font-size:10px; color:#1976d2; margin-bottom:8px; margin-top:10px; text-align:left; font-weight:bold;">縮尺: 未設定</div>
+
+                <div id="sidebarToolButtons" style="display:flex; gap:8px; margin-bottom:10px;">
+                    <button id="calibrateBtn" class="sidebar-tool-btn" type="button" title="縮尺合わせ">
+                        <span class="sidebar-tool-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="5" width="18" height="10" rx="1.5"/><path d="M4 5v3"/><path d="M7 5v5"/><path d="M10 5v3"/><path d="M13 5v5"/><path d="M16 5v3"/></svg></span>
+                        <span class="sidebar-tool-label">縮尺合わせ</span>
+                    </button>
+                    <button id="gridBtn" class="sidebar-tool-btn" type="button" disabled title="先に「縮尺合わせ」を行ってください">
+                        <span class="sidebar-tool-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="16" height="16" rx="1"/><line x1="2" y1="7.33" x2="18" y2="7.33"/><line x1="2" y1="12.67" x2="18" y2="12.67"/><line x1="7.33" y1="2" x2="7.33" y2="18"/><line x1="12.67" y1="2" x2="12.67" y2="18"/></svg></span>
+                        <span class="sidebar-tool-label">写植グリッド</span>
+                    </button>
+                </div>
+
+                <div id="gridSettingsArea">
+                    <div style="font-size:11px; font-weight:bold; color:#2e7d32; margin-bottom:8px; border-bottom:1px solid #c5e1a5; padding-bottom:4px;">
+                        写植グリッド設定
+                    </div>
+                    <label>セリフサンプル</label>
+                    <textarea id="gridTextInput" placeholder="セリフを入れると文字数を自動計算" style="font-size:11px; height:45px;"></textarea>
+                    <div style="display:flex; gap:6px; margin-top:4px;">
+                        <button id="btnHorizontalMode" type="button" style="font-size:10px; padding:2px 8px; border:1px solid #81c784; border-radius:4px; background:#fff; color:#2e7d32; cursor:pointer;">横方向</button>
+                        <button id="btnClearText" type="button" style="font-size:10px; padding:2px 8px; border:1px solid #e57373; border-radius:4px; background:#fff; color:#c62828; cursor:pointer;">削除</button>
+                    </div>
+
+                    <!-- 行数・文字数入力は非表示（機能は維持、テキストから自動計算） -->
+                    <div class="grid-inputs-container" style="display: none;">
+                        <div class="grid-input-group"><label>行数</label><input type="number" id="gridLinesInput" value="1" min="1"></div>
+                        <div class="grid-input-group"><label>文字数</label><input type="number" id="gridCharsInput" value="1" min="1"></div>
+                    </div>
+
+                    <!-- 余白設定（UIは非表示だが機能は維持） -->
+                    <select id="densitySelect" style="display: none;">
+                        <option value="loose">余白ゆったり</option>
+                        <option value="standard" selected>標準</option>
+                        <option value="tight">文字大きめ</option>
+                        <option value="none">余白なし</option>
+                    </select>
+
+                    <!-- adjustMessage: グリッド調整時に表示 -->
+                    <div id="adjustMessage">
+                        <span class="adjust-label">サイズ</span>
+                        <span class="adjust-value" id="monPt">-</span>
+                        <span class="adjust-unit">pt</span>
+                    </div>
+                </div>
+
+                <!-- 文字サイズUIは非表示、機能は維持 -->
+                <input type="number" id="sim-fontSizeInput" value="16" min="1" max="200" step="0.1" style="display:none;">
+
+            </div>
+
+            </div><!-- .sidebar-content -->
+            <!-- ページバー表示/非表示ボタン -->
+            <div class="sidebar-bottom-actions">
+                <button id="navBarToggleBtn" class="sidebar-bottom-btn" title="ページバーを隠す">
+                    <svg class="nav-toggle-hide" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    <svg class="nav-toggle-show" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                        <path d="M1 1l22 22"/>
+                        <path d="M10.59 10.59a3 3 0 1 0 4.24 4.24"/>
+                    </svg>
+                </button>
+                <!-- コメントテキスト表示/非表示ボタン -->
+                <button id="textLayerBtn" class="sidebar-bottom-btn pdf-required" title="コメントテキスト非表示 (Ctrl+T)" disabled>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <!-- 角丸四角形 -->
+                        <rect x="3" y="3" width="18" height="18" rx="3" ry="3"/>
+                        <!-- Tの文字 -->
+                        <path d="M8 8h8"/>
+                        <path d="M12 8v9"/>
+                        <!-- 斜線（非表示時のみ表示） -->
+                        <path id="textLayerSlash" d="M4 4L20 20" style="display: none;"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- 描画ツール縦バー（校正・指示モード用） -->
+        <div class="tool-bar-vertical" id="toolBarVertical">
+            <div class="toolbar-header">
+                <button class="toolbar-toggle-btn" id="toolbarToggle" title="ツールバーを折り畳む">«</button>
+            </div>
+            <div class="toolbar-content">
+            <button id="selectBtn" class="tool-btn-icon" title="選択 (V)"><span class="tool-icon"><svg width="16" height="16" viewBox="0 -1 16 17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1v14"/><path d="M1 8h14"/><path d="M8 1l-2 2"/><path d="M8 1l2 2"/><path d="M8 15l-2-2"/><path d="M8 15l2-2"/><path d="M1 8l2-2"/><path d="M1 8l2 2"/><path d="M15 8l-2-2"/><path d="M15 8l-2 2"/></svg></span></button>
+            <button id="drawBtn" class="tool-btn-icon" title="ペン (P)"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><!-- ペン本体（斜め） --><path d="M17 3 L21 7 L8 20 L4 20 L4 16 Z"/><!-- 区切り線1 --><line x1="14" y1="6" x2="18" y2="10"/><!-- 区切り線2 --><line x1="8" y1="12" x2="12" y2="16"/></svg></span></button>
+            <button id="markerBtn" class="tool-btn-icon" title="マーカー (M)"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(45 12 12) translate(0 2)"><!-- ペン本体 --><rect x="9" y="3" width="6" height="13" rx="1.5"/><!-- ペン先 --><path d="M9 16 L12 21 L15 16"/><!-- 上キャップ --><rect x="9" y="1" width="6" height="3" rx="1"/><!-- キャップ装飾 --><line x1="9" y1="2.5" x2="15" y2="2.5" stroke-width="1"/></g></svg></span></button>
+            <button id="eraserBtn" class="tool-btn-icon" title="消しゴム (E)"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 15h8"/><path d="M3 11l4 4 8-8-4-4z"/><path d="M6 8l4 4"/></svg></span></button>
+            <button id="eyedropperBtn" class="tool-btn-icon" title="スポイト (I)"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><!-- 注射器アイコン --><path d="M19 3l2 2-1 1-2-2"/><path d="M17 5l-10 10-2 4 4-2 10-10"/><path d="M11 9l4 4"/><path d="M9 11l4 4"/><path d="M5 19l-2 2"/></svg></span></button>
+            <button id="handBtn" class="tool-btn-icon" title="移動"><span class="tool-icon"><svg width="22" height="22" viewBox="2 -3 30 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><!-- 手のひら（開いた手）アイコン 左右反転 --><g transform="translate(30, 0) scale(-1, 1)"><path d="M9 15 V8 a1.5 1.5 0 0 1 3 0 V14 M12 14 V6 a1.5 1.5 0 0 1 3 0 V14 M15 14 V7 a1.5 1.5 0 0 1 3 0 V14 M18 14 V9 a1.5 1.5 0 0 1 3 0 V17 C21 23 18 27 13.5 27 C9 27 6 24 5.5 20 L4 14 a1.5 1.5 0 0 1 2.5-1.5 L9 15 Z"/></g></svg></span></button>
+            <button id="rectBtn" class="tool-btn-icon" title="枠線"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="12" height="12" rx="1"/></svg></span></button>
+            <button id="rectAnnotatedBtn" class="tool-btn-icon tool-btn-annotated" title="枠線+テキスト指示"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="12" height="12" rx="1"/></svg></span><span class="annotated-badge">指</span></button>
+            <button id="ellipseBtn" class="tool-btn-icon" title="楕円"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="9" cy="9" rx="6" ry="6"/></svg></span></button>
+            <button id="ellipseAnnotatedBtn" class="tool-btn-icon tool-btn-annotated" title="楕円+テキスト指示"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="9" cy="9" rx="6" ry="6"/></svg></span><span class="annotated-badge">指</span></button>
+            <button id="chevronBtn" class="tool-btn-icon" title="アキ"><span class="tool-icon">＜</span></button>
+            <button id="lshapeBtn" class="tool-btn-icon" title="行移動"><span class="tool-icon">∟</span></button>
+            <button id="zshapeBtn" class="tool-btn-icon" title="改行"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2 L4 9 L14 9 L14 16"/></svg></span></button>
+            <button id="bracketBtn" class="tool-btn-icon" title="全体移動"><span class="tool-icon">⊐</span></button>
+            <button id="lineBtn" class="tool-btn-icon" title="直線"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="15" x2="15" y2="3"/></svg></span></button>
+            <button id="lineAnnotatedBtn" class="tool-btn-icon tool-btn-annotated" title="直線+テキスト指示"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="15" x2="15" y2="3"/></svg></span><span class="annotated-badge">指</span></button>
+            <button id="arrowBtn" class="tool-btn-icon" title="矢印"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 9H3"/><path d="M7 5L3 9L7 13"/></svg></span></button>
+            <button id="doubleArrowBtn" class="tool-btn-icon" title="両矢印"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 9H3"/><path d="M7 5L3 9L7 13"/><path d="M11 5L15 9L11 13"/></svg></span></button>
+            <button id="polylineBtn" class="tool-btn-icon" title="折れ線"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2 L4 9 L14 9"/><path d="M14 9 L4 16"/></svg></span></button>
+            <button id="textBtn" class="tool-btn-icon" title="テキスト"><span class="tool-icon">Aa</span></button>
+            <button id="imgInsertBtn" class="tool-btn-icon" title="画像"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="14" height="12" rx="1"/><circle cx="6" cy="7" r="1.5"/><path d="M16 12l-4-4-6 6"/></svg></span></button>
+            </div>
+        </div>
+
+        <div class="shared-canvas-area" id="sharedCanvasArea">
+
+            <div id="canvas-wrapper">
+                <canvas id="layer-pdf-bg" class="canvas-layer"></canvas>
+
+                <canvas id="whiteboard" class="canvas-layer"></canvas>
+
+                <canvas id="sim-whiteboard" class="canvas-layer"></canvas>
+            </div>
+
+            <div id="sizeTooltip"></div>
+            <div id="calibrationGuide">
+                <span class="calib-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M2 12h20"/><path d="M6 8v8"/><path d="M10 10v4"/><path d="M14 10v4"/><path d="M18 8v8"/></svg>計測モード</span>
+                <span>画面上の長さが分かっている場所をドラッグして直線を引いてください</span>
+            </div>
+
+            <div id="initialMessage">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 16px; opacity: 0.9;">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <path d="M12 18v-6"/>
+                    <path d="M9 15l3-3 3 3"/>
+                </svg>
+                <br>
+                <b>PDF/JPEGを読み込んで下さい</b><br><span>(ドラッグ＆ドロップ可・複数選択対応)</span>
+            </div>
+
+            <div class="bottom-nav-bar" id="bottomNavBar" style="display:none;">
+                <div class="slider-container">
+                    <!-- ページ番号バブル（ボタン/スクロール/キー操作時に表示） -->
+                    <span id="sliderBubble" class="slider-bubble">1</span>
+                    <input type="range" id="pageSlider" min="1" max="1" value="1" step="1" dir="rtl">
+                </div>
+                <!-- ナビゲーションボタンを右端に配置 -->
+                <div class="nav-buttons">
+                    <button id="navPrevBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+                    <button id="navNextBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="sidebar right" id="rightSidebar">
+            <div class="sidebar-header">
+                <button class="sidebar-toggle-btn" id="rightSidebarToggle" title="サイドバーを折り畳む">«</button>
+            </div>
+            <div class="sidebar-content">
+
+            <div id="ui-group-mojiq-right" class="ui-group">
+<!-- ページ編集用の非表示要素（イベントハンドラ用） -->
+<input type="file" id="insertPdfUpload" accept="application/pdf,image/jpeg,.jpg,.jpeg" multiple style="display:none;">
+
+<div id="proofreading-instruction-area">
+    <button id="proofreadingInstructionToggleBtn" class="proofreading-instruction-toggle-btn">
+        <span class="toggle-label">校正ツール</span>
+        <span id="selectedProofreadingDisplay" class="selected-proofreading-display"></span>
+        <span class="toggle-arrow"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+    </button>
+    <div class="proofreading-instruction-dropdown">
+        <!-- 指示スタンプセクション -->
+        <div class="proofreading-section">
+            <div class="proofreading-section-label">校正指示ツール</div>
+            <div class="instruction-stamp-scroll">
+                <div class="instruction-stamp-buttons">
+                    <button id="toruStampBtn" class="stamp-btn" title="トルスタンプ">トル</button>
+                    <button id="torutsumeStampBtn" class="stamp-btn" title="トルツメスタンプ">トル<br>ツメ</button>
+                    <button id="torumamaStampBtn" class="stamp-btn" title="トルママスタンプ">トル<br>ママ</button>
+                    <button id="zenkakuakiStampBtn" class="stamp-btn" title="全角アキスタンプ">全角<br>アキ</button>
+                    <button id="nibunakiStampBtn" class="stamp-btn" title="半角アキスタンプ">半角<br>アキ</button>
+                    <button id="kaigyouStampBtn" class="stamp-btn" title="改行スタンプ">改行</button>
+                    <button id="tojiruStampBtn" class="stamp-btn" title="とじるスタンプ">とじる</button>
+                    <button id="hirakuStampBtn" class="stamp-btn" title="ひらくスタンプ">ひらく</button>
+                    <button id="labeledRectBtn" class="stamp-btn" title="小文字指定">小文字<br>指定</button>
+                    <button id="doubleArrowAnnotatedBtn" class="stamp-btn" title="字間指示入れ">字間<br>指示</button>
+                </div>
+            </div>
+        </div>
+        <!-- 写植指示スタンプセクション -->
+        <div class="proofreading-section">
+            <div class="proofreading-section-label">写植指示スタンプ</div>
+            <div class="instruction-stamp-scroll">
+                <div class="instruction-stamp-buttons shashoku-stamp-buttons">
+                    <button id="doneStampBtn" class="stamp-btn" title="済スタンプ">済</button>
+                    <button id="rubyStampBtn" class="stamp-btn" title="ルビスタンプ">ルビ</button>
+                </div>
+            </div>
+        </div>
+        <!-- 校正記号ツールセクション -->
+        <div class="proofreading-section">
+            <div class="proofreading-section-label">校正記号ツール</div>
+            <div class="proofreading-symbol-scroll">
+                <div class="proofreading-symbol-buttons">
+                    <button id="rectSymbolStampBtn" class="symbol-btn" title="全角アキ"><span class="symbol-icon">□</span><span class="symbol-label">全角アキ</span></button>
+                    <button id="triangleSymbolStampBtn" class="symbol-btn" title="半角アキ"><span class="symbol-icon">△</span><span class="symbol-label">半角アキ</span></button>
+                    <button id="chevronBtnSidebar" class="symbol-btn" title="アキ"><span class="symbol-icon">＜</span><span class="symbol-label">アキ</span></button>
+                    <button id="lshapeBtnSidebar" class="symbol-btn" title="行移動"><span class="symbol-icon">∟</span><span class="symbol-label">行移動</span></button>
+                    <button id="zshapeBtnSidebar" class="symbol-btn" title="改行"><span class="symbol-icon"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2 L4 9 L14 9 L14 16"/></svg></span><span class="symbol-label">改行</span></button>
+                    <button id="bracketBtnSidebar" class="symbol-btn" title="全体移動"><span class="symbol-icon">⊐</span><span class="symbol-label">全体移動</span></button>
+                    <button id="semicircleBtnSidebar" class="symbol-btn" title="半円"><span class="symbol-icon">◠</span><span class="symbol-label">半円</span></button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="locked-tools-area">
+    <input type="checkbox" id="useLeaderLine" checked style="display:none;">
+    <div id="stampContainer"></div>
+    <div class="add-font-row">
+        <button id="gdriveJsonBrowserBtn"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5a1 1 0 011-1h4l2 2h6a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1V5z"/></svg> 作品仕様を読み込み</button>
+        <button id="calibrationToggleBtn" class="calibration-toggle-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><polyline points="3,6 4,7 6,5"/><polyline points="3,12 4,13 6,11"/><polyline points="3,18 4,19 6,17"/></svg> 校正チェック</button>
+    </div>
+</div>
+            </div>
+
+<!-- 校正モード専用パネル -->
+<div id="proofreadingPanel" class="proofreading-panel" style="display:none;">
+    <!-- パネルヘッダー（折りたたみボタン） -->
+    <div class="proofreading-panel-header">
+        <button class="sidebar-toggle-btn" id="proofreadingPanelToggle" title="パネルを折りたたむ">«</button>
+    </div>
+    <!-- パネルコンテンツ -->
+    <div class="proofreading-panel-content">
+        <!-- カラーセクション（2列レイアウト） -->
+        <div class="proofreading-color-section">
+            <!-- カラー列 -->
+            <div class="proofreading-color-column">
+                <h3 class="proofreading-section-title">カラー</h3>
+                <div class="proofreading-color-grid">
+                    <button class="color-swatch proofreading-color active" style="background-color: #ff0000;" data-color="#ff0000" title="赤"></button>
+                    <button class="color-swatch proofreading-color" style="background-color: #0000ff;" data-color="#0000ff" title="青"></button>
+                    <button id="proofCustomColorSwatch" class="color-swatch proofreading-color custom-color" style="background-color: transparent; border: 2px dashed #ccc;" title="カスタムカラー"></button>
+                    <button id="proofEyedropperBtn" class="proofreading-eyedropper-btn" title="スポイト">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px;">
+                            <path d="M19 3l2 2-1 1-2-2"/><path d="M17 5l-10 10-2 4 4-2 10-10"/><path d="M11 9l4 4"/><path d="M9 11l4 4"/><path d="M5 19l-2 2"/>
+                        </svg>
+                    </button>
+                </div>
+                <input type="color" id="proofColorPicker" value="#ff0000" style="display:none;">
+                <div id="proofRainbowPicker" class="proofreading-rainbow-picker" title="クリックで色を選択"></div>
+            </div>
+            <!-- 線の太さ列 -->
+            <div class="proofreading-linewidth-column">
+                <h3 class="proofreading-section-title">線の太さ</h3>
+                <div class="proofreading-line-width">
+                    <label><input type="number" id="proofLineWidthInput" min="1" max="20" step="0.5" value="3" class="proofreading-line-width-input">px</label>
+                    <input type="range" id="proofLineWidthSlider" min="1" max="20" step="0.5" value="3" class="proofreading-line-width-slider">
+                </div>
+            </div>
+        </div>
+
+        <!-- チェックセクションラッパー -->
+        <div class="proofreading-checks-wrapper">
+            <!-- 正誤チェックセクション -->
+            <div class="proofreading-check-section correctness-section">
+                <div class="proofreading-check-header correctness-header">
+                    <span class="proofreading-check-title">正誤チェック</span>
+                </div>
+                <div class="proofreading-check-content" id="correctnessContent">
+                    <div class="proofreading-check-empty">データがありません</div>
+                </div>
+            </div>
+
+            <!-- 提案チェックセクション -->
+            <div class="proofreading-check-section proposal-section">
+                <div class="proofreading-check-header proposal-header">
+                    <span class="proofreading-check-title">提案チェック</span>
+                </div>
+                <div class="proofreading-check-content" id="proposalContent">
+                    <div class="proofreading-check-empty">データがありません</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 作業履歴機能 -->
+<div id="history-area" class="history-area">
+    <button id="historyToggleBtn" class="history-toggle-btn">
+        <span class="toggle-label">作業履歴</span>
+        <span class="toggle-arrow">◀</span>
+    </button>
+    <div id="historyDropdown" class="history-dropdown">
+        <div class="history-list" id="historyList">
+            <!-- 履歴アイテムが動的に生成される -->
+        </div>
+        <div class="history-footer">
+            <button id="historyClearBtn" class="history-clear-btn">履歴をクリア</button>
+        </div>
+    </div>
+</div>
+
+<!-- メモ機能 -->
+<div id="memo-area" class="memo-area">
+    <button id="memoToggleBtn" class="memo-toggle-btn">
+        <span class="toggle-label">メモ</span>
+        <span class="toggle-arrow">&#x25BC;</span>
+    </button>
+    <div id="memoDropdown" class="memo-dropdown">
+        <textarea id="memoTextarea" class="memo-textarea" placeholder="メモを入力..." rows="12"></textarea>
+        <div class="memo-footer">
+            <button id="memoClearBtn" class="memo-clear-btn" title="メモを削除">削除</button>
+        </div>
+    </div>
+</div>
+
+            </div><!-- .sidebar-content -->
+        </div>
+    </div>
+
+    <script>
+        // 統合モード - シミュレーター機能は指示入れUIに統合されました
+        // sim-whiteboardは両キャンバスで操作可能
+        function initIntegratedMode() {
+            // whiteboardのみ操作可能に（sim-whiteboardは描画専用なのでpointer-events: noneのまま）
+            const whiteboard = document.getElementById('whiteboard');
+            const simWhiteboard = document.getElementById('sim-whiteboard');
+            if (whiteboard) whiteboard.style.pointerEvents = 'auto';
+            if (simWhiteboard) {
+                // sim-whiteboardはwhiteboardの上にあるため、pointer-events: noneのままにする
+                // autoにするとwhiteboardへのクリックがブロックされる
+                simWhiteboard.style.pointerEvents = 'none';
+                simWhiteboard.style.opacity = '1.0';
+            }
+
+            // bodyクラスは常にmode-mojiq
+            document.body.classList.add('mode-mojiq');
+
+            // UIグループのhiddenクラスを外す（統合モードでは常に表示）
+            const mojiqLeft = document.getElementById('ui-group-mojiq-left');
+            const mojiqRight = document.getElementById('ui-group-mojiq-right');
+            if (mojiqLeft) mojiqLeft.classList.remove('hidden');
+            if (mojiqRight) mojiqRight.classList.remove('hidden');
+        }
+    </script>
+    <!-- Electron ブリッジ（最初に読み込み） -->
+    <script src="js/electron-bridge.js" defer></script>
+    <!-- コア基盤モジュール（他のモジュールより先に読み込み） -->
+    <script src="js/core/dom-cache.js" defer></script>
+    <script src="js/core/clone.js" defer></script>
+    <script src="js/core/event-bus.js" defer></script>
+    <script src="js/core/store.js" defer></script>
+    <script src="js/core/render-manager.js" defer></script>
+    <script src="js/core/legacy-bridge.js" defer></script>
+    <script src="js/core/module-registry.js" defer></script>
+    <script src="js/lock.js" defer></script>
+    <!-- 型定義・定数・ユーティリティ（他のモジュールより先に読み込み） -->
+    <script src="js/types.js" defer></script>
+    <script src="js/constants.js" defer></script>
+    <script src="js/utils.js" defer></script>
+    <!-- MojiQ モジュール群 -->
+    <script src="js/canvas-context.js" defer></script>
+    <script src="js/navigation.js" defer></script>
+    <script src="js/zoom.js" defer></script>
+    <script src="js/viewer-mode.js" defer></script>
+    <script src="js/mode-controller.js" defer></script>
+    <script src="js/modal.js" defer></script>
+    <script src="js/stamps.js" defer></script>
+    <script src="js/json-folder-browser.js" defer></script>
+    <!-- 描画オブジェクト管理（drawing.jsより前に読み込み） -->
+    <script src="js/drawing-objects.js" defer></script>
+    <script src="js/drawing-renderer.js" defer></script>
+    <script src="js/drawing-select.js" defer></script>
+    <script src="js/drawing-modes.js" defer></script>
+    <script src="js/drawing.js" defer></script>
+    <!-- PDF保存モジュール（pdf-managerより前に読み込み） -->
+    <script src="js/pdf-lib-saver.js" defer></script>
+    <!-- PDFサブモジュール（pdf-managerより前に読み込み） -->
+    <script src="js/pdf/pdf-utils.js" defer></script>
+    <script src="js/pdf/pdf-compress.js" defer></script>
+    <script src="js/pdf/pdf-cache.js" defer></script>
+    <script src="js/pdf/pdf-spread-state.js" defer></script>
+    <script src="js/text-layer-manager.js" defer></script>
+    <script src="js/pdf-manager.js" defer></script>
+    <script src="js/print-manager.js" defer></script>
+    <script src="js/page-manager.js" defer></script>
+    <!-- UIサブモジュール（script.jsより前に読み込み） -->
+    <script src="js/ui/dropdown-positioner.js" defer></script>
+    <script src="js/ui/proofreading-ui.js" defer></script>
+    <script src="js/ui/history-panel.js" defer></script>
+    <script src="js/ui/calibration-panel.js" defer></script>
+    <script src="js/ui/proofreading-panel.js" defer></script>
+    <!-- メインエントリーポイント -->
+    <script src="js/script.js" defer></script>
+    <!-- Simulator モジュール群 -->
+    <script src="js/simulator/state.js" defer></script>
+    <script src="js/simulator/dom-elements.js" defer></script>
+    <script src="js/simulator/grid-drawing.js" defer></script>
+    <script src="js/simulator/zoom.js" defer></script>
+    <script src="js/simulator/event-handlers.js" defer></script>
+    <script src="js/simulator/tools.js" defer></script>
+    <script src="js/simulator/undo-redo.js" defer></script>
+    <script src="js/simulator/ui-update.js" defer></script>
+    <script src="js/simulator/keyboard.js" defer></script>
+    <script src="js/simulator/index.js" defer></script>
+    <script src="js/shortcuts.js" defer></script>
+    <!-- 設定モジュール -->
+    <script src="js/settings.js" defer></script>
+    <script src="js/settings-ui.js" defer></script>
+
+    <!-- 設定モーダル -->
+    <div id="settingsModal" class="modal-overlay" tabindex="-1" style="display: none;">
+        <div class="modal-content settings-modal-content">
+            <div class="modal-header">
+                <span>環境設定</span>
+            </div>
+
+            <!-- タブナビゲーション -->
+            <div class="settings-tabs">
+                <button class="settings-tab active" data-tab="shortcuts">ショートカット</button>
+                <button class="settings-tab" data-tab="scroll">スクロール</button>
+                <button class="settings-tab" data-tab="arrowKey">方向キー</button>
+                <button class="settings-tab" data-tab="panel">パネル動作</button>
+            </div>
+
+            <!-- ショートカット設定タブ -->
+            <div class="settings-tab-content active" id="settingsShortcutsTab">
+                <div class="settings-section">
+                    <div class="settings-section-header">
+                        <span>ショートカットキー</span>
+                        <button id="resetShortcutsBtn" class="settings-reset-btn">デフォルトに戻す</button>
+                    </div>
+                    <div class="shortcut-list" id="shortcutList">
+                        <!-- 動的に生成 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- スクロール設定タブ -->
+            <div class="settings-tab-content" id="settingsScrollTab">
+                <div class="settings-section">
+                    <div class="settings-section-header">
+                        <span>マウススクロール</span>
+                    </div>
+                    <div class="scroll-direction-options">
+                        <label class="scroll-option" id="scrollOptionNormal">
+                            <input type="radio" name="scrollDirection" value="normal" checked>
+                            <span class="scroll-option-label">
+                                <span class="scroll-option-title">通常</span>
+                                <span class="scroll-option-desc">スクロール上で前ページ、下で次ページ</span>
+                            </span>
+                        </label>
+                        <label class="scroll-option" id="scrollOptionInverted">
+                            <input type="radio" name="scrollDirection" value="inverted">
+                            <span class="scroll-option-label">
+                                <span class="scroll-option-title">反転</span>
+                                <span class="scroll-option-desc">スクロール上で次ページ、下で前ページ</span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 方向キー設定タブ -->
+            <div class="settings-tab-content" id="settingsArrowKeyTab">
+                <div class="settings-section">
+                    <div class="settings-section-header">
+                        <span>方向キーのページ送り</span>
+                    </div>
+                    <div class="scroll-direction-options">
+                        <label class="scroll-option" id="arrowKeyOptionNormal">
+                            <input type="radio" name="arrowKeyDirection" value="normal" checked>
+                            <span class="scroll-option-label">
+                                <span class="scroll-option-title">通常</span>
+                                <span class="scroll-option-desc">←キーで次ページ、→キーで前ページ（左綴じ時: →で次、←で前）</span>
+                            </span>
+                        </label>
+                        <label class="scroll-option" id="arrowKeyOptionInverted">
+                            <input type="radio" name="arrowKeyDirection" value="inverted">
+                            <span class="scroll-option-label">
+                                <span class="scroll-option-title">反転</span>
+                                <span class="scroll-option-desc">→キーで次ページ、←キーで前ページ（左綴じ時: ←で次、→で前）</span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- パネル動作設定タブ -->
+            <div class="settings-tab-content" id="settingsPanelTab">
+                <div class="settings-section">
+                    <div class="settings-section-header">
+                        <span>パネルの開閉動作</span>
+                    </div>
+                    <p class="settings-section-description">校正ツール、文字サイズ、フォント指定パネルの動作を設定します。</p>
+                    <div class="scroll-direction-options">
+                        <label class="scroll-option" id="panelOptionKeepOpen">
+                            <input type="radio" name="panelBehavior" value="keepOpen" checked>
+                            <span class="scroll-option-label">
+                                <span class="scroll-option-title">パネルの展開を維持</span>
+                                <span class="scroll-option-desc">ボタンを選択してもパネルは開いたままになります</span>
+                            </span>
+                        </label>
+                        <label class="scroll-option" id="panelOptionCloseOnSelect">
+                            <input type="radio" name="panelBehavior" value="closeOnSelect">
+                            <span class="scroll-option-label">
+                                <span class="scroll-option-title">選択すると閉じる</span>
+                                <span class="scroll-option-desc">ボタンを選択するとパネルが自動的に閉じます</span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button id="settingsModalOkBtn" class="active">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- キーキャプチャモーダル -->
+    <div id="keyCaptureModal" class="modal-overlay" tabindex="-1" style="display: none;">
+        <div class="modal-content key-capture-modal-content">
+            <div class="modal-header">
+                <span id="keyCaptureTitle">ショートカットを入力</span>
+            </div>
+            <div class="key-capture-display waiting" id="keyCaptureDisplay">
+                キーを押してください...
+            </div>
+            <div class="key-capture-hint">
+                Escでキャンセル / Backspaceでクリア
+            </div>
+            <div id="keyCaptureConflict" class="key-capture-conflict" style="display: none;">
+                <!-- 衝突警告 -->
+            </div>
+            <div class="modal-actions">
+                <button id="keyCaptureCancelBtn">キャンセル</button>
+                <button id="keyCaptureOkBtn" class="active" disabled>設定</button>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

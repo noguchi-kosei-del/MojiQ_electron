@@ -1,0 +1,83 @@
+/* ========================================= */
+/* base.css - 基本設定 & リセット */
+/* ========================================= */
+
+body {
+    font-family: "Noto Sans JP","Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+    margin: 0; padding: 0;
+    background-color: #f0f0f0;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    touch-action: none;
+    overscroll-behavior: none;
+}
+
+input, button, textarea, select {
+    font-family: "Noto Sans JP", sans-serif;
+}
+
+/* ロック時の共通スタイル（両サイドバー・縦ツールバーをロック） */
+body.app-locked .sidebar.left,
+body.app-locked .sidebar.right,
+body.app-locked .tool-bar-vertical,
+body.app-locked .sim-tool-bar
+{
+    opacity: 0.4 !important;
+    pointer-events: none !important;
+    filter: grayscale(100%) !important;
+    transition: all 0.5s ease;
+}
+
+/* ロック解除時のトランジション設定 */
+body:not(.app-locked) .sidebar.left,
+body:not(.app-locked) .sidebar.right,
+body:not(.app-locked) .tool-bar-vertical,
+body:not(.app-locked) .sim-tool-bar
+{
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    filter: grayscale(0%) !important;
+}
+
+/* 初回起動時の完全非表示状態（PDF/JPEG読み込み前） */
+body.app-pre-load .sidebar.left,
+body.app-pre-load .sidebar.right,
+body.app-pre-load .tool-bar-vertical,
+body.app-pre-load .sim-tool-bar {
+    display: none !important;
+}
+
+/* 読み込み後の表示アニメーション */
+@keyframes fadeInSidebar {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+body:not(.app-pre-load) .sidebar.left,
+body:not(.app-pre-load) .sidebar.right,
+body:not(.app-pre-load) .tool-bar-vertical,
+body:not(.app-pre-load) .sim-tool-bar {
+    animation: fadeInSidebar 0.3s ease;
+}
+
+/* リセット時のフェードアウト（transitionで実現） */
+body.app-resetting .sidebar.left,
+body.app-resetting .sidebar.right,
+body.app-resetting .tool-bar-vertical,
+body.app-resetting .sim-tool-bar {
+    opacity: 0 !important;
+    transition: opacity 0.3s ease !important;
+    pointer-events: none !important;
+}
+
+/* UIグループ表示制御 */
+.ui-group.hidden {
+    display: none !important;
+}
+
+.ui-group.ui-disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
