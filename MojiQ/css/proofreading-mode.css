@@ -744,22 +744,85 @@ body.dark-mode .proofreading-icon-btn.active:hover {
    ヘッダーボタンのスタイル
    ===================================================== */
 
-/* モード切替ボタンのアイコン */
-#proofreadingModeBtn .mode-icon {
-    display: block;
+/* モード切替トグルコンテナ */
+.mode-toggle-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #999;
+    border-radius: 14px;
+    padding: 3px;
+    gap: 2px;
 }
 
-#proofreadingModeBtn .proofreading-mode-icon {
-    display: none;
+/* モード切替ボタン共通 */
+.mode-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 22px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0;
+    margin: 0;
 }
 
-/* 校正モードボタンのアクティブ状態（校正モード時） - アイコン切替のみ */
-#proofreadingModeBtn.active .instruction-mode-icon {
-    display: none !important;
+.mode-toggle-btn svg {
+    transition: stroke 0.2s ease;
 }
 
-#proofreadingModeBtn.active .proofreading-mode-icon {
-    display: block !important;
+/* 非アクティブ状態 */
+.mode-toggle-btn:not(.active) {
+    background: transparent;
+}
+
+.mode-toggle-btn:not(.active) svg {
+    stroke: #fff;
+}
+
+.mode-toggle-btn:not(.active):hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* アクティブ状態（選択中のモード） */
+.mode-toggle-btn.active {
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.mode-toggle-btn.active svg {
+    stroke: #333;
+}
+
+/* ハンバーガーメニュー展開時のロック状態 */
+.mode-toggle-container.menu-locked {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+/* ダークモード対応 */
+body.dark-mode .mode-toggle-container {
+    background: #555;
+}
+
+body.dark-mode .mode-toggle-btn:not(.active) svg {
+    stroke: #ddd;
+}
+
+body.dark-mode .mode-toggle-btn:not(.active):hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .mode-toggle-btn.active {
+    background: #2a2a2a;
+}
+
+body.dark-mode .mode-toggle-btn.active svg {
+    stroke: #e0e0e0;
 }
 
 /* =====================================================
@@ -822,6 +885,19 @@ body.proofreading-mode .header-spec-btn.mode-disabled svg {
     stroke: #999 !important;
 }
 
+/* ハンバーガーメニュー展開時のロック状態 */
+.header-spec-btn.menu-locked,
+.header-calibration-btn.menu-locked {
+    opacity: 0.3;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.header-spec-btn.menu-locked svg,
+.header-calibration-btn.menu-locked svg {
+    stroke: #999 !important;
+}
+
 /* 元の位置のボタンを非表示（サイドバー内） */
 #locked-tools-area .add-font-row #gdriveJsonBrowserBtn,
 #locked-tools-area .add-font-row #calibrationToggleBtn {
@@ -854,6 +930,12 @@ body.dark-mode .header-calibration-btn:disabled svg {
 /* ダークモード mode-disabled状態 */
 body.dark-mode .header-spec-btn.mode-disabled svg,
 body.dark-mode .header-calibration-btn.mode-disabled svg {
+    stroke: #555 !important;
+}
+
+/* ダークモード menu-locked状態（ハンバーガーメニュー展開時） */
+body.dark-mode .header-spec-btn.menu-locked svg,
+body.dark-mode .header-calibration-btn.menu-locked svg {
     stroke: #555 !important;
 }
 

@@ -9,6 +9,9 @@ function toggleProofreadingMode() {
     const enabled = !MojiQStore.get('proofreadingMode.enabled');
     MojiQStore.set('proofreadingMode.enabled', enabled);
 
+    // localStorageに保存（次回起動時に復元用）
+    localStorage.setItem('mojiq_proofreading_mode', enabled ? 'true' : 'false');
+
     if (enabled) {
         enterProofreadingMode();
     } else {
@@ -20,24 +23,23 @@ function toggleProofreadingMode() {
     if (menuCheck) {
         menuCheck.style.display = enabled ? 'inline' : 'none';
     }
+}
 
-    // ヘッダーボタンのアクティブ状態更新とアイコン切替
-    const headerBtn = document.getElementById('proofreadingModeBtn');
-    if (headerBtn) {
-        headerBtn.classList.toggle('active', enabled);
-        // アイコン切替
-        const instructionIcon = headerBtn.querySelector('.instruction-mode-icon');
-        const proofreadingIcon = headerBtn.querySelector('.proofreading-mode-icon');
-        if (instructionIcon && proofreadingIcon) {
-            if (enabled) {
-                instructionIcon.style.display = 'none';
-                proofreadingIcon.style.display = 'block';
-                headerBtn.title = '校正チェックモード';
-            } else {
-                instructionIcon.style.display = 'block';
-                proofreadingIcon.style.display = 'none';
-                headerBtn.title = '指示入れモード';
-            }
+/**
+ * 保存されたモード状態を復元
+ */
+function restoreProofreadingMode() {
+    const saved = localStorage.getItem('mojiq_proofreading_mode');
+    if (saved === 'true') {
+        if (window.MojiQStore) {
+            MojiQStore.set('proofreadingMode.enabled', true);
+        }
+        enterProofreadingMode();
+
+        // メニューのチェックマーク更新
+        const menuCheck = document.getElementById('proofreadingModeCheck');
+        if (menuCheck) {
+            menuCheck.style.display = 'inline';
         }
     }
 }
@@ -69,6 +71,12 @@ function enterProofreadingMode() {
 
     // ヘッダーボタンのグレーアウト切替
     updateHeaderButtonModeState(true);
+
+    // モード切替トグルボタンの状態更新
+    const instructionBtn = document.getElementById('instructionModeBtn');
+    const proofBtn = document.getElementById('proofreadingModeBtn');
+    if (instructionBtn) instructionBtn.classList.remove('active');
+    if (proofBtn) proofBtn.classList.add('active');
 }
 
 /**
@@ -137,6 +145,12 @@ function exitProofreadingMode() {
 
     // ヘッダーボタンのグレーアウト切替
     updateHeaderButtonModeState(false);
+
+    // モード切替トグルボタンの状態更新
+    const instructionBtn = document.getElementById('instructionModeBtn');
+    const proofBtn = document.getElementById('proofreadingModeBtn');
+    if (instructionBtn) instructionBtn.classList.add('active');
+    if (proofBtn) proofBtn.classList.remove('active');
 }
 
 /**
@@ -207,10 +221,28 @@ function initWindowControlsAndMenuBar() {
         }
     }
 
-    // --- 校正モードボタン ---
+    // --- モード切替トグルボタン ---
+    const instructionModeBtn = document.getElementById('instructionModeBtn');
     const proofreadingModeBtn = document.getElementById('proofreadingModeBtn');
+
+    // 指示入れモードボタン
+    if (instructionModeBtn) {
+        instructionModeBtn.addEventListener('click', () => {
+            // 既に指示入れモードなら何もしない
+            if (window.MojiQStore && !MojiQStore.get('proofreadingMode.enabled')) return;
+            // 校正モードから指示入れモードへ
+            if (window.MojiQStore && MojiQStore.get('proofreadingMode.enabled')) {
+                toggleProofreadingMode();
+            }
+        });
+    }
+
+    // 校正チェックモードボタン
     if (proofreadingModeBtn) {
         proofreadingModeBtn.addEventListener('click', () => {
+            // 既に校正モードなら何もしない
+            if (window.MojiQStore && MojiQStore.get('proofreadingMode.enabled')) return;
+            // 指示入れモードから校正モードへ
             toggleProofreadingMode();
         });
     }
@@ -396,6 +428,8 @@ function initWindowControlsAndMenuBar() {
     const slideMenuOverlay = document.getElementById('slideMenuOverlay');
     const modeTabs = document.querySelector('.mode-tabs');
     const menuLockableItems = document.querySelectorAll('.menu-lockable');
+    const headerSpecBtn = document.getElementById('headerGdriveJsonBtn');
+    const headerCalibBtn = document.getElementById('headerCalibrationBtn');
 
     if (hamburgerBtn && slideMenu) {
         function toggleSlideMenu() {
@@ -406,6 +440,9 @@ function initWindowControlsAndMenuBar() {
                 hamburgerBtn.classList.remove('active');
                 if (modeTabs) modeTabs.classList.remove('menu-locked');
                 menuLockableItems.forEach(item => item.classList.remove('menu-locked'));
+                // ヘッダーボタンのメニューロック解除
+                if (headerSpecBtn) headerSpecBtn.classList.remove('menu-locked');
+                if (headerCalibBtn) headerCalibBtn.classList.remove('menu-locked');
             } else {
                 // 他のドロップダウンを閉じる
                 if (window._savePdfDropdownClose) {
@@ -419,6 +456,9 @@ function initWindowControlsAndMenuBar() {
                 hamburgerBtn.classList.add('active');
                 if (modeTabs) modeTabs.classList.add('menu-locked');
                 menuLockableItems.forEach(item => item.classList.add('menu-locked'));
+                // ヘッダーボタンをメニューロック
+                if (headerSpecBtn) headerSpecBtn.classList.add('menu-locked');
+                if (headerCalibBtn) headerCalibBtn.classList.add('menu-locked');
             }
         }
 
@@ -428,6 +468,9 @@ function initWindowControlsAndMenuBar() {
             hamburgerBtn.classList.remove('active');
             if (modeTabs) modeTabs.classList.remove('menu-locked');
             menuLockableItems.forEach(item => item.classList.remove('menu-locked'));
+            // ヘッダーボタンのメニューロック解除
+            if (headerSpecBtn) headerSpecBtn.classList.remove('menu-locked');
+            if (headerCalibBtn) headerCalibBtn.classList.remove('menu-locked');
         }
 
         hamburgerBtn.addEventListener('click', toggleSlideMenu);
@@ -1574,6 +1617,9 @@ window.addEventListener('load', () => {
     }
 
     // 注意: アプリ終了時の確認とダークモードの初期化はinitWindowControlsAndMenuBar()で実行済み
+
+    // 保存されたモード状態を復元
+    restoreProofreadingMode();
 
 });
 

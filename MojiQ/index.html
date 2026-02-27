@@ -35,19 +35,23 @@
 
         <div class="header-divider"></div>
 
-        <!-- モード切替ボタン（指示入れモード / 校正モード） -->
-        <button id="proofreadingModeBtn" class="header-icon-btn menu-lockable" title="指示入れモード">
-            <!-- 指示入れモードアイコン（フキダシ） -->
-            <svg class="mode-icon instruction-mode-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-            <!-- 校正モードアイコン（チェックリスト） -->
-            <svg class="mode-icon proofreading-mode-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
-                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
-                <rect x="9" y="3" width="6" height="4" rx="1"/>
-                <path d="M9 12l2 2 4-4"/>
-            </svg>
-        </button>
+        <!-- モード切替トグル（指示入れモード / 校正モード） -->
+        <div class="mode-toggle-container menu-lockable" id="modeToggleContainer">
+            <!-- 指示入れモードボタン -->
+            <button id="instructionModeBtn" class="mode-toggle-btn active" title="指示入れモード">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+            </button>
+            <!-- 校正チェックモードボタン -->
+            <button id="proofreadingModeBtn" class="mode-toggle-btn" title="校正チェックモード">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+                    <rect x="9" y="3" width="6" height="4" rx="1"/>
+                    <path d="M9 12l2 2 4-4"/>
+                </svg>
+            </button>
+        </div>
 
         <div class="header-divider"></div>
 
