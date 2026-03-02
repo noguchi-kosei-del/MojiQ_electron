@@ -377,6 +377,10 @@ window.MojiQModeController = (function() {
                 lineWidthRange.value = savedWidth;
             }
             if (window.MojiQCanvasContext) MojiQCanvasContext.updateLineWidthDisplay();
+            // Storeに保存（校正モードと同期）
+            if (window.MojiQStore) {
+                window.MojiQStore.set('drawing.lineWidth', savedWidth);
+            }
         }
 
         state.currentMode = mode;

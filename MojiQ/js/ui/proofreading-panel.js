@@ -140,6 +140,20 @@ const ProofreadingPanel = (() => {
                     renderCheckData(data);
                 }
             });
+
+            // 線の太さの変更を監視（両モード間で同期）
+            window.MojiQStore.subscribe('drawing.lineWidth', (value) => {
+                // DOM要素を直接取得（キャッシュが古い場合に備えて）
+                const proofLineWidthInput = document.getElementById('proofLineWidthInput');
+                const proofLineWidthSlider = document.getElementById('proofLineWidthSlider');
+                if (proofLineWidthInput && proofLineWidthSlider) {
+                    proofLineWidthInput.value = value;
+                    proofLineWidthInput.setAttribute('value', value);
+                    proofLineWidthSlider.value = value;
+                    proofLineWidthSlider.setAttribute('value', value);
+                    updateSliderGradient(value);
+                }
+            });
         }
     }
 
@@ -511,15 +525,47 @@ const ProofreadingPanel = (() => {
             }
         }
 
+        // 指示入れモードの線の太さを引き継ぐ
+        syncLineWidthFromMainUI();
+
         // ボタン状態を同期（モード切替時の状態引き継ぎ）
         updateTextLayerButtonState();
         updatePageBarButtonState();
 
         // DOM更新後も再度更新（確実に反映させる）
         setTimeout(() => {
+            syncLineWidthFromMainUI();
             updateTextLayerButtonState();
             updatePageBarButtonState();
         }, 50);
+
+        // さらにrequestAnimationFrameでレンダリング後にも更新
+        requestAnimationFrame(() => {
+            syncLineWidthFromMainUI();
+            requestAnimationFrame(() => {
+                syncLineWidthFromMainUI();
+            });
+        });
+    }
+
+    /**
+     * 指示入れモードの線の太さを校正モードに同期
+     */
+    function syncLineWidthFromMainUI() {
+        const mainLineWidthInput = document.getElementById('lineWidthInput');
+        // DOM要素を直接取得（キャッシュが初期化前の場合に備えて）
+        const proofLineWidthInput = document.getElementById('proofLineWidthInput');
+        const proofLineWidthSlider = document.getElementById('proofLineWidthSlider');
+
+        if (mainLineWidthInput && proofLineWidthInput && proofLineWidthSlider) {
+            const value = parseFloat(mainLineWidthInput.value) || 3;
+            // プロパティと属性の両方を更新
+            proofLineWidthInput.value = value;
+            proofLineWidthInput.setAttribute('value', value);
+            proofLineWidthSlider.value = value;
+            proofLineWidthSlider.setAttribute('value', value);
+            updateSliderGradient(value);
+        }
     }
 
     /**

@@ -8,21 +8,30 @@
    ※ PDF読み込み後（.pdf-loaded）のみ適用
    ===================================================== */
 
-/* 校正モード時のキャンバスエリア - 左寄せ（PDF読み込み後のみ） */
-body.proofreading-mode.pdf-loaded .shared-canvas-area {
-    flex: 0 0 auto;
-    align-items: flex-start;
-    justify-content: flex-start;
+/* 校正モード時のapp-container - 高さを固定（PDFサイズに依存しない） */
+body.proofreading-mode.pdf-loaded .app-container {
+    height: 100%;
+    min-height: 0;
 }
 
-/* 校正モード時の右サイドバー - 拡大（PDF読み込み後のみ） */
+/* 校正モード時のキャンバスエリア - 通常モードと同じ幅を維持（PDF読み込み後のみ） */
+body.proofreading-mode.pdf-loaded .shared-canvas-area {
+    flex: 1;
+    align-items: flex-start;
+    justify-content: flex-start;
+    min-height: 0;
+}
+
+/* 校正モード時の右サイドバー - 固定幅（PDF読み込み後のみ） */
 body.proofreading-mode.pdf-loaded .sidebar.right {
-    flex: 1 1 400px;
+    flex: 0 0 400px;
     min-width: 350px;
     max-width: 500px;
     overflow: hidden !important;
     display: flex;
     flex-direction: column;
+    height: 100%;
+    align-self: stretch;
 }
 
 /* 校正モード時のサイドバーヘッダー - 非表示（PDF読み込み後のみ） */
@@ -329,7 +338,8 @@ body.proofreading-mode #proofEyedropperBtn svg {
 }
 
 .proofreading-line-width-input {
-    width: 60px;
+    width: 60px !important;
+    flex: 0 0 60px;
     padding: 4px 6px;
     border: 1px solid #ccc;
     border-radius: 4px;

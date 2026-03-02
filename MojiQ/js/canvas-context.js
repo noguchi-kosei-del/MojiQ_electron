@@ -149,6 +149,10 @@ window.MojiQCanvasContext = (function() {
             applyLineWidthToSelectedObject(value);
             // ツール別線幅設定を保存
             saveToolLineWidth(state.currentMode, value);
+            // Storeに保存（校正モードと同期）
+            if (window.MojiQStore) {
+                window.MojiQStore.set('drawing.lineWidth', value);
+            }
         });
 
         // 線幅入力フィールド変更時のイベント
@@ -173,6 +177,10 @@ window.MojiQCanvasContext = (function() {
                 applyLineWidthToSelectedObject(value);
                 // ツール別線幅設定を保存
                 saveToolLineWidth(state.currentMode, value);
+                // Storeに保存（校正モードと同期）
+                if (window.MojiQStore) {
+                    window.MojiQStore.set('drawing.lineWidth', value);
+                }
             });
 
             // フォーカスが外れた時に値を整形
