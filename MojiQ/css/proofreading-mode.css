@@ -1105,6 +1105,37 @@ body.dark-mode .proofreading-item.selected {
 }
 
 /* =====================================================
+   校正モード + 閲覧モード時のスタイル
+   ===================================================== */
+
+/* 校正モード + 閲覧モード時 - 右サイドバーを完全非表示 */
+body.proofreading-mode.viewer-mode .sidebar.right {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    flex: 0 0 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    overflow: hidden !important;
+}
+
+/* 校正モード + 閲覧モード時 - ツールバーを完全非表示 */
+body.proofreading-mode.viewer-mode .tool-bar-vertical {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    flex: 0 0 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    overflow: hidden !important;
+}
+
+/* =====================================================
    モード切り替えアニメーション
    ===================================================== */
 
