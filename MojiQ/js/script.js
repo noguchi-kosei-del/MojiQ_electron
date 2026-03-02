@@ -59,15 +59,11 @@ function enterProofreadingMode() {
         document.body.classList.remove('mode-transition-to-proofreading');
     }, 200);
 
-    // ページバーの状態を同期（user-hidden → hidden）
-    const pageBar = document.querySelector('.bottom-nav-bar');
-    if (pageBar && pageBar.classList.contains('user-hidden')) {
-        pageBar.classList.add('hidden');
-    }
-
-    // 校正パネルを表示（ボタン状態も同期される）
+    // 校正パネルを表示し、ページバーボタンの状態を同期
+    // ページバーはuser-hiddenクラスで統一管理（localStorageから復元済み）
     if (window.ProofreadingPanel) {
         ProofreadingPanel.show();
+        ProofreadingPanel.updatePageBarButtonState();
     }
 
     // 現在のJSONデータでパネルをレンダリング
@@ -86,6 +82,10 @@ function enterProofreadingMode() {
     const proofBtn = document.getElementById('proofreadingModeBtn');
     if (instructionBtn) instructionBtn.classList.remove('active');
     if (proofBtn) proofBtn.classList.add('active');
+
+    // ホーム画面のモードラベル更新
+    const modeLabel = document.getElementById('currentModeLabel');
+    if (modeLabel) modeLabel.textContent = '校正チェックモード';
 }
 
 /**
@@ -101,39 +101,26 @@ function exitProofreadingMode() {
         document.body.classList.remove('mode-transition-to-instruction');
     }, 200);
 
-    // ページバーの状態を同期（hidden → user-hidden）
+    // サイドバーのページバーボタン状態を同期（user-hiddenクラスで統一管理）
     const pageBar = document.querySelector('.bottom-nav-bar');
     if (pageBar) {
-        const isHidden = pageBar.classList.contains('hidden');
-        if (isHidden) {
-            pageBar.classList.add('user-hidden');
-            // サイドバーのボタン状態も更新
-            const sidebarBtn = document.getElementById('navBarToggleBtn');
-            if (sidebarBtn) {
-                const hideIcon = sidebarBtn.querySelector('.nav-toggle-hide');
-                const showIcon = sidebarBtn.querySelector('.nav-toggle-show');
+        const isHidden = pageBar.classList.contains('user-hidden');
+        const sidebarBtn = document.getElementById('navBarToggleBtn');
+        if (sidebarBtn) {
+            const hideIcon = sidebarBtn.querySelector('.nav-toggle-hide');
+            const showIcon = sidebarBtn.querySelector('.nav-toggle-show');
+            if (isHidden) {
                 if (hideIcon) hideIcon.style.display = 'none';
                 if (showIcon) showIcon.style.display = '';
                 sidebarBtn.title = 'ページバーを表示';
                 sidebarBtn.classList.add('hidden-state');
-            }
-            localStorage.setItem('mojiq_pagebar_hidden', 'true');
-        } else {
-            pageBar.classList.remove('user-hidden');
-            // サイドバーのボタン状態も更新
-            const sidebarBtn = document.getElementById('navBarToggleBtn');
-            if (sidebarBtn) {
-                const hideIcon = sidebarBtn.querySelector('.nav-toggle-hide');
-                const showIcon = sidebarBtn.querySelector('.nav-toggle-show');
+            } else {
                 if (hideIcon) hideIcon.style.display = '';
                 if (showIcon) showIcon.style.display = 'none';
                 sidebarBtn.title = 'ページバーを隠す';
                 sidebarBtn.classList.remove('hidden-state');
             }
-            localStorage.setItem('mojiq_pagebar_hidden', 'false');
         }
-        // 校正モード用のhiddenクラスを削除
-        pageBar.classList.remove('hidden');
     }
 
     // テキストレイヤーのサイドバーボタン状態を同期
@@ -172,6 +159,10 @@ function exitProofreadingMode() {
     const proofBtn = document.getElementById('proofreadingModeBtn');
     if (instructionBtn) instructionBtn.classList.add('active');
     if (proofBtn) proofBtn.classList.remove('active');
+
+    // ホーム画面のモードラベル更新
+    const modeLabel = document.getElementById('currentModeLabel');
+    if (modeLabel) modeLabel.textContent = '指示入れモード';
 }
 
 /**
@@ -1674,7 +1665,7 @@ window.addEventListener('load', () => {
 
     function toggleToolbar() {
         const isCollapsed = toolBarVertical.classList.toggle('collapsed');
-        toolbarToggle.textContent = isCollapsed ? '»' : '«';
+        toolbarToggle.textContent = isCollapsed ? '«' : '»';
         toolbarToggle.title = isCollapsed ? 'ツールバーを展開' : 'ツールバーを折り畳む';
     }
 

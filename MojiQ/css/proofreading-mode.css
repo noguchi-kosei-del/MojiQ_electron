@@ -61,6 +61,16 @@ body.proofreading-mode.pdf-loaded .tool-bar-vertical {
     border-right: 1px solid #ddd;
 }
 
+/* 校正モード時のツールバー折りたたみボタンを反転（右側配置のため） */
+body.proofreading-mode.pdf-loaded .tool-bar-vertical .toolbar-toggle-btn {
+    transform: scaleX(-1);
+}
+
+/* 校正モード + ワークスペース反転時は反転を解除（二重反転で元に戻す） */
+body.proofreading-mode.pdf-loaded.workspace-flipped .tool-bar-vertical .toolbar-toggle-btn {
+    transform: scaleX(1);
+}
+
 /* 校正モード時の右サイドバーの順序（PDF読み込み後のみ） */
 body.proofreading-mode.pdf-loaded .sidebar.right {
     order: 3;
@@ -79,14 +89,8 @@ body.proofreading-mode.pdf-loaded .bottom-nav-bar {
     transform: translateX(-50%);
     width: 70%;
     max-width: 600px;
-    transition: opacity 0.2s, visibility 0.2s;
-}
-
-/* ページバー非表示状態 */
-body.proofreading-mode.pdf-loaded .bottom-nav-bar.hidden {
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
+    /* 両モード共通：0.3秒でフェードイン/アウト */
+    transition: opacity 0.3s ease;
 }
 
 /* 通常モードで非表示にする要素 */
@@ -159,8 +163,8 @@ body.proofreading-mode #eyedropperBtn {
 
 /* ダークモード時のパネルヘッダー */
 body.dark-mode .proofreading-panel-header {
-    background: #37474f;
-    border-bottom-color: #546e7a;
+    background: #2a2a2a;
+    border-bottom-color: #3a3a3a;
 }
 
 /* パネルコンテンツ */
@@ -584,16 +588,21 @@ body.proofreading-mode #proofEyedropperBtn svg {
 /* ダークモード */
 body.dark-mode .proofreading-icon-btn {
     color: #888;
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
 }
 
 body.dark-mode .proofreading-icon-btn:hover {
     color: #64b5f6;
-    background: transparent;
+    background: transparent !important;
+    background-color: transparent !important;
 }
 
 body.dark-mode .proofreading-icon-btn.active {
     color: #ef5350;
-    background: transparent;
+    background: transparent !important;
+    background-color: transparent !important;
 }
 
 body.dark-mode .proofreading-icon-btn.active:hover {
@@ -825,12 +834,16 @@ body.dark-mode .mode-toggle-container {
     background: #555;
 }
 
+body.dark-mode .mode-toggle-btn:not(.active) {
+    background: transparent;
+}
+
 body.dark-mode .mode-toggle-btn:not(.active) svg {
     stroke: #ddd;
 }
 
 body.dark-mode .mode-toggle-btn:not(.active):hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: #2a2a2a;
 }
 
 body.dark-mode .mode-toggle-btn.active {
@@ -972,12 +985,26 @@ body.dark-mode .proofreading-color-grid .color-swatch {
 }
 
 body.dark-mode .proofreading-eyedropper-btn {
-    background: #3a3a3a;
+    background: #333;
     border-color: #555;
+    color: #ddd;
 }
 
 body.dark-mode .proofreading-eyedropper-btn:hover {
-    background: #4a4a4a;
+    background: #3a3a3a;
+    border-color: #666;
+}
+
+body.dark-mode .proofreading-eyedropper-btn.active,
+body.dark-mode #proofEyedropperBtn.active {
+    background: #1a3a5c !important;
+    border-color: #2196f3 !important;
+    color: #90caf9;
+}
+
+body.dark-mode .proofreading-eyedropper-btn.active svg,
+body.dark-mode #proofEyedropperBtn.active svg {
+    stroke: #90caf9 !important;
 }
 
 body.dark-mode .proofreading-line-width label {
@@ -1158,12 +1185,12 @@ body.proofreading-mode.viewer-mode .tool-bar-vertical {
     }
 }
 
-/* 指示入れ→校正チェック（右から左へスライド） */
-body.mode-transition-to-proofreading .app-container {
+/* 指示入れ→校正チェック（右から左へスライド）- PDF読み込み後のみ */
+body.pdf-loaded.mode-transition-to-proofreading .app-container {
     animation: slideInFromRight 0.2s ease-out forwards;
 }
 
-/* 校正チェック→指示入れ（左から右へスライド） */
-body.mode-transition-to-instruction .app-container {
+/* 校正チェック→指示入れ（左から右へスライド）- PDF読み込み後のみ */
+body.pdf-loaded.mode-transition-to-instruction .app-container {
     animation: slideInFromLeft 0.2s ease-out forwards;
 }

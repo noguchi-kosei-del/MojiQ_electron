@@ -20,8 +20,10 @@
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     z-index: 100;
     opacity: 1;
+    visibility: visible;
     pointer-events: auto;
-    transition: opacity 0.5s ease;
+    /* 両モード共通：0.3秒でフェードイン/アウト */
+    transition: opacity 0.3s ease;
 }
 
 .bottom-nav-bar button {
@@ -109,17 +111,17 @@
 
 .bottom-nav-bar.fade-out {
     opacity: 0;
-    visibility: hidden;
     pointer-events: none;
-    transition: opacity 0.5s ease, visibility 0s linear 0.5s;
+    /* 0.3秒でフェードアウト */
+    transition: opacity 0.3s ease;
 }
 
 /* --- ユーザー非表示状態 --- */
 .bottom-nav-bar.user-hidden {
     opacity: 0;
-    visibility: hidden;
     pointer-events: none;
-    transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+    /* 0.3秒でフェードアウト */
+    transition: opacity 0.3s ease;
 }
 
 /* --- ページバー表示/非表示トグル（左サイドバー下部） --- */

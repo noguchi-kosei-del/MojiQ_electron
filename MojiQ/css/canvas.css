@@ -98,6 +98,9 @@ body.mode-simulator .shared-canvas-area {
     text-align: center;
     pointer-events: none;
     z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 #initialMessage svg {
@@ -106,6 +109,24 @@ body.mode-simulator .shared-canvas-area {
 
 .shared-canvas-area.drag-over #initialMessage svg {
     transform: scale(1.3);
+}
+
+/* --- 現在のモード表示ラベル --- */
+.current-mode-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 24px;
+    padding: 6px 16px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    display: inline-block;
+}
+
+/* 校正モード時のラベル色（白とグレーで統一） */
+body.proofreading-mode .current-mode-label {
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.15);
 }
 
 /* --- パン操作時のカーソル --- */

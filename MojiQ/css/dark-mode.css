@@ -292,18 +292,24 @@ body.dark-mode .color-swatch.active-color {
 }
 
 /* スポイトボタン（ダークモード） */
+body.dark-mode #colorPalette .color-swatch.eyedropper-swatch,
 body.dark-mode .color-swatch.eyedropper-swatch {
-    background-color: #3a3a3a;
+    background-color: #333;
     border-color: #555;
+    color: #ddd;
 }
 
+body.dark-mode #colorPalette .color-swatch.eyedropper-swatch:hover,
 body.dark-mode .color-swatch.eyedropper-swatch:hover {
-    background-color: #4a4a4a;
+    background-color: #3a3a3a;
+    border-color: #666;
 }
 
+body.dark-mode #colorPalette .color-swatch.eyedropper-swatch.active,
 body.dark-mode .color-swatch.eyedropper-swatch.active {
-    background-color: #1976d2;
-    border-color: #42a5f5;
+    background-color: #1a3a5c !important;
+    border-color: #2196f3 !important;
+    color: #90caf9 !important;
 }
 
 /* オプション行 */
@@ -1436,8 +1442,12 @@ body.dark-mode .print-radio-label {
 }
 
 /* ローディングオーバーレイ（ダークモード） */
-body.dark-mode .loading-content {
+body.dark-mode .loading-overlay {
     background-color: #2a2a2a;
+}
+
+body.dark-mode .loading-content {
+    background-color: #3a3a3a;
 }
 
 body.dark-mode .loading-title {

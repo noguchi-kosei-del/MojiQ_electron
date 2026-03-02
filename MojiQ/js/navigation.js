@@ -103,6 +103,9 @@ window.MojiQNavigation = (function() {
         showNavBar();
         clearTimeout(navBarHideTimer);
 
+        // 校正モードでは自動フェードを無効化
+        if (document.body.classList.contains('proofreading-mode')) return;
+
         navBarHideTimer = setTimeout(() => {
             bottomNavBar.classList.add('fade-out');
         }, FADE_DELAY_MS);
@@ -520,6 +523,11 @@ window.MojiQNavigation = (function() {
      * ナビゲーションバーを隠す
      */
     function hideNavBar() {
+        // ユーザーが明示的に非表示にしている場合は何もしない
+        if (isUserHidden) return;
+        // 校正モードでは自動的な非表示を行わない
+        if (document.body.classList.contains('proofreading-mode')) return;
+
         bottomNavBar.classList.add('fade-out');
         clearTimeout(navBarHideTimer);
     }
@@ -530,6 +538,14 @@ window.MojiQNavigation = (function() {
     function userHideNavBar() {
         isUserHidden = true;
         clearTimeout(navBarHideTimer);
+
+        // fade-outクラスがある場合、一旦表示状態に戻してからフェードアウト
+        if (bottomNavBar.classList.contains('fade-out')) {
+            bottomNavBar.classList.remove('fade-out');
+            // リフローを強制して表示状態を確定
+            void bottomNavBar.offsetHeight;
+        }
+
         bottomNavBar.classList.add('user-hidden');
         // アイコン切り替え: 目→目斜線（赤色）
         if (navBarToggleBtn) {

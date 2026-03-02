@@ -672,14 +672,22 @@ const ProofreadingPanel = (() => {
 
     /**
      * ページバーの表示/非表示をトグル
+     * MojiQNavigationの関数を使用して状態を統一管理
      */
     function togglePageBar() {
         const pageBar = document.querySelector('.bottom-nav-bar');
-        const btn = document.getElementById('proofTogglePageBarBtn');
+        if (!pageBar || !window.MojiQNavigation) return;
 
-        if (pageBar) {
-            const isHidden = pageBar.classList.toggle('hidden');
-            updatePageBarButtonStateInternal(isHidden);
+        const isCurrentlyHidden = pageBar.classList.contains('user-hidden');
+
+        if (isCurrentlyHidden) {
+            // 表示する
+            MojiQNavigation.userShowNavBar();
+            updatePageBarButtonStateInternal(false);
+        } else {
+            // 非表示にする
+            MojiQNavigation.userHideNavBar();
+            updatePageBarButtonStateInternal(true);
         }
     }
 
@@ -701,8 +709,8 @@ const ProofreadingPanel = (() => {
      */
     function updatePageBarButtonState() {
         const pageBar = document.querySelector('.bottom-nav-bar');
-        // hidden（校正モード用）または user-hidden（指示入れモード用）どちらかがあれば非表示状態
-        const isHidden = pageBar ? (pageBar.classList.contains('hidden') || pageBar.classList.contains('user-hidden')) : false;
+        // user-hiddenクラスで非表示状態を判定（両モード共通）
+        const isHidden = pageBar ? pageBar.classList.contains('user-hidden') : false;
         updatePageBarButtonStateInternal(isHidden);
     }
 
