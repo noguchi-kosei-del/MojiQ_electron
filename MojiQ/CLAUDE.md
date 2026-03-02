@@ -444,6 +444,58 @@ G:\共有ドライブ\CLLENN\編集部フォルダ\編集企画部\編集企画_
 ## 変更履歴
 
 ### 2026-03-02
+#### モード切り替えアニメーションの追加
+- **変更内容**: 指示入れモードと校正チェックモードの切り替え時にスライドアニメーションを追加
+- **仕様**:
+  - 指示入れ→校正チェック: 右から左へスライド
+  - 校正チェック→指示入れ: 左から右へスライド
+  - アニメーション時間: 0.2秒（ease-out）
+- **修正ファイル**:
+  - `css/proofreading-mode.css`: `@keyframes slideInFromRight/Left`アニメーション追加
+  - `js/script.js`: `enterProofreadingMode()`/`exitProofreadingMode()`にアニメーションクラス追加
+
+#### モード切替トグルスイッチの背景色変更
+- **変更内容**: トグルスイッチの背景色を`#999`から`#bbb`に変更（より明るいグレー）
+- **修正ファイル**: `css/proofreading-mode.css`
+
+#### 線の太さの両モード間同期
+- **変更内容**: 指示入れモードと校正チェックモードで線の太さを完全に同期
+- **仕様**:
+  - どちらのモードで線の太さを変更しても、もう一方のスライダー値とグラデーション表示が即座に同期
+  - マウスホイールでの変更も同期対象
+  - Storeの`drawing.lineWidth`を介した双方向同期
+- **修正ファイル**:
+  - `js/ui/proofreading-panel.js`: `updateMainSliderGradient()`関数追加、`setLineWidth()`で指示入れモードのスライダーも更新
+  - `js/canvas-context.js`: Store購読で校正モードからの変更を同期
+  - `js/script.js`: `syncLineWidthToMainUI()`関数追加、モード切替時のスライダー同期
+
+#### 校正チェックスタンプ機能の追加
+- **機能概要**: 校正モードで正誤チェック/提案チェックの項目をクリックして選択し、キャンバスに`content`をスタンプとして配置できる機能
+- **仕様**:
+  - サイドバーで項目クリック → オレンジ色ハイライトで選択状態
+  - キャンバスクリック → contentテキストがスタンプとして配置
+  - キャンバスドラッグ（5px以上） → 引出線付きでスタンプ配置
+  - 他のツールを選択すると選択状態が解除
+  - 既存の`text`モードを再利用（文字サイズツールと同じ動作パターン）
+- **修正ファイル**:
+  - `css/proofreading-mode.css`: `.proofreading-item`の選択状態スタイル追加
+  - `js/script.js`: `setProofreadingStampText()`/`clearProofreadingStampText()`ヘルパー関数追加、`handleInputRequest`でactiveStampText時の直接描画
+  - `js/ui/proofreading-panel.js`: `selectItem()`/`clearItemSelection()`関数追加、テーブル行にクリックイベント追加
+  - `js/mode-controller.js`: モード切替時の選択状態クリア処理追加
+
+#### 正誤/提案チェックのコピー機能削除
+- **変更内容**: 正誤チェック・提案チェックテーブルからコピーボタン列を削除
+- **理由**: スタンプ配置機能の追加に伴い不要に
+- **修正ファイル**: `js/ui/proofreading-panel.js`
+
+#### カラーパレットの変更
+- **変更内容**: 左サイドバーのカラーパレットから「マーカー黄色」ボタンを削除し、スポイトボタンを追加
+- **仕様**: クリックでスポイトモードに切り替え
+- **修正ファイル**:
+  - `index.html`: カラーパレット内のマーカー黄色→スポイトボタンに変更
+  - `js/canvas-context.js`: サイドバーのスポイトボタンにイベントリスナー追加
+  - `css/components.css`: `.eyedropper-swatch`スタイル追加
+
 #### 校正モードのUI改善
 - **サイドバー表示領域の固定**: 単ページPDFでもサイドバーの表示領域がPDFサイズに依存せず、画面いっぱいに固定されるように修正
 - **レイアウト調整**: `app-container`に`height: 100%`と`min-height: 0`を追加し、キャンバスエリアとサイドバーの高さを固定

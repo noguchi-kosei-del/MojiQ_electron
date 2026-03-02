@@ -451,6 +451,13 @@ window.MojiQModeController = (function() {
             }
         }
 
+        // 校正チェックアイテムの選択状態をクリア（text以外のモードに切り替えた時）
+        if (mode !== 'text') {
+            if (window.ProofreadingPanel && ProofreadingPanel.clearItemSelection) {
+                ProofreadingPanel.clearItemSelection();
+            }
+        }
+
         if (mode === 'select' && selectBtn) selectBtn.classList.add('active');
         if (mode === 'hand') handBtn.classList.add('active');
         if (mode === 'draw') drawBtn.classList.add('active');

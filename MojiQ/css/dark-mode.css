@@ -291,6 +291,21 @@ body.dark-mode .color-swatch.active-color {
     box-shadow: 0 0 0 2px #ddd;
 }
 
+/* スポイトボタン（ダークモード） */
+body.dark-mode .color-swatch.eyedropper-swatch {
+    background-color: #3a3a3a;
+    border-color: #555;
+}
+
+body.dark-mode .color-swatch.eyedropper-swatch:hover {
+    background-color: #4a4a4a;
+}
+
+body.dark-mode .color-swatch.eyedropper-swatch.active {
+    background-color: #1976d2;
+    border-color: #42a5f5;
+}
+
 /* オプション行 */
 body.dark-mode .option-row {
     background: #3a3520;

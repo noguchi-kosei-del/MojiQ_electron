@@ -31,6 +31,20 @@ window.MojiQCanvasContext = (function() {
         setupRainbowPicker();
         setupEyedropper();
         updateLineWidthDisplay();
+
+        // Storeの線の太さ変更を監視（校正モードからの変更を同期）
+        if (window.MojiQStore) {
+            window.MojiQStore.subscribe('drawing.lineWidth', (value) => {
+                // 値が同じ場合は更新をスキップ（ラグ防止）
+                if (parseFloat(lineWidthRange.value) === value) return;
+                lineWidthRange.value = value;
+                const lineWidthInput = document.getElementById('lineWidthInput');
+                if (lineWidthInput && document.activeElement !== lineWidthInput) {
+                    lineWidthInput.value = value;
+                }
+                updateLineWidthDisplay();
+            });
+        }
     }
 
     /**
@@ -66,7 +80,10 @@ window.MojiQCanvasContext = (function() {
 
         swatches.forEach(swatch => {
             if (swatch.closest('#ui-group-mojiq-left')) { // MojiQパレットのみ
-                const swatchColor = swatch.getAttribute('data-color').toLowerCase();
+                const swatchColorAttr = swatch.getAttribute('data-color');
+                // スポイトボタンなどdata-colorがない要素はスキップ
+                if (!swatchColorAttr) return;
+                const swatchColor = swatchColorAttr.toLowerCase();
                 if (swatchColor === currentColor) {
                     swatch.classList.add('active-color');
                 } else {
@@ -108,6 +125,9 @@ window.MojiQCanvasContext = (function() {
     function setupColorPaletteEvents() {
         const swatches = document.querySelectorAll('.color-swatch');
         swatches.forEach(swatch => {
+            // スポイトボタンは別途処理するためスキップ
+            if (swatch.classList.contains('eyedropper-swatch')) return;
+
             swatch.addEventListener('click', (e) => {
                 const color = e.target.getAttribute('data-color');
                 if (color) {
@@ -209,15 +229,28 @@ window.MojiQCanvasContext = (function() {
         // 線幅スライダー上でのマウススクロールによる変更
         lineWidthRange.addEventListener('wheel', (e) => {
             e.preventDefault();
+            e.stopPropagation();
             const step = e.deltaY > 0 ? -0.1 : 0.1;
             const min = parseFloat(lineWidthRange.min);
             const max = parseFloat(lineWidthRange.max);
-            const currentValue = parseFloat(lineWidthRange.value);
+            // Storeから現在の値を取得（スライダーの値は同期が遅れる可能性がある）
+            const currentValue = window.MojiQStore ?
+                (window.MojiQStore.get('drawing.lineWidth') || parseFloat(lineWidthRange.value)) :
+                parseFloat(lineWidthRange.value);
             // 0.1単位に丸める
             let newValue = Math.round((currentValue + step) * 10) / 10;
             newValue = Math.max(min, Math.min(max, newValue));
 
+            // Storeを先に更新
+            if (window.MojiQStore) {
+                window.MojiQStore.set('drawing.lineWidth', newValue);
+            }
+            // 値を更新
             lineWidthRange.value = newValue;
+            const lineWidthInput = document.getElementById('lineWidthInput');
+            if (lineWidthInput) {
+                lineWidthInput.value = newValue;
+            }
             if (state.currentMode === 'eraser') {
                 state.eraserSize = newValue;
             }
@@ -388,6 +421,20 @@ window.MojiQCanvasContext = (function() {
             rainbowSwatch.setAttribute('data-color', color);
         }
 
+        // 校正モードのカスタムカラーサムネイルも更新
+        const proofCustomSwatch = document.getElementById('proofCustomColorSwatch');
+        if (proofCustomSwatch) {
+            proofCustomSwatch.style.backgroundColor = color;
+            proofCustomSwatch.style.border = '2px solid #ccc';
+            proofCustomSwatch.setAttribute('data-color', color);
+        }
+
+        // 校正パネルのカラーピッカーも同期
+        const proofColorPicker = document.getElementById('proofColorPicker');
+        if (proofColorPicker) {
+            proofColorPicker.value = color;
+        }
+
         updateColorUI();
     }
 
@@ -396,11 +443,21 @@ window.MojiQCanvasContext = (function() {
      * @param {boolean} active - アクティブ状態
      */
     function setEyedropperActive(active) {
+        // 通常モードのスポイトボタン
         if (eyedropperBtn) {
             if (active) {
                 eyedropperBtn.classList.add('active');
             } else {
                 eyedropperBtn.classList.remove('active');
+            }
+        }
+        // 校正モードのスポイトボタン
+        const proofEyedropperBtn = document.getElementById('proofEyedropperBtn');
+        if (proofEyedropperBtn) {
+            if (active) {
+                proofEyedropperBtn.classList.add('active');
+            } else {
+                proofEyedropperBtn.classList.remove('active');
             }
         }
     }

@@ -48,7 +48,16 @@ function restoreProofreadingMode() {
  * 校正モードに入る
  */
 function enterProofreadingMode() {
+    // アニメーションクラスを追加（右から左へスライド）
+    document.body.classList.remove('mode-transition-to-instruction');
+    document.body.classList.add('mode-transition-to-proofreading');
+
     document.body.classList.add('proofreading-mode');
+
+    // アニメーション終了後にクラスを削除
+    setTimeout(() => {
+        document.body.classList.remove('mode-transition-to-proofreading');
+    }, 200);
 
     // ページバーの状態を同期（user-hidden → hidden）
     const pageBar = document.querySelector('.bottom-nav-bar');
@@ -83,6 +92,15 @@ function enterProofreadingMode() {
  * 校正モードから出る
  */
 function exitProofreadingMode() {
+    // アニメーションクラスを追加（左から右へスライド）
+    document.body.classList.remove('mode-transition-to-proofreading');
+    document.body.classList.add('mode-transition-to-instruction');
+
+    // アニメーション終了後にクラスを削除
+    setTimeout(() => {
+        document.body.classList.remove('mode-transition-to-instruction');
+    }, 200);
+
     // ページバーの状態を同期（hidden → user-hidden）
     const pageBar = document.querySelector('.bottom-nav-bar');
     if (pageBar) {
@@ -143,6 +161,9 @@ function exitProofreadingMode() {
         ProofreadingPanel.hide();
     }
 
+    // 指示入れモードの線の太さスライダーを同期
+    syncLineWidthToMainUI();
+
     // ヘッダーボタンのグレーアウト切替
     updateHeaderButtonModeState(false);
 
@@ -151,6 +172,37 @@ function exitProofreadingMode() {
     const proofBtn = document.getElementById('proofreadingModeBtn');
     if (instructionBtn) instructionBtn.classList.add('active');
     if (proofBtn) proofBtn.classList.remove('active');
+}
+
+/**
+ * 校正モードの線の太さを指示入れモードに同期
+ */
+function syncLineWidthToMainUI() {
+    const lineWidthInput = document.getElementById('lineWidthInput');
+    const lineWidthRange = document.getElementById('lineWidth');
+
+    // Storeから現在の値を取得
+    let value = 3;
+    if (window.MojiQStore) {
+        value = window.MojiQStore.get('drawing.lineWidth') || 3;
+    }
+
+    if (lineWidthInput && lineWidthRange) {
+        // 値を更新
+        lineWidthInput.value = value;
+        lineWidthRange.value = value;
+
+        // スライダーのグラデーションを更新
+        const min = parseFloat(lineWidthRange.min) || 1;
+        const max = parseFloat(lineWidthRange.max) || 20;
+        const percent = ((value - min) / (max - min)) * 100;
+        lineWidthRange.style.background = `linear-gradient(to right, #ff8c00 ${percent}%, #333 ${percent}%)`;
+    }
+
+    // MojiQCanvasContextがあればそちらでも更新
+    if (window.MojiQCanvasContext && MojiQCanvasContext.updateLineWidthDisplay) {
+        MojiQCanvasContext.updateLineWidthDisplay();
+    }
 }
 
 /**
@@ -817,6 +869,15 @@ window.addEventListener('load', () => {
         }
     };
 
+    // --- 校正チェックスタンプ用ヘルパー関数 ---
+    window.setProofreadingStampText = function(text) {
+        appState.activeStampText = text;
+    };
+
+    window.clearProofreadingStampText = function() {
+        appState.activeStampText = null;
+    };
+
     // --- Store連携（コア基盤との同期） ---
     if (window.MojiQStore && window.MojiQLegacyBridge) {
         // 初期状態をStoreに同期
@@ -1269,7 +1330,14 @@ window.addEventListener('load', () => {
         canvasArea: elements.canvasArea
     }, appState, {
         saveHistory: () => MojiQPageManager.saveCurrentCanvasToHistory(),
-        handleInputRequest: (drawingInfo) => MojiQModal.handleInputRequest(drawingInfo),
+        handleInputRequest: (drawingInfo) => {
+            // 校正チェックスタンプ（activeStampTextが設定済み）の場合はモーダル表示せず直接描画
+            if (appState.activeStampText) {
+                executeTextDrawing(drawingInfo, appState.activeStampText, false, 12);
+            } else {
+                MojiQModal.handleInputRequest(drawingInfo);
+            }
+        },
         putFontLabel: (start, end, fontInfo) => MojiQStamps.putFontLabel(start, end, fontInfo),
         getCurrentPage: () => appState.currentPageNum,
         editText: (textObj, index, pageNum) => MojiQModal.openTextEditModal(textObj, index, pageNum),  // テキスト編集コールバック

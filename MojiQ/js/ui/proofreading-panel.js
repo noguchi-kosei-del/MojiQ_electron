@@ -105,8 +105,8 @@ const ProofreadingPanel = (() => {
         if (eyedropperBtn) {
             eyedropperBtn.addEventListener('click', () => {
                 // スポイトモードに切り替え
-                if (window.ModeController && window.ModeController.changeMode) {
-                    window.ModeController.changeMode('eyedropper');
+                if (window.MojiQModeController && window.MojiQModeController.setMode) {
+                    window.MojiQModeController.setMode('eyedropper');
                     eyedropperBtn.classList.add('active');
                 }
             });
@@ -128,6 +128,31 @@ const ProofreadingPanel = (() => {
                 setLineWidth(value);
             });
 
+            // マウスホイールで線の太さを変更
+            lineWidthSlider.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const step = e.deltaY > 0 ? -0.1 : 0.1;
+                const min = parseFloat(lineWidthSlider.min) || 1;
+                const max = parseFloat(lineWidthSlider.max) || 20;
+                // Storeから現在の値を取得（スライダーの値は同期が遅れる可能性がある）
+                const currentValue = window.MojiQStore ?
+                    (window.MojiQStore.get('drawing.lineWidth') || parseFloat(lineWidthSlider.value)) :
+                    parseFloat(lineWidthSlider.value);
+                // 0.1単位に丸める
+                let newValue = Math.round((currentValue + step) * 10) / 10;
+                newValue = Math.max(min, Math.min(max, newValue));
+                // 値を更新（Storeを先に更新）
+                if (window.MojiQStore) {
+                    window.MojiQStore.set('drawing.lineWidth', newValue);
+                }
+                lineWidthSlider.value = newValue;
+                lineWidthInput.value = newValue;
+                updateSliderGradient(newValue);
+                // 指示入れモードのスライダーも同期
+                updateMainSliderGradient(newValue);
+            }, { passive: false });
+
             // 初期グラデーションを設定
             const initialValue = parseFloat(lineWidthSlider.value) || 3;
             updateSliderGradient(initialValue);
@@ -147,10 +172,10 @@ const ProofreadingPanel = (() => {
                 const proofLineWidthInput = document.getElementById('proofLineWidthInput');
                 const proofLineWidthSlider = document.getElementById('proofLineWidthSlider');
                 if (proofLineWidthInput && proofLineWidthSlider) {
+                    // 値が同じ場合は更新をスキップ（ラグ防止）
+                    if (parseFloat(proofLineWidthSlider.value) === value) return;
                     proofLineWidthInput.value = value;
-                    proofLineWidthInput.setAttribute('value', value);
                     proofLineWidthSlider.value = value;
-                    proofLineWidthSlider.setAttribute('value', value);
                     updateSliderGradient(value);
                 }
             });
@@ -255,6 +280,8 @@ const ProofreadingPanel = (() => {
         const mainLineWidthInput = document.getElementById('lineWidthInput');
         if (mainLineWidth) mainLineWidth.value = value;
         if (mainLineWidthInput) mainLineWidthInput.value = value;
+        // 指示入れモードのスライダーグラデーションも更新
+        updateMainSliderGradient(value);
     }
 
     /**
@@ -266,6 +293,18 @@ const ProofreadingPanel = (() => {
         const max = parseFloat(lineWidthSlider.max) || 20;
         const percentage = ((value - min) / (max - min)) * 100;
         lineWidthSlider.style.background = `linear-gradient(to right, #ff8c00 ${percentage}%, #333 ${percentage}%)`;
+    }
+
+    /**
+     * 指示入れモードのスライダーグラデーションを更新
+     */
+    function updateMainSliderGradient(value) {
+        const mainLineWidth = document.getElementById('lineWidth');
+        if (!mainLineWidth) return;
+        const min = parseFloat(mainLineWidth.min) || 1;
+        const max = parseFloat(mainLineWidth.max) || 20;
+        const percentage = ((value - min) / (max - min)) * 100;
+        mainLineWidth.style.background = `linear-gradient(to right, #ff8c00 ${percentage}%, #333 ${percentage}%)`;
     }
 
     /**
@@ -358,15 +397,10 @@ const ProofreadingPanel = (() => {
             html += '<table class="proofreading-table"><tbody>';
 
             catItems.forEach(item => {
-                html += '<tr>';
-                html += '<td class="cal-page" onclick="ProofreadingPanel.jumpToPage(\'' + escapeAttr(item.page) + '\')">' + formatPage(item.page) + '</td>';
+                html += '<tr class="proofreading-item" data-content="' + escapeAttr(item.content || '') + '" onclick="ProofreadingPanel.selectItem(this)">';
+                html += '<td class="cal-page" onclick="event.stopPropagation(); ProofreadingPanel.jumpToPage(\'' + escapeAttr(item.page) + '\')">' + formatPage(item.page) + '</td>';
                 html += '<td class="cal-excerpt">' + escapeHtml(item.excerpt || '') + '</td>';
                 html += '<td class="cal-content">' + escapeHtml(item.content || '') + '</td>';
-                html += '<td class="cal-copy">';
-                html += '<button class="cal-copy-btn" data-content="' + escapeAttr(item.content || '') + '" onclick="ProofreadingPanel.copyContent(this)" title="コピー">';
-                html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-                html += '</button>';
-                html += '</td>';
                 html += '</tr>';
             });
 
@@ -552,13 +586,22 @@ const ProofreadingPanel = (() => {
      * 指示入れモードの線の太さを校正モードに同期
      */
     function syncLineWidthFromMainUI() {
-        const mainLineWidthInput = document.getElementById('lineWidthInput');
         // DOM要素を直接取得（キャッシュが初期化前の場合に備えて）
         const proofLineWidthInput = document.getElementById('proofLineWidthInput');
         const proofLineWidthSlider = document.getElementById('proofLineWidthSlider');
 
-        if (mainLineWidthInput && proofLineWidthInput && proofLineWidthSlider) {
-            const value = parseFloat(mainLineWidthInput.value) || 3;
+        // Storeから値を優先的に取得（より信頼性が高い）
+        let value = 3;
+        if (window.MojiQStore) {
+            value = window.MojiQStore.get('drawing.lineWidth') || 3;
+        } else {
+            const mainLineWidthInput = document.getElementById('lineWidthInput');
+            if (mainLineWidthInput) {
+                value = parseFloat(mainLineWidthInput.value) || 3;
+            }
+        }
+
+        if (proofLineWidthInput && proofLineWidthSlider) {
             // プロパティと属性の両方を更新
             proofLineWidthInput.value = value;
             proofLineWidthInput.setAttribute('value', value);
@@ -692,6 +735,44 @@ const ProofreadingPanel = (() => {
         btn.title = isHidden ? 'コメントテキスト表示' : 'コメントテキスト非表示';
     }
 
+    /**
+     * アイテムを選択してスタンプモードに移行
+     * @param {HTMLElement} rowElement - クリックされたtr要素
+     */
+    function selectItem(rowElement) {
+        const content = rowElement.getAttribute('data-content');
+        if (!content) return;
+
+        // 既存の選択表示をクリア
+        clearItemSelection();
+
+        // 選択状態を視覚的に表示
+        rowElement.classList.add('selected');
+
+        // textモードに切り替え（文字サイズツールと同様）
+        if (window.MojiQModeController) {
+            MojiQModeController.setMode('text');
+        }
+
+        // activeStampTextを設定
+        if (window.setProofreadingStampText) {
+            window.setProofreadingStampText(content);
+        }
+    }
+
+    /**
+     * アイテム選択をクリア
+     */
+    function clearItemSelection() {
+        const selected = document.querySelectorAll('.proofreading-item.selected');
+        selected.forEach(el => el.classList.remove('selected'));
+
+        // activeStampTextもクリア
+        if (window.clearProofreadingStampText) {
+            window.clearProofreadingStampText();
+        }
+    }
+
     // DOMContentLoadedで初期化
     document.addEventListener('DOMContentLoaded', init);
 
@@ -710,7 +791,9 @@ const ProofreadingPanel = (() => {
         togglePageBar,
         toggleTextLayer,
         updateTextLayerButtonState,
-        updatePageBarButtonState
+        updatePageBarButtonState,
+        selectItem,
+        clearItemSelection
     };
 
     // windowオブジェクトに登録（script.jsからのアクセス用）

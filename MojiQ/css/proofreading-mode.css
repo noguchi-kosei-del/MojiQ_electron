@@ -306,9 +306,15 @@ body.proofreading-mode #proofEyedropperBtn svg {
     background: #e0e0e0;
 }
 
-.proofreading-eyedropper-btn.active {
-    background: #e3f2fd;
-    border-color: #1976d2;
+.proofreading-eyedropper-btn.active,
+#proofEyedropperBtn.active {
+    background: #e3f2fd !important;
+    border-color: #2196f3 !important;
+}
+
+.proofreading-eyedropper-btn.active svg,
+#proofEyedropperBtn.active svg {
+    stroke: #0d47a1 !important;
 }
 
 .proofreading-rainbow-picker {
@@ -759,7 +765,7 @@ body.dark-mode .proofreading-icon-btn.active:hover {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #999;
+    background: #bbb;
     border-radius: 14px;
     padding: 3px;
     gap: 2px;
@@ -1068,4 +1074,65 @@ body.dark-mode .proofreading-check-content::-webkit-scrollbar-thumb {
 
 body.dark-mode .proofreading-check-content::-webkit-scrollbar-thumb:hover {
     background: #666;
+}
+
+/* =====================================================
+   校正チェックアイテムの選択状態（スタンプ配置用）
+   ===================================================== */
+
+.proofreading-item {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.proofreading-item:hover {
+    background-color: rgba(255, 140, 0, 0.1);
+}
+
+.proofreading-item.selected {
+    background-color: rgba(255, 140, 0, 0.25);
+    outline: 2px solid #ff8c00;
+    outline-offset: -2px;
+}
+
+/* ダークモード対応 */
+body.dark-mode .proofreading-item:hover {
+    background-color: rgba(255, 140, 0, 0.15);
+}
+
+body.dark-mode .proofreading-item.selected {
+    background-color: rgba(255, 140, 0, 0.3);
+}
+
+/* =====================================================
+   モード切り替えアニメーション
+   ===================================================== */
+
+/* アニメーション用キーフレーム（opacityなしでフラッシュ防止） */
+@keyframes slideInFromRight {
+    from {
+        transform: translateX(20px);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideInFromLeft {
+    from {
+        transform: translateX(-20px);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+/* 指示入れ→校正チェック（右から左へスライド） */
+body.mode-transition-to-proofreading .app-container {
+    animation: slideInFromRight 0.2s ease-out forwards;
+}
+
+/* 校正チェック→指示入れ（左から右へスライド） */
+body.mode-transition-to-instruction .app-container {
+    animation: slideInFromLeft 0.2s ease-out forwards;
 }
