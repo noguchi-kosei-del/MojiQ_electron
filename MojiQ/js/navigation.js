@@ -103,9 +103,6 @@ window.MojiQNavigation = (function() {
         showNavBar();
         clearTimeout(navBarHideTimer);
 
-        // 校正モードでは自動フェードを無効化
-        if (document.body.classList.contains('proofreading-mode')) return;
-
         navBarHideTimer = setTimeout(() => {
             bottomNavBar.classList.add('fade-out');
         }, FADE_DELAY_MS);
@@ -121,8 +118,8 @@ window.MojiQNavigation = (function() {
         const clientY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches.length > 0 ? e.touches[0].clientY : 0);
         const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches.length > 0 ? e.touches[0].clientX : 0);
 
-        // フローティングバーの位置を計算（CSS: bottom: 30px, height: 36px, width: 70%, max-width: 600px, 中央配置）
-        const barBottom = 30;
+        // フローティングバーの位置を計算（CSS: bottom: 15px, height: 36px, width: 70%, max-width: 600px, 中央配置）
+        const barBottom = 15;
         const barHeight = 36;
         const barTop = window.innerHeight - barBottom - barHeight;
         const barBottomY = window.innerHeight - barBottom;
@@ -365,6 +362,7 @@ window.MojiQNavigation = (function() {
                 endSliderDrag();
                 // ドラッグ終了後にページ移動を実行
                 await navigateToPage(targetPage);
+                resetNavBarTimer();
             }
         };
         boundHandlers.documentTouchend = async () => {
@@ -373,6 +371,7 @@ window.MojiQNavigation = (function() {
                 endSliderDrag();
                 // ドラッグ終了後にページ移動を実行
                 await navigateToPage(targetPage);
+                resetNavBarTimer();
             }
         };
         document.addEventListener('mouseup', boundHandlers.documentMouseup);
@@ -390,6 +389,7 @@ window.MojiQNavigation = (function() {
             // ドラッグ中はmouseup/touchendで処理するため、ここでは何もしない
             if (isDragging) return;
             await navigateToPage(parseInt(e.target.value, 10));
+            resetNavBarTimer();
         };
         pageSlider.addEventListener('input', boundHandlers.sliderInput);
         pageSlider.addEventListener('change', boundHandlers.sliderChange);
@@ -406,6 +406,7 @@ window.MojiQNavigation = (function() {
                 await renderPageCallback(newPage);
                 showBubbleTemporarily(newPage);
             }
+            resetNavBarTimer();
         };
         // 右(▶ Next)ボタンを押すと「前へ戻る (-1)」
         boundHandlers.nextBtnClick = async () => {
@@ -418,6 +419,7 @@ window.MojiQNavigation = (function() {
                 await renderPageCallback(newPage);
                 showBubbleTemporarily(newPage);
             }
+            resetNavBarTimer();
         };
         navPrevBtn.addEventListener('click', boundHandlers.prevBtnClick);
         navNextBtn.addEventListener('click', boundHandlers.nextBtnClick);
@@ -525,8 +527,6 @@ window.MojiQNavigation = (function() {
     function hideNavBar() {
         // ユーザーが明示的に非表示にしている場合は何もしない
         if (isUserHidden) return;
-        // 校正モードでは自動的な非表示を行わない
-        if (document.body.classList.contains('proofreading-mode')) return;
 
         bottomNavBar.classList.add('fade-out');
         clearTimeout(navBarHideTimer);

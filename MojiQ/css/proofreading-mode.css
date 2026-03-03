@@ -84,7 +84,7 @@ body.proofreading-mode.pdf-loaded .shared-canvas-area {
 /* 校正モード時のページナビバー - キャンバス下部中央（PDF読み込み後のみ） */
 body.proofreading-mode.pdf-loaded .bottom-nav-bar {
     position: absolute;
-    bottom: 10px;
+    bottom: 15px;
     left: 50%;
     transform: translateX(-50%);
     width: 70%;
@@ -210,8 +210,7 @@ body.proofreading-mode.pdf-loaded .sidebar.right.collapsed .proofreading-panel-h
 
 /* カラーセクション */
 .proofreading-color-section {
-    padding: 8px 12px;
-    border-bottom: 1px solid #e0e0e0;
+    padding: 0 12px 10px;
     flex-shrink: 0;
     display: flex;
     flex-wrap: wrap;
@@ -244,6 +243,130 @@ body.proofreading-mode.pdf-loaded .sidebar.right.collapsed .proofreading-panel-h
     flex: 1;
     min-height: 0;
     overflow: hidden;
+    position: relative;
+    padding-top: 8px;
+}
+
+/* 区切り線（両端をつなげないデザイン） */
+.proofreading-checks-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 12px;
+    right: 12px;
+    height: 1px;
+    background: #e0e0e0;
+}
+
+/* =====================================================
+   検索ボックス
+   ===================================================== */
+
+.proofreading-search-section {
+    display: flex;
+    padding: 6px 12px;
+    flex-shrink: 0;
+}
+
+.proofreading-search-box {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+}
+
+.proofreading-search-icon {
+    flex-shrink: 0;
+    color: #888;
+}
+
+.proofreading-search-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 12px;
+    color: #333;
+    outline: none;
+    min-width: 0;
+}
+
+.proofreading-search-input::placeholder {
+    color: #999;
+}
+
+.proofreading-search-count {
+    flex-shrink: 0;
+    font-size: 11px;
+    color: #1976d2;
+    font-weight: 500;
+}
+
+.proofreading-search-clear-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    border-radius: 50%;
+    cursor: pointer;
+    color: #888;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.proofreading-search-clear-btn:hover {
+    background: #e0e0e0;
+    color: #333;
+}
+
+/* 検索ハイライト */
+.proofreading-search-highlight {
+    background-color: #fff59d;
+    color: #333;
+    border-radius: 2px;
+    padding: 0 1px;
+}
+
+/* 検索でフィルタされて非表示になったアイテム */
+.proofreading-item.search-hidden {
+    display: none;
+}
+
+.proofreading-category.search-hidden {
+    display: none;
+}
+
+/* ダークモード */
+body.dark-mode .proofreading-search-icon {
+    color: #888;
+}
+
+body.dark-mode .proofreading-search-input {
+    color: #e0e0e0;
+}
+
+body.dark-mode .proofreading-search-input::placeholder {
+    color: #666;
+}
+
+body.dark-mode .proofreading-search-clear-btn {
+    color: #888;
+}
+
+body.dark-mode .proofreading-search-clear-btn:hover {
+    background: #444;
+    color: #e0e0e0;
+}
+
+body.dark-mode .proofreading-search-count {
+    color: #64b5f6;
+}
+
+body.dark-mode .proofreading-search-highlight {
+    background-color: #fbc02d;
+    color: #1a1a1a;
 }
 
 .proofreading-section-title {
@@ -274,8 +397,10 @@ body.proofreading-mode.pdf-loaded .sidebar.right.collapsed .proofreading-panel-h
 }
 
 .proofreading-color-grid .color-swatch.active {
-    border-color: #1976d2;
-    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.3);
+    transform: scale(1.15);
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 2px #333;
+    z-index: 1;
 }
 
 .proofreading-color-grid .custom-color {
@@ -751,6 +876,96 @@ body.dark-mode .proofreading-icon-btn.active:hover {
 .proofreading-category.cal-color-default .proofreading-category-header { border-left: 3px solid #9e9e9e; }
 
 /* =====================================================
+   カテゴリ確認済みチェックボックス
+   ===================================================== */
+
+.proofreading-category-checkbox {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin-right: 4px;
+}
+
+.proofreading-category-checkbox input[type="checkbox"] {
+    display: none;
+}
+
+.proofreading-checkbox-icon {
+    width: 11px;
+    height: 11px;
+    border: 1.5px solid #aaa;
+    border-radius: 2px;
+    background: #fff;
+    position: relative;
+    transition: all 0.15s ease;
+}
+
+.proofreading-category-checkbox:hover .proofreading-checkbox-icon {
+    border-color: #666;
+}
+
+.proofreading-category-checkbox input[type="checkbox"]:checked + .proofreading-checkbox-icon {
+    background: #4caf50;
+    border-color: #4caf50;
+}
+
+.proofreading-category-checkbox input[type="checkbox"]:checked + .proofreading-checkbox-icon::after {
+    content: '';
+    position: absolute;
+    left: 2.5px;
+    top: 0px;
+    width: 3px;
+    height: 6px;
+    border: solid #fff;
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg);
+}
+
+/* 確認済みカテゴリのスタイル */
+.proofreading-category.checked .proofreading-category-checkbox,
+.proofreading-category.checked .proofreading-category-toggle,
+.proofreading-category.checked .proofreading-category-name,
+.proofreading-category.checked .proofreading-category-count {
+    opacity: 0.5;
+}
+
+.proofreading-category.checked .proofreading-category-name {
+    text-decoration: line-through;
+}
+
+.proofreading-category.checked .proofreading-category-header::after {
+    content: '確認済み';
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 500;
+    color: #1976d2;
+}
+
+.proofreading-category.checked .proofreading-category-body {
+    opacity: 0.4;
+}
+
+/* ダークモード */
+body.dark-mode .proofreading-checkbox-icon {
+    background: #2a2a2a;
+    border-color: #666;
+}
+
+body.dark-mode .proofreading-category-checkbox:hover .proofreading-checkbox-icon {
+    border-color: #888;
+}
+
+body.dark-mode .proofreading-category-checkbox input[type="checkbox"]:checked + .proofreading-checkbox-icon {
+    background: #66bb6a;
+    border-color: #66bb6a;
+}
+
+body.dark-mode .proofreading-category.checked .proofreading-category-header::after {
+    color: #64b5f6;
+}
+
+/* =====================================================
    メニュー項目のスタイル
    ===================================================== */
 
@@ -972,8 +1187,8 @@ body.dark-mode .header-calibration-btn.menu-locked svg {
    ダークモード対応
    ===================================================== */
 
-body.dark-mode .proofreading-color-section {
-    border-bottom-color: #444;
+body.dark-mode .proofreading-checks-wrapper::before {
+    background: #444;
 }
 
 body.dark-mode .proofreading-section-title {
@@ -982,6 +1197,10 @@ body.dark-mode .proofreading-section-title {
 
 body.dark-mode .proofreading-color-grid .color-swatch {
     border-color: #555;
+}
+
+body.dark-mode .proofreading-color-grid .color-swatch.active {
+    box-shadow: 0 0 0 2px #ddd;
 }
 
 body.dark-mode .proofreading-eyedropper-btn {

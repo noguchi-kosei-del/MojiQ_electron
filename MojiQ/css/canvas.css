@@ -120,13 +120,18 @@ body.mode-simulator .shared-canvas-area {
     padding: 6px 16px;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 20px;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
-/* 校正モード時のラベル色（白とグレーで統一） */
+.mode-label-icon {
+    flex-shrink: 0;
+}
+
+/* 校正モード時のラベル色 */
 body.proofreading-mode .current-mode-label {
     color: rgba(255, 255, 255, 0.9);
-    background: rgba(255, 255, 255, 0.15);
 }
 
 /* --- パン操作時のカーソル --- */

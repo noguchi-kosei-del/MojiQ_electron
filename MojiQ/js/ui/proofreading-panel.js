@@ -14,10 +14,12 @@ const ProofreadingPanel = (() => {
     let panel, panelToggle, colorSwatches, customColorSwatch, eyedropperBtn, colorPicker, rainbowPicker;
     let lineWidthInput, lineWidthSlider;
     let correctnessContent, proposalContent, correctnessCount, proposalCount;
+    let searchInput, searchClearBtn, searchCountEl;
 
     // 現在の状態
     let currentColor = '#ff0000';
     let isCollapsed = false;
+    let checkedCategories = new Set(); // 確認済みカテゴリを保持
 
     /**
      * 初期化
@@ -45,6 +47,11 @@ const ProofreadingPanel = (() => {
         proposalContent = document.getElementById('proposalContent');
         correctnessCount = document.getElementById('correctnessCount');
         proposalCount = document.getElementById('proposalCount');
+
+        // 検索関連
+        searchInput = document.getElementById('proofreadingSearchInput');
+        searchClearBtn = document.getElementById('proofreadingSearchClearBtn');
+        searchCountEl = document.getElementById('proofreadingSearchCount');
 
         setupEventListeners();
     }
@@ -178,6 +185,33 @@ const ProofreadingPanel = (() => {
                     proofLineWidthSlider.value = value;
                     updateSliderGradient(value);
                 }
+            });
+        }
+
+        // 検索関連のイベントリスナー
+        if (searchInput) {
+            // 入力時に検索実行
+            searchInput.addEventListener('input', () => {
+                const query = searchInput.value.trim();
+                performSearch(query);
+                // クリアボタンの表示/非表示
+                if (searchClearBtn) {
+                    searchClearBtn.style.display = query ? 'flex' : 'none';
+                }
+            });
+
+            // Escapeキーでクリア
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    clearSearch();
+                }
+            });
+        }
+
+        // 検索クリアボタン
+        if (searchClearBtn) {
+            searchClearBtn.addEventListener('click', () => {
+                clearSearch();
             });
         }
     }
@@ -344,6 +378,166 @@ const ProofreadingPanel = (() => {
         if (proposalContent) {
             proposalContent.innerHTML = renderItemsToHtml(proposalItems);
         }
+
+        // 検索フィルタを再適用（検索中の場合）
+        if (searchInput && searchInput.value.trim()) {
+            performSearch(searchInput.value.trim());
+        }
+    }
+
+    /**
+     * 検索を実行
+     * @param {string} query - 検索クエリ
+     */
+    function performSearch(query) {
+        // 検索結果表示を更新
+        if (!query) {
+            // クエリが空の場合は全アイテムを表示
+            resetSearchFilter();
+            if (searchCountEl) {
+                searchCountEl.style.display = 'none';
+            }
+            return;
+        }
+
+        const lowerQuery = query.toLowerCase();
+        let totalMatches = 0;
+
+        // 正誤チェックと提案チェックの両方を検索
+        [correctnessContent, proposalContent].forEach(content => {
+            if (!content) return;
+
+            const categories = content.querySelectorAll('.proofreading-category');
+            categories.forEach(category => {
+                const items = category.querySelectorAll('.proofreading-item');
+                let categoryHasMatch = false;
+
+                items.forEach(item => {
+                    // 検索対象: content, excerpt
+                    const contentText = item.getAttribute('data-content') || '';
+                    const excerptEl = item.querySelector('.cal-excerpt');
+                    const contentEl = item.querySelector('.cal-content');
+                    const excerptText = excerptEl ? excerptEl.textContent : '';
+                    const displayContentText = contentEl ? contentEl.textContent : '';
+
+                    const matchesContent = contentText.toLowerCase().includes(lowerQuery);
+                    const matchesExcerpt = excerptText.toLowerCase().includes(lowerQuery);
+                    const matchesDisplay = displayContentText.toLowerCase().includes(lowerQuery);
+
+                    if (matchesContent || matchesExcerpt || matchesDisplay) {
+                        item.classList.remove('search-hidden');
+                        categoryHasMatch = true;
+                        totalMatches++;
+
+                        // ハイライト表示
+                        if (excerptEl) {
+                            highlightText(excerptEl, query);
+                        }
+                        if (contentEl) {
+                            highlightText(contentEl, query);
+                        }
+                    } else {
+                        item.classList.add('search-hidden');
+                        // ハイライトをクリア
+                        if (excerptEl) {
+                            clearHighlight(excerptEl);
+                        }
+                        if (contentEl) {
+                            clearHighlight(contentEl);
+                        }
+                    }
+                });
+
+                // カテゴリ内にマッチがない場合は非表示
+                if (categoryHasMatch) {
+                    category.classList.remove('search-hidden');
+                } else {
+                    category.classList.add('search-hidden');
+                }
+            });
+        });
+
+        // 検索結果件数を表示
+        if (searchCountEl) {
+            searchCountEl.style.display = 'inline';
+            searchCountEl.textContent = `${totalMatches}件`;
+        }
+    }
+
+    /**
+     * 検索フィルタをリセット
+     */
+    function resetSearchFilter() {
+        [correctnessContent, proposalContent].forEach(content => {
+            if (!content) return;
+
+            const categories = content.querySelectorAll('.proofreading-category');
+            categories.forEach(category => {
+                category.classList.remove('search-hidden');
+
+                const items = category.querySelectorAll('.proofreading-item');
+                items.forEach(item => {
+                    item.classList.remove('search-hidden');
+
+                    // ハイライトをクリア
+                    const excerptEl = item.querySelector('.cal-excerpt');
+                    const contentEl = item.querySelector('.cal-content');
+                    if (excerptEl) clearHighlight(excerptEl);
+                    if (contentEl) clearHighlight(contentEl);
+                });
+            });
+        });
+    }
+
+    /**
+     * 検索をクリア
+     */
+    function clearSearch() {
+        if (searchInput) {
+            searchInput.value = '';
+        }
+        if (searchClearBtn) {
+            searchClearBtn.style.display = 'none';
+        }
+        resetSearchFilter();
+        if (searchCountEl) {
+            searchCountEl.style.display = 'none';
+        }
+    }
+
+    /**
+     * テキストをハイライト表示
+     * @param {HTMLElement} element - 対象要素
+     * @param {string} query - 検索クエリ
+     */
+    function highlightText(element, query) {
+        const originalText = element.textContent;
+        const lowerText = originalText.toLowerCase();
+        const lowerQuery = query.toLowerCase();
+        const index = lowerText.indexOf(lowerQuery);
+
+        if (index === -1) {
+            element.innerHTML = escapeHtml(originalText);
+            return;
+        }
+
+        // マッチ部分をハイライト（大文字小文字を保持）
+        const before = originalText.substring(0, index);
+        const match = originalText.substring(index, index + query.length);
+        const after = originalText.substring(index + query.length);
+
+        element.innerHTML = escapeHtml(before) +
+            '<span class="proofreading-search-highlight">' + escapeHtml(match) + '</span>' +
+            escapeHtml(after);
+    }
+
+    /**
+     * ハイライトをクリア
+     * @param {HTMLElement} element - 対象要素
+     */
+    function clearHighlight(element) {
+        // innerHTMLをtextContentに戻す
+        element.textContent = element.textContent;
     }
 
     /**
@@ -386,12 +580,18 @@ const ProofreadingPanel = (() => {
         sortedKeys.forEach(category => {
             const catItems = grouped[category];
             const colorClass = getCategoryColor(category);
+            const isChecked = checkedCategories.has(category);
+            const checkedClass = isChecked ? ' checked collapsed' : '';
 
-            html += '<div class="proofreading-category ' + colorClass + '">';
-            html += '<div class="proofreading-category-header" onclick="ProofreadingPanel.toggleCategory(this)">';
-            html += '<span class="proofreading-category-toggle">▼</span>';
-            html += '<span class="proofreading-category-name">' + escapeHtml(category) + '</span>';
-            html += '<span class="proofreading-category-count">(' + catItems.length + ')</span>';
+            html += '<div class="proofreading-category ' + colorClass + checkedClass + '" data-category="' + escapeAttr(category) + '">';
+            html += '<div class="proofreading-category-header">';
+            html += '<label class="proofreading-category-checkbox" onclick="event.stopPropagation()">';
+            html += '<input type="checkbox" ' + (isChecked ? 'checked' : '') + ' onchange="ProofreadingPanel.toggleCategoryChecked(this, \'' + escapeAttr(category) + '\')">';
+            html += '<span class="proofreading-checkbox-icon"></span>';
+            html += '</label>';
+            html += '<span class="proofreading-category-toggle" onclick="ProofreadingPanel.toggleCategory(this.parentElement)">▼</span>';
+            html += '<span class="proofreading-category-name" onclick="ProofreadingPanel.toggleCategory(this.parentElement)">' + escapeHtml(category) + '</span>';
+            html += '<span class="proofreading-category-count" onclick="ProofreadingPanel.toggleCategory(this.parentElement)">(' + catItems.length + ')</span>';
             html += '</div>';
             html += '<div class="proofreading-category-body">';
             html += '<table class="proofreading-table"><tbody>';
@@ -487,6 +687,35 @@ const ProofreadingPanel = (() => {
         if (category) {
             category.classList.toggle('collapsed');
         }
+    }
+
+    /**
+     * カテゴリの確認済み状態をトグル
+     * @param {HTMLInputElement} checkbox - チェックボックス要素
+     * @param {string} categoryName - カテゴリ名
+     */
+    function toggleCategoryChecked(checkbox, categoryName) {
+        const category = checkbox.closest('.proofreading-category');
+        if (!category) return;
+
+        if (checkbox.checked) {
+            checkedCategories.add(categoryName);
+            category.classList.add('checked');
+            // チェック時に自動で折りたたむ
+            category.classList.add('collapsed');
+        } else {
+            checkedCategories.delete(categoryName);
+            category.classList.remove('checked');
+            // チェック解除時に展開
+            category.classList.remove('collapsed');
+        }
+    }
+
+    /**
+     * 確認済み状態をリセット
+     */
+    function resetCheckedCategories() {
+        checkedCategories.clear();
     }
 
     /**
@@ -740,7 +969,7 @@ const ProofreadingPanel = (() => {
 
         // activeクラスで斜線切り替え（CSSで制御）
         btn.classList.toggle('active', isHidden);
-        btn.title = isHidden ? 'コメントテキスト表示' : 'コメントテキスト非表示';
+        btn.title = isHidden ? 'コメントテキスト表示 (Ctrl+T)' : 'コメントテキスト非表示 (Ctrl+T)';
     }
 
     /**
@@ -791,6 +1020,8 @@ const ProofreadingPanel = (() => {
         toggleSection,
         toggleCategory,
         toggleCheckSection,
+        toggleCategoryChecked,
+        resetCheckedCategories,
         jumpToPage,
         copyContent,
         renderCheckData,
@@ -801,7 +1032,9 @@ const ProofreadingPanel = (() => {
         updateTextLayerButtonState,
         updatePageBarButtonState,
         selectItem,
-        clearItemSelection
+        clearItemSelection,
+        clearSearch,
+        performSearch
     };
 
     // windowオブジェクトに登録（script.jsからのアクセス用）

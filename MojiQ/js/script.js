@@ -85,7 +85,9 @@ function enterProofreadingMode() {
 
     // ホーム画面のモードラベル更新
     const modeLabel = document.getElementById('currentModeLabel');
-    if (modeLabel) modeLabel.textContent = '校正チェックモード';
+    if (modeLabel) {
+        modeLabel.innerHTML = '<svg class="mode-label-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg><span class="mode-label-text">校正チェックモード</span>';
+    }
 }
 
 /**
@@ -130,7 +132,7 @@ function exitProofreadingMode() {
         const isTextHidden = MojiQTextLayerManager.isHidden();
         if (textLayerBtn) {
             if (isTextHidden) {
-                textLayerBtn.title = 'コメントテキスト表示 (Ctrl+T) - 非表示中';
+                textLayerBtn.title = 'コメントテキスト表示 (Ctrl+T)';
                 textLayerBtn.classList.add('hidden-state');
                 if (textLayerSlash) textLayerSlash.style.display = '';
             } else {
@@ -162,7 +164,9 @@ function exitProofreadingMode() {
 
     // ホーム画面のモードラベル更新
     const modeLabel = document.getElementById('currentModeLabel');
-    if (modeLabel) modeLabel.textContent = '指示入れモード';
+    if (modeLabel) {
+        modeLabel.innerHTML = '<svg class="mode-label-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="mode-label-text">指示入れモード</span>';
+    }
 }
 
 /**

@@ -744,7 +744,7 @@
             </div>
 
             <div id="initialMessage">
-                <div id="currentModeLabel" class="current-mode-label">指示入れモード</div>
+                <div id="currentModeLabel" class="current-mode-label"><svg class="mode-label-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="mode-label-text">指示入れモード</span></div>
                 <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 16px; opacity: 0.9;">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                     <polyline points="14 2 14 8 20 8"/>
@@ -861,7 +861,7 @@
                     <button class="color-swatch proofreading-color active" style="background-color: #ff0000;" data-color="#ff0000" title="赤"></button>
                     <button class="color-swatch proofreading-color" style="background-color: #0000ff;" data-color="#0000ff" title="青"></button>
                     <button id="proofCustomColorSwatch" class="color-swatch proofreading-color custom-color" style="background-color: transparent; border: 2px dashed #ccc;" title="カスタムカラー"></button>
-                    <button id="proofEyedropperBtn" class="proofreading-eyedropper-btn" title="スポイト">
+                    <button id="proofEyedropperBtn" class="proofreading-eyedropper-btn" title="スポイト (I)">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px;">
                             <path d="M19 3l2 2-1 1-2-2"/><path d="M17 5l-10 10-2 4 4-2 10-10"/><path d="M11 9l4 4"/><path d="M9 11l4 4"/><path d="M5 19l-2 2"/>
                         </svg>
@@ -882,6 +882,24 @@
 
         <!-- チェックセクションラッパー -->
         <div class="proofreading-checks-wrapper">
+            <!-- 検索ボックス -->
+            <div class="proofreading-search-section">
+                <div class="proofreading-search-box">
+                    <svg class="proofreading-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.35-4.35"/>
+                    </svg>
+                    <input type="text" id="proofreadingSearchInput" class="proofreading-search-input" placeholder="検索...">
+                    <span id="proofreadingSearchCount" class="proofreading-search-count" style="display:none;"></span>
+                    <button id="proofreadingSearchClearBtn" class="proofreading-search-clear-btn" title="クリア" style="display:none;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 6L6 18"/>
+                            <path d="M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
             <!-- 正誤チェックセクション -->
             <div class="proofreading-check-section correctness-section" id="correctnessSection">
                 <div class="proofreading-check-header correctness-header" onclick="ProofreadingPanel.toggleCheckSection('correctness')">
@@ -920,7 +938,7 @@
                         <path d="M10.59 10.59a3 3 0 1 0 4.24 4.24"/>
                     </svg>
                 </button>
-                <button class="proofreading-icon-btn" id="proofToggleTextLayerBtn" onclick="ProofreadingPanel.toggleTextLayer()" title="コメントテキスト非表示">
+                <button class="proofreading-icon-btn" id="proofToggleTextLayerBtn" onclick="ProofreadingPanel.toggleTextLayer()" title="コメントテキスト非表示 (Ctrl+T)">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="3" y="3" width="18" height="18" rx="3" ry="3"/>
                         <path d="M8 8h8"/>

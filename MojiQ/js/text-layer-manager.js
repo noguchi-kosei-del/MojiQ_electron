@@ -69,7 +69,7 @@ window.MojiQTextLayerManager = (function() {
         const slash = document.getElementById('textLayerSlash');
         if (btn) {
             if (isHidden) {
-                btn.title = 'コメントテキスト表示 (Ctrl+T) - 非表示中';
+                btn.title = 'コメントテキスト表示 (Ctrl+T)';
                 btn.classList.add('hidden-state');
                 if (slash) slash.style.display = '';
             } else {

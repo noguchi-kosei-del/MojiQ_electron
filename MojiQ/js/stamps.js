@@ -143,6 +143,12 @@ window.MojiQStamps = (function() {
         fontPaletteDiv = document.createElement('div');
         fontPaletteDiv.className = 'stamp-palette';
 
+        // フォントが無い場合は「データがありません」を表示
+        const fontNoDataMsg = document.createElement('div');
+        fontNoDataMsg.className = 'stamp-no-data-message';
+        fontNoDataMsg.textContent = 'データがありません';
+        fontPaletteDiv.appendChild(fontNoDataMsg);
+
         fontScrollBox.appendChild(fontPaletteDiv);
         fontDropdown.appendChild(fontScrollBox);
 
@@ -377,6 +383,14 @@ window.MojiQStamps = (function() {
                 e.stopPropagation();
                 if (await MojiQModal.showConfirm(`サイズ「${size}P」を削除しますか？`)) {
                     btn.remove();
+                    // 残りのスタンプが無ければ「データがありません」を表示
+                    const remainingSizes = container.querySelectorAll('.stamp-btn[data-size]');
+                    if (remainingSizes.length === 0) {
+                        const noDataMsg = document.createElement('div');
+                        noDataMsg.className = 'stamp-no-data-message';
+                        noDataMsg.textContent = 'データがありません';
+                        container.appendChild(noDataMsg);
+                    }
                 }
                 return;
             }
@@ -555,6 +569,11 @@ window.MojiQStamps = (function() {
      */
     function addSizeStamp(size) {
         const palette = getOrCreateSizePalette();
+        // 「データがありません」メッセージを削除
+        const noDataMsg = palette.querySelector('.stamp-no-data-message');
+        if (noDataMsg) {
+            noDataMsg.remove();
+        }
         createSizeStampElement(size, palette);
     }
 
@@ -588,8 +607,15 @@ window.MojiQStamps = (function() {
                     // フォントスタンプが全て削除されたら編集ボタンを無効化
                     const remainingFonts = stampContainer.querySelectorAll('.stamp-btn.font-type');
                     const fontEditModeBtn = document.getElementById('fontEditModeBtn');
-                    if (remainingFonts.length === 0 && fontEditModeBtn) {
-                        fontEditModeBtn.disabled = true;
+                    if (remainingFonts.length === 0) {
+                        if (fontEditModeBtn) {
+                            fontEditModeBtn.disabled = true;
+                        }
+                        // 「データがありません」を表示
+                        const noDataMsg = document.createElement('div');
+                        noDataMsg.className = 'stamp-no-data-message';
+                        noDataMsg.textContent = 'データがありません';
+                        container.appendChild(noDataMsg);
                     }
                 }
                 return;
@@ -662,97 +688,103 @@ window.MojiQStamps = (function() {
         stampContainer.innerHTML = '';
         state.fontCount = 0;
 
-        // 文字サイズエリア
+        // 文字サイズエリア（常に表示）
+        const sizeArea = document.createElement('div');
+        sizeArea.className = 'stamp-toggle-area';
+        sizeArea.id = 'size-stamp-area';
+
+        // 文字サイズトグルボタン
+        sizeToggleBtn = document.createElement('button');
+        sizeToggleBtn.className = 'stamp-toggle-btn';
+        sizeToggleBtn.id = 'sizeStampToggleBtn';
+        sizeToggleBtn.innerHTML = '<span class="toggle-label">文字サイズ</span><span id="selectedSizeDisplay" class="selected-stamp-display"></span><span class="toggle-arrow"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>';
+        sizeArea.appendChild(sizeToggleBtn);
+
+        // 文字サイズドロップダウン
+        sizeDropdown = document.createElement('div');
+        sizeDropdown.className = 'stamp-dropdown';
+
+        const sizeScrollBox = document.createElement('div');
+        sizeScrollBox.className = 'stamp-section';
+
+        sizePaletteDiv = document.createElement('div');
+        sizePaletteDiv.className = 'stamp-palette';
+
         if (sizes && sizes.length > 0) {
-            const sizeArea = document.createElement('div');
-            sizeArea.className = 'stamp-toggle-area';
-            sizeArea.id = 'size-stamp-area';
-
-            // 文字サイズトグルボタン
-            sizeToggleBtn = document.createElement('button');
-            sizeToggleBtn.className = 'stamp-toggle-btn';
-            sizeToggleBtn.id = 'sizeStampToggleBtn';
-            sizeToggleBtn.innerHTML = '<span class="toggle-label">文字サイズ</span><span id="selectedSizeDisplay" class="selected-stamp-display"></span><span class="toggle-arrow"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>';
-            sizeArea.appendChild(sizeToggleBtn);
-
-            // 文字サイズドロップダウン
-            sizeDropdown = document.createElement('div');
-            sizeDropdown.className = 'stamp-dropdown';
-
-            const sizeScrollBox = document.createElement('div');
-            sizeScrollBox.className = 'stamp-section';
-
-            sizePaletteDiv = document.createElement('div');
-            sizePaletteDiv.className = 'stamp-palette';
-
             sizes.forEach(size => {
                 createSizeStampElement(size, sizePaletteDiv);
             });
-
-            sizeScrollBox.appendChild(sizePaletteDiv);
-            sizeDropdown.appendChild(sizeScrollBox);
-
-            // スクロールボックス外のアクション行（文字サイズ追加・削除）
-            const sizeActionRow = document.createElement('div');
-            sizeActionRow.className = 'section-action-row';
-
-            const sizeAddBtn = document.createElement('button');
-            sizeAddBtn.className = 'section-add-btn';
-            sizeAddBtn.id = 'sizeAddBtn';
-            sizeAddBtn.textContent = '追加';
-            sizeAddBtn.onclick = async (e) => {
-                e.stopPropagation();
-                MojiQModeController.turnOffAllSectionModes();
-                const input = await MojiQModal.showPrompt('追加する文字サイズ（数値）を入力してください:', '', '文字サイズ追加');
-                if (input !== null && input.trim() !== '') {
-                    const size = parseInt(input.trim(), 10);
-                    if (!isNaN(size) && size > 0) {
-                        addSizeStamp(size);
-                    } else {
-                        await MojiQModal.showAlert('有効な数値を入力してください', 'エラー');
-                    }
-                }
-            };
-            sizeActionRow.appendChild(sizeAddBtn);
-
-            const sizeDeleteBtn = document.createElement('button');
-            sizeDeleteBtn.className = 'section-delete-btn';
-            sizeDeleteBtn.id = 'sizeDeleteModeBtn';
-            sizeDeleteBtn.textContent = '削除';
-            sizeDeleteBtn.onclick = (e) => {
-                e.stopPropagation();
-                MojiQModeController.toggleDeleteModeForSection('size');
-            };
-            sizeActionRow.appendChild(sizeDeleteBtn);
-
-            sizeDropdown.appendChild(sizeActionRow);
-            sizeArea.appendChild(sizeDropdown);
-            stampContainer.appendChild(sizeArea);
+        } else {
+            // サイズが無い場合は「データがありません」を表示
+            const sizeNoDataMsg = document.createElement('div');
+            sizeNoDataMsg.className = 'stamp-no-data-message';
+            sizeNoDataMsg.textContent = 'データがありません';
+            sizePaletteDiv.appendChild(sizeNoDataMsg);
         }
 
-        // フォント指定エリア
+        sizeScrollBox.appendChild(sizePaletteDiv);
+        sizeDropdown.appendChild(sizeScrollBox);
+
+        // スクロールボックス外のアクション行（文字サイズ追加・削除）
+        const sizeActionRow = document.createElement('div');
+        sizeActionRow.className = 'section-action-row';
+
+        const sizeAddBtn = document.createElement('button');
+        sizeAddBtn.className = 'section-add-btn';
+        sizeAddBtn.id = 'sizeAddBtn';
+        sizeAddBtn.textContent = '追加';
+        sizeAddBtn.onclick = async (e) => {
+            e.stopPropagation();
+            MojiQModeController.turnOffAllSectionModes();
+            const input = await MojiQModal.showPrompt('追加する文字サイズ（数値）を入力してください:', '', '文字サイズ追加');
+            if (input !== null && input.trim() !== '') {
+                const size = parseInt(input.trim(), 10);
+                if (!isNaN(size) && size > 0) {
+                    addSizeStamp(size);
+                } else {
+                    await MojiQModal.showAlert('有効な数値を入力してください', 'エラー');
+                }
+            }
+        };
+        sizeActionRow.appendChild(sizeAddBtn);
+
+        const sizeDeleteBtn = document.createElement('button');
+        sizeDeleteBtn.className = 'section-delete-btn';
+        sizeDeleteBtn.id = 'sizeDeleteModeBtn';
+        sizeDeleteBtn.textContent = '削除';
+        sizeDeleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            MojiQModeController.toggleDeleteModeForSection('size');
+        };
+        sizeActionRow.appendChild(sizeDeleteBtn);
+
+        sizeDropdown.appendChild(sizeActionRow);
+        sizeArea.appendChild(sizeDropdown);
+        stampContainer.appendChild(sizeArea);
+
+        // フォント指定エリア（常に表示）
+        const fontArea = document.createElement('div');
+        fontArea.className = 'stamp-toggle-area';
+        fontArea.id = 'font-stamp-area';
+
+        // フォント指定トグルボタン
+        fontToggleBtn = document.createElement('button');
+        fontToggleBtn.className = 'stamp-toggle-btn';
+        fontToggleBtn.id = 'fontStampToggleBtn';
+        fontToggleBtn.innerHTML = '<span class="toggle-label">フォント指定</span><span id="selectedFontDisplay" class="selected-stamp-display"></span><span class="toggle-arrow"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>';
+        fontArea.appendChild(fontToggleBtn);
+
+        // フォント指定ドロップダウン
+        fontDropdown = document.createElement('div');
+        fontDropdown.className = 'stamp-dropdown';
+
+        const fontScrollBox = document.createElement('div');
+        fontScrollBox.className = 'font-section';
+
+        fontPaletteDiv = document.createElement('div');
+        fontPaletteDiv.className = 'stamp-palette';
+
         if (fonts && fonts.length > 0) {
-            const fontArea = document.createElement('div');
-            fontArea.className = 'stamp-toggle-area';
-            fontArea.id = 'font-stamp-area';
-
-            // フォント指定トグルボタン
-            fontToggleBtn = document.createElement('button');
-            fontToggleBtn.className = 'stamp-toggle-btn';
-            fontToggleBtn.id = 'fontStampToggleBtn';
-            fontToggleBtn.innerHTML = '<span class="toggle-label">フォント指定</span><span id="selectedFontDisplay" class="selected-stamp-display"></span><span class="toggle-arrow"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>';
-            fontArea.appendChild(fontToggleBtn);
-
-            // フォント指定ドロップダウン
-            fontDropdown = document.createElement('div');
-            fontDropdown.className = 'stamp-dropdown';
-
-            const fontScrollBox = document.createElement('div');
-            fontScrollBox.className = 'font-section';
-
-            fontPaletteDiv = document.createElement('div');
-            fontPaletteDiv.className = 'stamp-palette';
-
             fonts.forEach((fontItem) => {
                 const name = (typeof fontItem === 'object' && fontItem.name) ? fontItem.name : String(fontItem);
                 let color = null;
@@ -765,49 +797,57 @@ window.MojiQStamps = (function() {
 
                 createFontStampElement(name, color, fontPaletteDiv);
             });
-
-            fontScrollBox.appendChild(fontPaletteDiv);
-            fontDropdown.appendChild(fontScrollBox);
-
-            // スクロールボックス外のアクション行（フォント追加・編集・削除）
-            const fontActionRow = document.createElement('div');
-            fontActionRow.className = 'section-action-row triple';
-
-            const fontAddBtn = document.createElement('button');
-            fontAddBtn.className = 'section-add-btn';
-            fontAddBtn.id = 'fontAddBtn';
-            fontAddBtn.textContent = '追加';
-            fontAddBtn.onclick = (e) => {
-                e.stopPropagation();
-                MojiQModeController.turnOffAllSectionModes();
-                MojiQModal.openFontModal();
-            };
-            fontActionRow.appendChild(fontAddBtn);
-
-            const fontEditBtn = document.createElement('button');
-            fontEditBtn.className = 'section-edit-btn';
-            fontEditBtn.id = 'fontEditModeBtn';
-            fontEditBtn.textContent = '編集';
-            fontEditBtn.onclick = (e) => {
-                e.stopPropagation();
-                MojiQModeController.toggleEditModeForSection('font');
-            };
-            fontActionRow.appendChild(fontEditBtn);
-
-            const fontDeleteBtn = document.createElement('button');
-            fontDeleteBtn.className = 'section-delete-btn';
-            fontDeleteBtn.id = 'fontDeleteModeBtn';
-            fontDeleteBtn.textContent = '削除';
-            fontDeleteBtn.onclick = (e) => {
-                e.stopPropagation();
-                MojiQModeController.toggleDeleteModeForSection('font');
-            };
-            fontActionRow.appendChild(fontDeleteBtn);
-
-            fontDropdown.appendChild(fontActionRow);
-            fontArea.appendChild(fontDropdown);
-            stampContainer.appendChild(fontArea);
+        } else {
+            // フォントが無い場合は「データがありません」を表示
+            const fontNoDataMsg = document.createElement('div');
+            fontNoDataMsg.className = 'stamp-no-data-message';
+            fontNoDataMsg.textContent = 'データがありません';
+            fontPaletteDiv.appendChild(fontNoDataMsg);
         }
+
+        fontScrollBox.appendChild(fontPaletteDiv);
+        fontDropdown.appendChild(fontScrollBox);
+
+        // スクロールボックス外のアクション行（フォント追加・編集・削除）
+        const fontActionRow = document.createElement('div');
+        fontActionRow.className = 'section-action-row triple';
+
+        const fontAddBtn = document.createElement('button');
+        fontAddBtn.className = 'section-add-btn';
+        fontAddBtn.id = 'fontAddBtn';
+        fontAddBtn.textContent = '追加';
+        fontAddBtn.onclick = (e) => {
+            e.stopPropagation();
+            MojiQModeController.turnOffAllSectionModes();
+            MojiQModal.openFontModal();
+        };
+        fontActionRow.appendChild(fontAddBtn);
+
+        const fontEditBtn = document.createElement('button');
+        fontEditBtn.className = 'section-edit-btn';
+        fontEditBtn.id = 'fontEditModeBtn';
+        fontEditBtn.textContent = '編集';
+        // フォントが無い場合は編集ボタンを無効化
+        fontEditBtn.disabled = !fonts || fonts.length === 0;
+        fontEditBtn.onclick = (e) => {
+            e.stopPropagation();
+            MojiQModeController.toggleEditModeForSection('font');
+        };
+        fontActionRow.appendChild(fontEditBtn);
+
+        const fontDeleteBtn = document.createElement('button');
+        fontDeleteBtn.className = 'section-delete-btn';
+        fontDeleteBtn.id = 'fontDeleteModeBtn';
+        fontDeleteBtn.textContent = '削除';
+        fontDeleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            MojiQModeController.toggleDeleteModeForSection('font');
+        };
+        fontActionRow.appendChild(fontDeleteBtn);
+
+        fontDropdown.appendChild(fontActionRow);
+        fontArea.appendChild(fontDropdown);
+        stampContainer.appendChild(fontArea);
 
         // 選択表示用の参照を取得
         selectedSizeDisplay = document.getElementById('selectedSizeDisplay');
@@ -840,6 +880,11 @@ window.MojiQStamps = (function() {
         // 文字サイズボタンを追加（重複を除く）
         if (sizes && sizes.length > 0) {
             const sizePalette = getOrCreateSizePalette();
+            // 「データがありません」メッセージを削除
+            const sizeNoDataMsg = sizePalette.querySelector('.stamp-no-data-message');
+            if (sizeNoDataMsg) {
+                sizeNoDataMsg.remove();
+            }
             sizes.forEach(size => {
                 if (!existingSizes.has(size)) {
                     createSizeStampElement(size, sizePalette);
@@ -851,6 +896,11 @@ window.MojiQStamps = (function() {
         // フォントボタンを追加（重複を除く）
         if (fonts && fonts.length > 0) {
             const fontPalette = getOrCreateFontPalette();
+            // 「データがありません」メッセージを削除
+            const fontNoDataMsg = fontPalette.querySelector('.stamp-no-data-message');
+            if (fontNoDataMsg) {
+                fontNoDataMsg.remove();
+            }
             fonts.forEach((fontItem) => {
                 const name = (typeof fontItem === 'object' && fontItem.name) ? fontItem.name : String(fontItem);
 
@@ -957,6 +1007,11 @@ window.MojiQStamps = (function() {
      */
     function addFontStamp(name, color) {
         const palette = getOrCreateFontPalette();
+        // 「データがありません」メッセージを削除
+        const noDataMsg = palette.querySelector('.stamp-no-data-message');
+        if (noDataMsg) {
+            noDataMsg.remove();
+        }
         createFontStampElement(name, color, palette);
     }
 
