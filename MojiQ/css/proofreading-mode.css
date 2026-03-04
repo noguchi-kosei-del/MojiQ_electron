@@ -543,7 +543,7 @@ body.proofreading-mode #proofEyedropperBtn svg {
 }
 
 .proofreading-check-section.proposal-section {
-    border-color: #2e7d32;
+    border-color: #1565c0;
 }
 
 .proofreading-check-header {
@@ -572,12 +572,12 @@ body.proofreading-mode #proofEyedropperBtn svg {
 
 .proofreading-check-header.proposal-header {
     background-color: #fff;
-    color: #2e7d32;
-    border-bottom-color: #c8e6c9;
+    color: #1565c0;
+    border-bottom-color: #bbdefb;
 }
 
 .proofreading-check-header.proposal-header:hover {
-    background-color: #f5fef5;
+    background-color: #e3f2fd;
 }
 
 .proofreading-check-toggle {
@@ -1248,12 +1248,12 @@ body.dark-mode .proofreading-check-header.correctness-header:hover {
 
 body.dark-mode .proofreading-check-header.proposal-header {
     background-color: #2a2a2a;
-    color: #81c784;
-    border-bottom-color: #2e5a30;
+    color: #64b5f6;
+    border-bottom-color: #1a3a5c;
 }
 
 body.dark-mode .proofreading-check-header.proposal-header:hover {
-    background-color: #2a352a;
+    background-color: #2a2a35;
 }
 
 /* 校正モード時のツールバーボーダー（ダークモード） */
@@ -1266,7 +1266,7 @@ body.dark-mode .proofreading-check-section.correctness-section {
 }
 
 body.dark-mode .proofreading-check-section.proposal-section {
-    border-color: #66bb6a;
+    border-color: #42a5f5;
 }
 
 body.dark-mode .proofreading-category {

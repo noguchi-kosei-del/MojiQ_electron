@@ -735,12 +735,29 @@ const ProofreadingPanel = (() => {
         }
         if (!pageMatch) return;
 
-        const pageNum = parseInt(pageMatch[1], 10);
+        let pageNum = parseInt(pageMatch[1], 10);
         if (isNaN(pageNum) || pageNum < 1) return;
 
-        // ページ移動（goToPageは1-indexedを期待）
-        if (window.goToPage) {
-            window.goToPage(pageNum);
+        // ページ移動
+        if (window.MojiQPdfManager && window.MojiQPdfManager.renderPage) {
+            // 1. アプリの見開きモード（SpreadViewMode）: 白紙ページ分を加算
+            if (window.MojiQPdfManager.isSpreadViewMode && window.MojiQPdfManager.isSpreadViewMode()) {
+                const SpreadState = window._MojiQPdfSpreadState;
+                if (SpreadState && SpreadState.getSpreadBlankPagesAdded) {
+                    const blankPages = SpreadState.getSpreadBlankPagesAdded();
+                    pageNum += blankPages.front;
+                }
+            }
+            // 2. 横長原稿（幅 > 高さ）: 1ページ目は単独、2ページ目以降は見開きとして計算
+            else if (window.MojiQPdfManager.getOriginalPageSize) {
+                const pageSize = window.MojiQPdfManager.getOriginalPageSize(1);
+                if (pageSize && pageSize.width > pageSize.height && pageNum >= 2) {
+                    // 2P,3P→2ページ目、4P,5P→3ページ目、...
+                    pageNum = Math.ceil((pageNum - 1) / 2) + 1;
+                }
+            }
+
+            window.MojiQPdfManager.renderPage(pageNum);
         } else if (window.MojiQStore) {
             // フォールバック：Storeを通じて移動
             const totalPages = window.MojiQStore.get('page.totalPages');
@@ -985,6 +1002,14 @@ const ProofreadingPanel = (() => {
 
         // 選択状態を視覚的に表示
         rowElement.classList.add('selected');
+
+        // 正誤/提案に応じて色を設定
+        // correctnessContent内なら赤、proposalContent内なら青
+        if (correctnessContent && correctnessContent.contains(rowElement)) {
+            setColor('#ff0000'); // 赤
+        } else if (proposalContent && proposalContent.contains(rowElement)) {
+            setColor('#0000ff'); // 青
+        }
 
         // textモードに切り替え（文字サイズツールと同様）
         if (window.MojiQModeController) {
