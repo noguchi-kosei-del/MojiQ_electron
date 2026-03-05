@@ -351,7 +351,14 @@ window.MojiQShortcuts = (function() {
                 }
             }
 
-            // 10. ツール切り替えショートカット（単一キー）
+            // 10. ページジャンプ (Ctrl+J)
+            if (matchesShortcut(e, 'pageJump')) {
+                e.preventDefault();
+                window.dispatchEvent(new CustomEvent('mojiq:page-jump', { detail: {} }));
+                return;
+            }
+
+            // 11. ツール切り替えショートカット（単一キー）
             // Ctrlキーが押されていない場合のみ処理
             // ビューワーモード中は無効化
             if (!isCtrlOrMeta && !(window.MojiQViewerMode && MojiQViewerMode.isActive())) {

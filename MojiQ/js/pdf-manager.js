@@ -1103,7 +1103,8 @@ window.MojiQPdfManager = (function() {
         if (window.syncSimulatorFromScript) window.syncSimulatorFromScript(pageNum);
 
         // --- 回転を適用（グローバル回転） ---
-        applyRotationToCanvas();
+        // TODO: applyRotationToCanvas関数が未定義のため一時的に無効化
+        // applyRotationToCanvas();
 
         // --- 隣接ページのプリフェッチを開始 ---
         schedulePrefetch(pageNum, containerWidth, containerHeight);
@@ -5673,6 +5674,7 @@ window.MojiQPdfManager = (function() {
         prevSpread,
         displaySpreadFromCache,  // キャッシュからの高速表示（ページ移動用）
         getSpreadPageInfo,
+        getSpreadIndexFromPage,     // ページ番号から見開きインデックス取得
         setSpreadBindingDirection,  // 綴じ方向設定
         getSpreadBindingDirection,  // 綴じ方向取得
         getCurrentSpreadPageKey,    // 現在の見開きページキー取得

@@ -673,6 +673,100 @@ window.MojiQPageManager = (function() {
             }
         });
 
+        // ページジャンプ (Ctrl+J)
+        window.addEventListener('mojiq:page-jump', async () => {
+            if (state.totalPages === 0) return;
+            if (window.MojiQViewerMode && MojiQViewerMode.isActive()) return;
+
+            const PdfManager = window.MojiQPdfManager;
+            const SpreadState = window._MojiQPdfSpreadState;
+            const isSpreadMode = PdfManager && PdfManager.isSpreadViewMode();
+
+            // 見開きモード時の白紙ページ数を取得
+            let blankPagesFront = 0;
+            if (isSpreadMode && SpreadState && SpreadState.getSpreadBlankPagesAdded) {
+                const blankPages = SpreadState.getSpreadBlankPagesAdded();
+                blankPagesFront = blankPages.front || 0;
+            }
+
+            // 元のページ数（白紙を含まない）を計算
+            const originalTotalPages = isSpreadMode
+                ? state.totalPages - blankPagesFront - (SpreadState?.getSpreadBlankPagesAdded()?.back || 0)
+                : state.totalPages;
+
+            // 現在のページ番号を取得（デフォルト値用、元のページ番号に変換）
+            let currentPageDisplay = state.currentPageNum;
+            if (isSpreadMode) {
+                const spread = PdfManager.getCurrentSpread();
+                if (spread) {
+                    const bindingDir = PdfManager.getSpreadBindingDirection();
+                    // 見開き内のページ番号を取得（白紙を除く）
+                    let pageInSpread = null;
+                    if (bindingDir === 'right' && spread.rightPage && !spread.rightBlank) {
+                        pageInSpread = spread.rightPage;
+                    } else if (spread.leftPage && !spread.leftBlank) {
+                        pageInSpread = spread.leftPage;
+                    } else if (spread.rightPage && !spread.rightBlank) {
+                        pageInSpread = spread.rightPage;
+                    }
+                    if (pageInSpread) {
+                        // 白紙ページ分を引いて元のページ番号に変換
+                        currentPageDisplay = pageInSpread - blankPagesFront;
+                    }
+                }
+            }
+
+            // プロンプトモーダルを表示（元のページ番号で表示）
+            const inputValue = await MojiQModal.showPrompt(
+                `ページ番号を入力 (1-${originalTotalPages})`,
+                String(Math.max(1, currentPageDisplay)),
+                'ページジャンプ'
+            );
+
+            if (inputValue === null || inputValue.trim() === '') return;
+
+            const targetPage = parseInt(inputValue.trim(), 10);
+
+            if (isNaN(targetPage)) {
+                await MojiQModal.showAlert('数値を入力してください。', 'エラー');
+                return;
+            }
+
+            if (targetPage < 1 || targetPage > originalTotalPages) {
+                await MojiQModal.showAlert(
+                    `1から${originalTotalPages}の範囲で入力してください。`,
+                    'エラー'
+                );
+                return;
+            }
+
+            // ページジャンプ実行
+            try {
+                if (isSpreadMode) {
+                    // 見開きモード: 元のページ番号に白紙ページ分を加算して内部ページ番号に変換
+                    const internalPageNum = targetPage + blankPagesFront;
+                    const spreadIndex = PdfManager.getSpreadIndexFromPage(internalPageNum);
+                    PdfManager.displaySpreadFromCache(spreadIndex);
+                } else {
+                    // 単ページモード
+                    let actualPageNum = targetPage;
+
+                    // 横長原稿（幅 > 高さ）の場合: 1ページ目は単独、2ページ目以降は見開きとして計算
+                    if (PdfManager.getOriginalPageSize) {
+                        const pageSize = PdfManager.getOriginalPageSize(1);
+                        if (pageSize && pageSize.width > pageSize.height && targetPage >= 2) {
+                            // 2P,3P→2ページ目、4P,5P→3ページ目、...
+                            actualPageNum = Math.ceil((targetPage - 1) / 2) + 1;
+                        }
+                    }
+
+                    await PdfManager.renderPage(actualPageNum);
+                }
+            } catch (err) {
+                console.error('ページジャンプ中にエラーが発生:', err);
+            }
+        });
+
         // ページスライド（長押し中はスライダーのみ動かす）
         window.addEventListener('mojiq:page-slide', (e) => {
             const action = e.detail.action;

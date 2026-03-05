@@ -40,6 +40,7 @@ window.MojiQSettings = (function() {
             pagePrev: { key: 'ArrowLeft', modifiers: [], description: '前ページ' },
             pageFirst: { key: 'ArrowRight', modifiers: ['ctrl'], description: '最初のページ' },
             pageLast: { key: 'ArrowLeft', modifiers: ['ctrl'], description: '最後のページ' },
+            pageJump: { key: 'j', modifiers: ['ctrl'], description: 'ページジャンプ' },
             // 線幅
             lineWidthUp: { key: ']', modifiers: ['ctrl'], description: '線を太く' },
             lineWidthDown: { key: '[', modifiers: ['ctrl'], description: '線を細く' },
