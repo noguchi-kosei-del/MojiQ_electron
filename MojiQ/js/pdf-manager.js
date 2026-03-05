@@ -1176,12 +1176,16 @@ window.MojiQPdfManager = (function() {
     function updateSaveMenuState(enabled) {
         const saveMenuItem = document.querySelector('[data-action="save-pdf"]');
         const saveAsMenuItem = document.querySelector('[data-action="save-pdf-as"]');
+        const exportDrawingMenuItem = document.querySelector('[data-action="export-drawing"]');
 
         if (saveMenuItem) {
             saveMenuItem.classList.toggle('disabled', !enabled);
         }
         if (saveAsMenuItem) {
             saveAsMenuItem.classList.toggle('disabled', !enabled);
+        }
+        if (exportDrawingMenuItem) {
+            exportDrawingMenuItem.classList.toggle('disabled', !enabled);
         }
     }
 
@@ -5614,6 +5618,9 @@ window.MojiQPdfManager = (function() {
         // 上書き保存可否判定用（ファイルパスが設定されているか）
         canOverwriteSave: () => !!currentSaveFilePath,
         // 名前を付けて保存（常に新規ダイアログを表示）
-        saveAsNew
+        saveAsNew,
+        // ページ情報取得（描画データエクスポート/インポート用）
+        getPageCount: () => state?.totalPages || 0,
+        getCurrentPage: () => state?.currentPageNum || 1
     };
 })();

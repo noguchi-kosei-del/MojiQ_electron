@@ -465,6 +465,16 @@ function initWindowControlsAndMenuBar() {
                         window.MojiQPrintManager.printPdf();
                     }
                     break;
+                case 'export-drawing':
+                    if (window.DrawingExportImport) {
+                        window.DrawingExportImport.exportToFile();
+                    }
+                    break;
+                case 'import-drawing':
+                    if (window.DrawingExportImport) {
+                        window.DrawingExportImport.importFromFile();
+                    }
+                    break;
             }
         }
     }
@@ -649,8 +659,10 @@ function initWindowControlsAndMenuBar() {
     // --- 保存メニュー項目の初期状態（無効） ---
     const saveMenuItem = document.querySelector('[data-action="save-pdf"]');
     const saveAsMenuItem = document.querySelector('[data-action="save-pdf-as"]');
+    const exportDrawingMenuItem = document.querySelector('[data-action="export-drawing"]');
     if (saveMenuItem) saveMenuItem.classList.add('disabled');
     if (saveAsMenuItem) saveAsMenuItem.classList.add('disabled');
+    if (exportDrawingMenuItem) exportDrawingMenuItem.classList.add('disabled');
 
     // --- アプリ終了時の確認（Electron IPC経由） ---
     // DOM Cache初期化前に設定して、エラー時でもウィンドウを閉じられるようにする
@@ -1546,6 +1558,8 @@ window.addEventListener('load', () => {
     if (savePdfBtn && savePdfDropdown) {
         const overwriteSaveBtn = document.getElementById('overwriteSaveBtn');
         const saveAsNewBtn = document.getElementById('saveAsNewBtn');
+        const exportDrawingBtn = document.getElementById('exportDrawingBtn');
+        const importDrawingBtn = document.getElementById('importDrawingBtn');
 
         function updateSaveDropdownState() {
             // 上書き保存の有効/無効を更新
@@ -1595,6 +1609,39 @@ window.addEventListener('load', () => {
                 closeSavePdfDropdown();
                 MojiQPdfManager.saveAsNew();
             });
+        }
+
+        // 描画データを保存ボタン
+        console.log('[script.js] exportDrawingBtn:', exportDrawingBtn);
+        if (exportDrawingBtn) {
+            exportDrawingBtn.addEventListener('click', () => {
+                console.log('[script.js] exportDrawingBtn clicked');
+                console.log('[script.js] DrawingExportImport:', window.DrawingExportImport);
+                closeSavePdfDropdown();
+                if (window.DrawingExportImport) {
+                    window.DrawingExportImport.exportToFile();
+                } else {
+                    console.error('[script.js] DrawingExportImport not found');
+                }
+            });
+        } else {
+            console.error('[script.js] exportDrawingBtn not found');
+        }
+
+        // 描画データを読み込みボタン
+        console.log('[script.js] importDrawingBtn:', importDrawingBtn);
+        if (importDrawingBtn) {
+            importDrawingBtn.addEventListener('click', () => {
+                console.log('[script.js] importDrawingBtn clicked');
+                closeSavePdfDropdown();
+                if (window.DrawingExportImport) {
+                    window.DrawingExportImport.importFromFile();
+                } else {
+                    console.error('[script.js] DrawingExportImport not found');
+                }
+            });
+        } else {
+            console.error('[script.js] importDrawingBtn not found');
         }
 
         // グローバルにアクセス可能にする
