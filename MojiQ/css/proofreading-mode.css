@@ -1075,8 +1075,8 @@ body.dark-mode .mode-toggle-btn.active svg {
 
 /* 作品仕様を読み込みボタン（緑） */
 .header-spec-btn {
-    background: rgba(46, 125, 50, 0.1);
-    border: 1.5px solid #2e7d32;
+    background: rgba(46, 125, 50, 0.1) !important;
+    border: 1.5px solid #2e7d32 !important;
     border-radius: 6px;
 }
 
@@ -1085,7 +1085,7 @@ body.dark-mode .mode-toggle-btn.active svg {
 }
 
 .header-spec-btn:hover {
-    background: rgba(46, 125, 50, 0.2);
+    background: rgba(46, 125, 50, 0.2) !important;
 }
 
 .header-spec-btn:hover svg {
@@ -1094,8 +1094,8 @@ body.dark-mode .mode-toggle-btn.active svg {
 
 /* 校正チェックボタン（青） */
 .header-calibration-btn {
-    background: rgba(21, 101, 192, 0.1);
-    border: 1.5px solid #1565c0;
+    background: rgba(21, 101, 192, 0.1) !important;
+    border: 1.5px solid #1565c0 !important;
     border-radius: 6px;
 }
 
@@ -1104,7 +1104,7 @@ body.dark-mode .mode-toggle-btn.active svg {
 }
 
 .header-calibration-btn:hover {
-    background: rgba(21, 101, 192, 0.2);
+    background: rgba(21, 101, 192, 0.2) !important;
 }
 
 .header-calibration-btn:hover svg {
@@ -1116,8 +1116,8 @@ body.dark-mode .mode-toggle-btn.active svg {
 .header-calibration-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-    background: rgba(128, 128, 128, 0.1);
-    border-color: #bbb;
+    background: rgba(128, 128, 128, 0.1) !important;
+    border-color: #bbb !important;
 }
 
 .header-spec-btn:disabled svg,
@@ -1165,8 +1165,8 @@ body.proofreading-mode .header-calibration-btn {
 
 /* ダークモード対応 */
 body.dark-mode .header-spec-btn {
-    background: rgba(129, 199, 132, 0.15);
-    border-color: #81c784;
+    background: rgba(129, 199, 132, 0.15) !important;
+    border-color: #81c784 !important;
 }
 
 body.dark-mode .header-spec-btn svg {
@@ -1174,7 +1174,7 @@ body.dark-mode .header-spec-btn svg {
 }
 
 body.dark-mode .header-spec-btn:hover {
-    background: rgba(129, 199, 132, 0.25);
+    background: rgba(129, 199, 132, 0.25) !important;
 }
 
 body.dark-mode .header-spec-btn:hover svg {
@@ -1182,8 +1182,8 @@ body.dark-mode .header-spec-btn:hover svg {
 }
 
 body.dark-mode .header-calibration-btn {
-    background: rgba(144, 202, 249, 0.15);
-    border-color: #90caf9;
+    background: rgba(144, 202, 249, 0.15) !important;
+    border-color: #90caf9 !important;
 }
 
 body.dark-mode .header-calibration-btn svg {
@@ -1191,7 +1191,7 @@ body.dark-mode .header-calibration-btn svg {
 }
 
 body.dark-mode .header-calibration-btn:hover {
-    background: rgba(144, 202, 249, 0.25);
+    background: rgba(144, 202, 249, 0.25) !important;
 }
 
 body.dark-mode .header-calibration-btn:hover svg {
@@ -1201,8 +1201,8 @@ body.dark-mode .header-calibration-btn:hover svg {
 /* ダークモード disabled状態 */
 body.dark-mode .header-spec-btn:disabled,
 body.dark-mode .header-calibration-btn:disabled {
-    background: rgba(100, 100, 100, 0.1);
-    border-color: #666;
+    background: rgba(100, 100, 100, 0.1) !important;
+    border-color: #666 !important;
 }
 
 body.dark-mode .header-spec-btn:disabled svg,
