@@ -682,88 +682,136 @@ window.MojiQPageManager = (function() {
             const SpreadState = window._MojiQPdfSpreadState;
             const isSpreadMode = PdfManager && PdfManager.isSpreadViewMode();
 
-            // 見開きモード時の白紙ページ数を取得
-            let blankPagesFront = 0;
-            if (isSpreadMode && SpreadState && SpreadState.getSpreadBlankPagesAdded) {
-                const blankPages = SpreadState.getSpreadBlankPagesAdded();
-                blankPagesFront = blankPages.front || 0;
-            }
-
-            // 元のページ数（白紙を含まない）を計算
-            const originalTotalPages = isSpreadMode
-                ? state.totalPages - blankPagesFront - (SpreadState?.getSpreadBlankPagesAdded()?.back || 0)
-                : state.totalPages;
-
-            // 現在のページ番号を取得（デフォルト値用、元のページ番号に変換）
-            let currentPageDisplay = state.currentPageNum;
             if (isSpreadMode) {
-                const spread = PdfManager.getCurrentSpread();
-                if (spread) {
-                    const bindingDir = PdfManager.getSpreadBindingDirection();
-                    // 見開き内のページ番号を取得（白紙を除く）
-                    let pageInSpread = null;
-                    if (bindingDir === 'right' && spread.rightPage && !spread.rightBlank) {
-                        pageInSpread = spread.rightPage;
-                    } else if (spread.leftPage && !spread.leftBlank) {
-                        pageInSpread = spread.leftPage;
-                    } else if (spread.rightPage && !spread.rightBlank) {
-                        pageInSpread = spread.rightPage;
-                    }
-                    if (pageInSpread) {
-                        // 白紙ページ分を引いて元のページ番号に変換
-                        currentPageDisplay = pageInSpread - blankPagesFront;
+                // 見開きモード: ノンブル（表示ページ番号）でジャンプ
+                // 見開き数を取得
+                const spreadMapping = SpreadState.getSpreadMapping();
+                const totalSpreads = spreadMapping.length;
+                if (totalSpreads === 0) return;
+
+                // 総ノンブル数を計算: 最初の見開きは1ノンブル、以降は各2ノンブル
+                // 総ノンブル = 1 + (totalSpreads - 1) * 2 = 2 * totalSpreads - 1
+                const totalNombre = 2 * totalSpreads - 1;
+
+                // 現在の見開きインデックスからノンブルを計算
+                const currentSpreadIndex = SpreadState.getCurrentSpreadIndex();
+                // 見開き0 → ノンブル1、見開きn (n>=1) → ノンブル 2n
+                const currentNombre = currentSpreadIndex === 0 ? 1 : currentSpreadIndex * 2;
+
+                // プロンプトモーダルを表示（ノンブルで表示）
+                const inputValue = await MojiQModal.showPrompt(
+                    `ページ番号を入力 (1-${totalNombre})`,
+                    String(currentNombre),
+                    'ページジャンプ'
+                );
+
+                if (inputValue === null || inputValue.trim() === '') return;
+
+                const targetNombre = parseInt(inputValue.trim(), 10);
+
+                if (isNaN(targetNombre)) {
+                    await MojiQModal.showAlert('数値を入力してください。', 'エラー');
+                    return;
+                }
+
+                if (targetNombre < 1 || targetNombre > totalNombre) {
+                    await MojiQModal.showAlert(
+                        `1から${totalNombre}の範囲で入力してください。`,
+                        'エラー'
+                    );
+                    return;
+                }
+
+                // ノンブルから見開きインデックスを計算
+                // ノンブル1 → 見開き0
+                // ノンブル2,3 → 見開き1
+                // ノンブル4,5 → 見開き2
+                // ノンブルN (N>=2) → 見開き Math.ceil((N - 1) / 2)
+                let targetSpreadIndex;
+                if (targetNombre === 1) {
+                    targetSpreadIndex = 0;
+                } else {
+                    targetSpreadIndex = Math.ceil((targetNombre - 1) / 2);
+                }
+
+                // 範囲チェック
+                if (targetSpreadIndex >= totalSpreads) {
+                    targetSpreadIndex = totalSpreads - 1;
+                }
+
+                // ページジャンプ実行
+                try {
+                    PdfManager.displaySpreadFromCache(targetSpreadIndex);
+                } catch (err) {
+                    console.error('ページジャンプ中にエラーが発生:', err);
+                }
+            } else {
+                // 単ページモード
+                const originalTotalPages = state.totalPages;
+
+                // 横長原稿（幅 > 高さ）かどうかを判定
+                let isLandscape = false;
+                if (PdfManager && PdfManager.getOriginalPageSize) {
+                    const pageSize = PdfManager.getOriginalPageSize(1);
+                    if (pageSize && pageSize.width > pageSize.height) {
+                        isLandscape = true;
                     }
                 }
-            }
 
-            // プロンプトモーダルを表示（元のページ番号で表示）
-            const inputValue = await MojiQModal.showPrompt(
-                `ページ番号を入力 (1-${originalTotalPages})`,
-                String(Math.max(1, currentPageDisplay)),
-                'ページジャンプ'
-            );
+                // 横長原稿の場合、総ノンブル数を計算: 1 + (元ページ数 - 1) * 2
+                // 例: 16ページ → 1 + 15*2 = 31ノンブル
+                const totalNombre = isLandscape
+                    ? 1 + (originalTotalPages - 1) * 2
+                    : originalTotalPages;
 
-            if (inputValue === null || inputValue.trim() === '') return;
+                // 現在のページからノンブルを計算
+                let currentNombre = state.currentPageNum;
+                if (isLandscape && state.currentPageNum >= 2) {
+                    // 2ページ目以降は見開き表示なので、ノンブルを計算
+                    // 実際のページN (N>=2) → ノンブル (N-1)*2 または (N-1)*2+1
+                    currentNombre = (state.currentPageNum - 1) * 2;
+                }
 
-            const targetPage = parseInt(inputValue.trim(), 10);
-
-            if (isNaN(targetPage)) {
-                await MojiQModal.showAlert('数値を入力してください。', 'エラー');
-                return;
-            }
-
-            if (targetPage < 1 || targetPage > originalTotalPages) {
-                await MojiQModal.showAlert(
-                    `1から${originalTotalPages}の範囲で入力してください。`,
-                    'エラー'
+                // プロンプトモーダルを表示
+                const inputValue = await MojiQModal.showPrompt(
+                    `ページ番号を入力 (1-${totalNombre})`,
+                    String(currentNombre),
+                    'ページジャンプ'
                 );
-                return;
-            }
 
-            // ページジャンプ実行
-            try {
-                if (isSpreadMode) {
-                    // 見開きモード: 元のページ番号に白紙ページ分を加算して内部ページ番号に変換
-                    const internalPageNum = targetPage + blankPagesFront;
-                    const spreadIndex = PdfManager.getSpreadIndexFromPage(internalPageNum);
-                    PdfManager.displaySpreadFromCache(spreadIndex);
-                } else {
-                    // 単ページモード
-                    let actualPageNum = targetPage;
+                if (inputValue === null || inputValue.trim() === '') return;
 
-                    // 横長原稿（幅 > 高さ）の場合: 1ページ目は単独、2ページ目以降は見開きとして計算
-                    if (PdfManager.getOriginalPageSize) {
-                        const pageSize = PdfManager.getOriginalPageSize(1);
-                        if (pageSize && pageSize.width > pageSize.height && targetPage >= 2) {
-                            // 2P,3P→2ページ目、4P,5P→3ページ目、...
-                            actualPageNum = Math.ceil((targetPage - 1) / 2) + 1;
-                        }
+                const targetNombre = parseInt(inputValue.trim(), 10);
+
+                if (isNaN(targetNombre)) {
+                    await MojiQModal.showAlert('数値を入力してください。', 'エラー');
+                    return;
+                }
+
+                if (targetNombre < 1 || targetNombre > totalNombre) {
+                    await MojiQModal.showAlert(
+                        `1から${totalNombre}の範囲で入力してください。`,
+                        'エラー'
+                    );
+                    return;
+                }
+
+                try {
+                    let actualPageNum = targetNombre;
+
+                    // 横長原稿の場合: ノンブルから実際のPDFページ番号を計算
+                    if (isLandscape && targetNombre >= 2) {
+                        // ノンブル1 → ページ1
+                        // ノンブル2,3 → ページ2
+                        // ノンブル4,5 → ページ3
+                        // ノンブルN (N>=2) → ページ Math.ceil((N-1)/2) + 1
+                        actualPageNum = Math.ceil((targetNombre - 1) / 2) + 1;
                     }
 
                     await PdfManager.renderPage(actualPageNum);
+                } catch (err) {
+                    console.error('ページジャンプ中にエラーが発生:', err);
                 }
-            } catch (err) {
-                console.error('ページジャンプ中にエラーが発生:', err);
             }
         });
 
