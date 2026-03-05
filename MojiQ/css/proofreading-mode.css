@@ -1073,18 +1073,38 @@ body.dark-mode .mode-toggle-btn.active svg {
    ヘッダー用 作品仕様/校正チェックボタン（アイコンのみ）
    ===================================================== */
 
-/* 作品仕様を読み込みボタン（緑アイコン） */
+/* 作品仕様を読み込みボタン（緑） */
+.header-spec-btn {
+    background: rgba(46, 125, 50, 0.1);
+    border: 1.5px solid #2e7d32;
+    border-radius: 6px;
+}
+
 .header-spec-btn svg {
     stroke: #2e7d32;
+}
+
+.header-spec-btn:hover {
+    background: rgba(46, 125, 50, 0.2);
 }
 
 .header-spec-btn:hover svg {
     stroke: #1b5e20;
 }
 
-/* 校正チェックボタン（青アイコン） */
+/* 校正チェックボタン（青） */
+.header-calibration-btn {
+    background: rgba(21, 101, 192, 0.1);
+    border: 1.5px solid #1565c0;
+    border-radius: 6px;
+}
+
 .header-calibration-btn svg {
     stroke: #1565c0;
+}
+
+.header-calibration-btn:hover {
+    background: rgba(21, 101, 192, 0.2);
 }
 
 .header-calibration-btn:hover svg {
@@ -1092,41 +1112,36 @@ body.dark-mode .mode-toggle-btn.active svg {
 }
 
 /* disabled状態（グレーアウト） */
+.header-spec-btn:disabled,
+.header-calibration-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: rgba(128, 128, 128, 0.1);
+    border-color: #bbb;
+}
+
 .header-spec-btn:disabled svg,
 .header-calibration-btn:disabled svg {
     stroke: #bbb;
 }
 
-.header-spec-btn:disabled,
-.header-calibration-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-/* モード切替によるグレーアウト制御 */
-/* 両方のボタンを常に表示 */
-.header-calibration-btn {
+/* モード切替による表示/非表示制御 */
+/* 指示入れモード（通常）: 作品仕様ボタンを表示、校正チェックボタンを非表示 */
+.header-spec-btn {
     display: flex;
 }
 
-/* 通常モード（指示入れモード）: 校正チェックボタンをグレーアウト */
-.header-calibration-btn.mode-disabled {
-    opacity: 0.4;
-    pointer-events: none;
+.header-calibration-btn {
+    display: none;
 }
 
-.header-calibration-btn.mode-disabled svg {
-    stroke: #999 !important;
+/* 校正チェックモード: 校正チェックボタンを表示、作品仕様ボタンを非表示 */
+body.proofreading-mode .header-spec-btn {
+    display: none;
 }
 
-/* 校正モード: 作品仕様ボタンをグレーアウト */
-body.proofreading-mode .header-spec-btn.mode-disabled {
-    opacity: 0.4;
-    pointer-events: none;
-}
-
-body.proofreading-mode .header-spec-btn.mode-disabled svg {
-    stroke: #999 !important;
+body.proofreading-mode .header-calibration-btn {
+    display: flex;
 }
 
 /* ハンバーガーメニュー展開時のロック状態 */
@@ -1149,16 +1164,34 @@ body.proofreading-mode .header-spec-btn.mode-disabled svg {
 }
 
 /* ダークモード対応 */
+body.dark-mode .header-spec-btn {
+    background: rgba(129, 199, 132, 0.15);
+    border-color: #81c784;
+}
+
 body.dark-mode .header-spec-btn svg {
     stroke: #81c784;
+}
+
+body.dark-mode .header-spec-btn:hover {
+    background: rgba(129, 199, 132, 0.25);
 }
 
 body.dark-mode .header-spec-btn:hover svg {
     stroke: #a5d6a7;
 }
 
+body.dark-mode .header-calibration-btn {
+    background: rgba(144, 202, 249, 0.15);
+    border-color: #90caf9;
+}
+
 body.dark-mode .header-calibration-btn svg {
     stroke: #90caf9;
+}
+
+body.dark-mode .header-calibration-btn:hover {
+    background: rgba(144, 202, 249, 0.25);
 }
 
 body.dark-mode .header-calibration-btn:hover svg {
@@ -1166,15 +1199,15 @@ body.dark-mode .header-calibration-btn:hover svg {
 }
 
 /* ダークモード disabled状態 */
+body.dark-mode .header-spec-btn:disabled,
+body.dark-mode .header-calibration-btn:disabled {
+    background: rgba(100, 100, 100, 0.1);
+    border-color: #666;
+}
+
 body.dark-mode .header-spec-btn:disabled svg,
 body.dark-mode .header-calibration-btn:disabled svg {
     stroke: #666;
-}
-
-/* ダークモード mode-disabled状態 */
-body.dark-mode .header-spec-btn.mode-disabled svg,
-body.dark-mode .header-calibration-btn.mode-disabled svg {
-    stroke: #555 !important;
 }
 
 /* ダークモード menu-locked状態（ハンバーガーメニュー展開時） */

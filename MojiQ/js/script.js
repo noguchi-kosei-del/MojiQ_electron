@@ -202,23 +202,13 @@ function syncLineWidthToMainUI() {
 
 /**
  * ヘッダーボタンのモード状態を更新
+ * CSSでbody.proofreading-modeクラスに基づいて表示/非表示が切り替わる
  * @param {boolean} isProofreadingMode - 校正モードかどうか
  */
 function updateHeaderButtonModeState(isProofreadingMode) {
-    const specBtn = document.getElementById('headerGdriveJsonBtn');
-    const calibrationBtn = document.getElementById('headerCalibrationBtn');
-
-    if (specBtn && calibrationBtn) {
-        if (isProofreadingMode) {
-            // 校正モード: 作品仕様ボタンをグレーアウト
-            specBtn.classList.add('mode-disabled');
-            calibrationBtn.classList.remove('mode-disabled');
-        } else {
-            // 指示入れモード: 校正チェックボタンをグレーアウト
-            specBtn.classList.remove('mode-disabled');
-            calibrationBtn.classList.add('mode-disabled');
-        }
-    }
+    // ボタンの表示切替はCSSで body.proofreading-mode クラスに基づいて行われる
+    // 指示入れモード: 作品仕様ボタンを表示
+    // 校正チェックモード: 校正チェックボタンを表示
 }
 
 /**
