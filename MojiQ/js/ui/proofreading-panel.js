@@ -545,10 +545,10 @@ const ProofreadingPanel = (() => {
      */
     function renderEmpty() {
         if (correctnessContent) {
-            correctnessContent.innerHTML = '<div class="proofreading-check-empty">データがありません</div>';
+            correctnessContent.innerHTML = '<div class="proofreading-check-empty">データがありません（校正チェックを読み込みから読み込んでください）</div>';
         }
         if (proposalContent) {
-            proposalContent.innerHTML = '<div class="proofreading-check-empty">データがありません</div>';
+            proposalContent.innerHTML = '<div class="proofreading-check-empty">データがありません（校正チェックを読み込みから読み込んでください）</div>';
         }
         if (correctnessCount) {
             correctnessCount.textContent = '(0)';
@@ -563,7 +563,7 @@ const ProofreadingPanel = (() => {
      */
     function renderItemsToHtml(items) {
         if (!items || items.length === 0) {
-            return '<div class="proofreading-check-empty">データがありません</div>';
+            return '<div class="proofreading-check-empty">データがありません（校正チェックを読み込みから読み込んでください）</div>';
         }
 
         // カテゴリでグループ化

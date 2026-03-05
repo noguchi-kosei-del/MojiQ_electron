@@ -508,6 +508,9 @@ function initWindowControlsAndMenuBar() {
                 if (window._spreadBindingDropdownClose) {
                     window._spreadBindingDropdownClose();
                 }
+                if (window._pdfUploadDropdownClose) {
+                    window._pdfUploadDropdownClose();
+                }
                 slideMenu.classList.add('open');
                 if (slideMenuOverlay) slideMenuOverlay.classList.add('visible');
                 hamburgerBtn.classList.add('active');
@@ -1458,9 +1461,12 @@ window.addEventListener('load', () => {
         spreadViewBtn.addEventListener('click', () => {
             MojiQDropdownPositioner.toggle(spreadViewBtn, spreadBindingDropdown, spreadBindingDropdownOverlay, {
                 onBeforeOpen: () => {
-                    // PDF保存ドロップダウンを閉じる
+                    // 他のドロップダウンを閉じる
                     if (window._savePdfDropdownClose) {
                         window._savePdfDropdownClose();
+                    }
+                    if (window._pdfUploadDropdownClose) {
+                        window._pdfUploadDropdownClose();
                     }
                     updateSelectionState();
                 }
@@ -1555,11 +1561,24 @@ window.addEventListener('load', () => {
     const savePdfDropdown = document.getElementById('savePdfDropdown');
     const savePdfDropdownOverlay = document.getElementById('savePdfDropdownOverlay');
 
+    // チェックボックスの状態をグローバルに公開（常にDOMから取得）
+    window.isExportDrawingEnabled = () => {
+        const checkbox = document.getElementById('exportDrawingCheck');
+        return checkbox ? checkbox.checked : false;
+    };
+
     if (savePdfBtn && savePdfDropdown) {
         const overwriteSaveBtn = document.getElementById('overwriteSaveBtn');
         const saveAsNewBtn = document.getElementById('saveAsNewBtn');
-        const exportDrawingBtn = document.getElementById('exportDrawingBtn');
-        const importDrawingBtn = document.getElementById('importDrawingBtn');
+        const exportDrawingCheck = document.getElementById('exportDrawingCheck');
+
+        // 保存されたチェックボックスの状態を復元
+        if (exportDrawingCheck) {
+            const savedState = localStorage.getItem('mojiq_export_drawing_enabled');
+            if (savedState === 'true') {
+                exportDrawingCheck.checked = true;
+            }
+        }
 
         function updateSaveDropdownState() {
             // 上書き保存の有効/無効を更新
@@ -1579,9 +1598,12 @@ window.addEventListener('load', () => {
             e.stopPropagation();
             MojiQDropdownPositioner.toggle(savePdfBtn, savePdfDropdown, savePdfDropdownOverlay, {
                 onBeforeOpen: () => {
-                    // ページ編集ドロップダウンを閉じる
+                    // 他のドロップダウンを閉じる
                     if (window._spreadBindingDropdownClose) {
                         window._spreadBindingDropdownClose();
+                    }
+                    if (window._pdfUploadDropdownClose) {
+                        window._pdfUploadDropdownClose();
                     }
                     updateSaveDropdownState();
                 }
@@ -1611,41 +1633,74 @@ window.addEventListener('load', () => {
             });
         }
 
-        // 描画データを保存ボタン
-        console.log('[script.js] exportDrawingBtn:', exportDrawingBtn);
-        if (exportDrawingBtn) {
-            exportDrawingBtn.addEventListener('click', () => {
-                console.log('[script.js] exportDrawingBtn clicked');
-                console.log('[script.js] DrawingExportImport:', window.DrawingExportImport);
-                closeSavePdfDropdown();
-                if (window.DrawingExportImport) {
-                    window.DrawingExportImport.exportToFile();
-                } else {
-                    console.error('[script.js] DrawingExportImport not found');
-                }
+        // チェックボックスクリック時はドロップダウンを閉じない＆状態を保存
+        if (exportDrawingCheck) {
+            exportDrawingCheck.addEventListener('click', (e) => {
+                e.stopPropagation();
             });
-        } else {
-            console.error('[script.js] exportDrawingBtn not found');
-        }
-
-        // 描画データを読み込みボタン
-        console.log('[script.js] importDrawingBtn:', importDrawingBtn);
-        if (importDrawingBtn) {
-            importDrawingBtn.addEventListener('click', () => {
-                console.log('[script.js] importDrawingBtn clicked');
-                closeSavePdfDropdown();
-                if (window.DrawingExportImport) {
-                    window.DrawingExportImport.importFromFile();
-                } else {
-                    console.error('[script.js] DrawingExportImport not found');
-                }
+            exportDrawingCheck.addEventListener('change', () => {
+                localStorage.setItem('mojiq_export_drawing_enabled', exportDrawingCheck.checked ? 'true' : 'false');
             });
-        } else {
-            console.error('[script.js] importDrawingBtn not found');
         }
 
         // グローバルにアクセス可能にする
         window._savePdfDropdownClose = closeSavePdfDropdown;
+    }
+
+    // --- PDF/JPEG読み込みボタン（ドロップダウン付き） ---
+    const pdfUploadBtn = document.getElementById('pdfUploadBtn');
+    const pdfUpload = document.getElementById('pdfUpload');
+    const pdfUploadDropdown = document.getElementById('pdfUploadDropdown');
+    const pdfUploadDropdownOverlay = document.getElementById('pdfUploadDropdownOverlay');
+
+    if (pdfUploadBtn && pdfUploadDropdown) {
+        const normalLoadBtn = document.getElementById('normalLoadBtn');
+
+        function closePdfUploadDropdown() {
+            MojiQDropdownPositioner.close(pdfUploadDropdown, pdfUploadDropdownOverlay, pdfUploadBtn);
+        }
+
+        // 読み込みボタンのクリックでドロップダウン表示
+        pdfUploadBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            MojiQDropdownPositioner.toggle(pdfUploadBtn, pdfUploadDropdown, pdfUploadDropdownOverlay, {
+                onBeforeOpen: () => {
+                    // 他のドロップダウンを閉じる
+                    if (window._savePdfDropdownClose) {
+                        window._savePdfDropdownClose();
+                    }
+                    if (window._spreadBindingDropdownClose) {
+                        window._spreadBindingDropdownClose();
+                    }
+                }
+            });
+        });
+
+        if (pdfUploadDropdownOverlay) {
+            pdfUploadDropdownOverlay.addEventListener('click', closePdfUploadDropdown);
+        }
+
+        // 通常の読み込みボタン
+        if (normalLoadBtn) {
+            normalLoadBtn.addEventListener('click', () => {
+                closePdfUploadDropdown();
+                pdfUpload.click();
+            });
+        }
+
+        // 描画を追加ボタン（PDF/JPEG読み込み済みの状態で描画JSONのみを読み込む）
+        const importDrawingOnlyBtn = document.getElementById('importDrawingOnlyBtn');
+        if (importDrawingOnlyBtn) {
+            importDrawingOnlyBtn.addEventListener('click', () => {
+                closePdfUploadDropdown();
+                if (window.DrawingExportImport) {
+                    window.DrawingExportImport.importFromFile();
+                }
+            });
+        }
+
+        // グローバルにアクセス可能にする
+        window._pdfUploadDropdownClose = closePdfUploadDropdown;
     }
 
     // --- 校正指示スタンプUI ---

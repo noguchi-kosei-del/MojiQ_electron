@@ -64,7 +64,7 @@
                     <div class="menu-dropdown-item" data-action="save-pdf">PDFを保存<span class="shortcut">Ctrl+S</span></div>
                     <div class="menu-dropdown-item" data-action="save-pdf-as">名前を付けて保存<span class="shortcut">Ctrl+Shift+S</span></div>
                     <div class="menu-dropdown-divider"></div>
-                    <div class="menu-dropdown-item" data-action="export-drawing">描画データを保存...</div>
+                    <div class="menu-dropdown-item" data-action="export-drawing">描画データを保存</div>
                     <div class="menu-dropdown-item" data-action="import-drawing">描画データを読み込み...</div>
                     <div class="menu-dropdown-divider"></div>
                     <div class="menu-dropdown-item" data-action="print">印刷<span class="shortcut">Ctrl+P</span></div>
@@ -156,18 +156,18 @@
             <button id="headerGdriveJsonBtn" class="header-icon-btn header-spec-btn pdf-required" title="作品仕様を読み込み" disabled>
                 <svg width="24" height="24" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5a1 1 0 011-1h4l2 2h6a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1V5z"/></svg>
             </button>
-            <button id="headerCalibrationBtn" class="header-icon-btn header-calibration-btn pdf-required" title="校正チェック" disabled>
+            <button id="headerCalibrationBtn" class="header-icon-btn header-calibration-btn pdf-required" title="校正チェックを読み込み" disabled>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><polyline points="3,6 4,7 6,5"/><polyline points="3,12 4,13 6,11"/><polyline points="3,18 4,19 6,17"/></svg>
             </button>
-            <label for="pdfUpload" class="header-icon-btn menu-lockable" title="PDF/JPEG読込">
+            <button id="pdfUploadBtn" class="header-icon-btn menu-lockable" title="PDF/JPEG読込">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                     <polyline points="14 2 14 8 20 8"/>
                     <path d="M12 18v-6"/>
                     <path d="M9 15l3-3 3 3"/>
                 </svg>
-            </label>
-            <input type="file" id="pdfUpload" accept="application/pdf,image/jpeg,.jpg,.jpeg" multiple>
+            </button>
+            <input type="file" id="pdfUpload" accept="application/pdf,image/jpeg,.jpg,.jpeg" multiple style="display:none;">
             <button id="savePdfBtn" class="header-icon-btn pdf-required menu-lockable" title="PDF保存" disabled>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
@@ -334,18 +334,29 @@
                 <span class="dropdown-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></span>
                 <span>名前を付けて保存</span>
             </button>
-            <div class="page-edit-dropdown-divider"></div>
-            <button id="exportDrawingBtn" class="page-edit-dropdown-item save-option">
-                <span class="dropdown-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
-                <span>描画データを保存...</span>
-            </button>
-            <button id="importDrawingBtn" class="page-edit-dropdown-item save-option">
-                <span class="dropdown-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
-                <span>描画データを読み込み...</span>
-            </button>
+            <label id="exportDrawingCheckLabel" class="page-edit-dropdown-item save-option drawing-export checkbox-item">
+                <input type="checkbox" id="exportDrawingCheck">
+                <span class="checkbox-icon"></span>
+                <span>描画データを追加保存</span>
+            </label>
         </div>
     </div>
     <div id="savePdfDropdownOverlay" class="page-edit-dropdown-overlay"></div>
+
+    <!-- PDF/JPEG読み込みドロップダウンメニュー -->
+    <div id="pdfUploadDropdown" class="page-edit-dropdown pdf-upload-dropdown">
+        <div class="page-edit-dropdown-content">
+            <button id="normalLoadBtn" class="page-edit-dropdown-item load-option">
+                <span class="dropdown-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3-3 3 3"/></svg></span>
+                <span>PDF/JPEGを読み込み</span>
+            </button>
+            <button id="importDrawingOnlyBtn" class="page-edit-dropdown-item load-option drawing-import pdf-required" disabled>
+                <span class="dropdown-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 13l2 2 4-4"/></svg></span>
+                <span>描画を追加</span>
+            </button>
+        </div>
+    </div>
+    <div id="pdfUploadDropdownOverlay" class="page-edit-dropdown-overlay"></div>
 
     <div id="textModal" class="modal-overlay" tabindex="-1">
         <div class="modal-content">
@@ -795,7 +806,7 @@
 
 <div id="proofreading-instruction-area">
     <button id="proofreadingInstructionToggleBtn" class="proofreading-instruction-toggle-btn">
-        <span class="toggle-label">校正ツール</span>
+        <span class="toggle-label">指示ツール</span>
         <span id="selectedProofreadingDisplay" class="selected-proofreading-display"></span>
         <span class="toggle-arrow"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
     </button>
@@ -920,7 +931,7 @@
                     <span class="proofreading-check-count" id="correctnessCount">(0)</span>
                 </div>
                 <div class="proofreading-check-content" id="correctnessContent">
-                    <div class="proofreading-check-empty">データがありません</div>
+                    <div class="proofreading-check-empty">データがありません（校正チェックを読み込みから読み込んでください）</div>
                 </div>
             </div>
 
@@ -932,7 +943,7 @@
                     <span class="proofreading-check-count" id="proposalCount">(0)</span>
                 </div>
                 <div class="proofreading-check-content" id="proposalContent">
-                    <div class="proofreading-check-empty">データがありません</div>
+                    <div class="proofreading-check-empty">データがありません（校正チェックを読み込みから読み込んでください）</div>
                 </div>
             </div>
 
@@ -1172,7 +1183,7 @@
                     <div class="settings-section-header">
                         <span>パネルの開閉動作</span>
                     </div>
-                    <p class="settings-section-description">校正ツール、文字サイズ、フォント指定パネルの動作を設定します。</p>
+                    <p class="settings-section-description">指示ツール、文字サイズ、フォント指定パネルの動作を設定します。</p>
                     <div class="scroll-direction-options">
                         <label class="scroll-option" id="panelOptionKeepOpen">
                             <input type="radio" name="panelBehavior" value="keepOpen" checked>

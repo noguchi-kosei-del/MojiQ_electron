@@ -146,7 +146,7 @@ window.MojiQStamps = (function() {
         // フォントが無い場合は「データがありません」を表示
         const fontNoDataMsg = document.createElement('div');
         fontNoDataMsg.className = 'stamp-no-data-message';
-        fontNoDataMsg.textContent = 'データがありません';
+        fontNoDataMsg.textContent = 'データがありません（追加するか作品仕様を読み込みから読み込んでください）';
         fontPaletteDiv.appendChild(fontNoDataMsg);
 
         fontScrollBox.appendChild(fontPaletteDiv);
@@ -388,7 +388,7 @@ window.MojiQStamps = (function() {
                     if (remainingSizes.length === 0) {
                         const noDataMsg = document.createElement('div');
                         noDataMsg.className = 'stamp-no-data-message';
-                        noDataMsg.textContent = 'データがありません';
+                        noDataMsg.textContent = 'データがありません（追加するか作品仕様を読み込みから読み込んでください）';
                         container.appendChild(noDataMsg);
                     }
                 }
@@ -614,7 +614,7 @@ window.MojiQStamps = (function() {
                         // 「データがありません」を表示
                         const noDataMsg = document.createElement('div');
                         noDataMsg.className = 'stamp-no-data-message';
-                        noDataMsg.textContent = 'データがありません';
+                        noDataMsg.textContent = 'データがありません（追加するか作品仕様を読み込みから読み込んでください）';
                         container.appendChild(noDataMsg);
                     }
                 }
@@ -718,7 +718,7 @@ window.MojiQStamps = (function() {
             // サイズが無い場合は「データがありません」を表示
             const sizeNoDataMsg = document.createElement('div');
             sizeNoDataMsg.className = 'stamp-no-data-message';
-            sizeNoDataMsg.textContent = 'データがありません';
+            sizeNoDataMsg.textContent = 'データがありません（追加するか作品仕様を読み込みから読み込んでください）';
             sizePaletteDiv.appendChild(sizeNoDataMsg);
         }
 
@@ -801,7 +801,7 @@ window.MojiQStamps = (function() {
             // フォントが無い場合は「データがありません」を表示
             const fontNoDataMsg = document.createElement('div');
             fontNoDataMsg.className = 'stamp-no-data-message';
-            fontNoDataMsg.textContent = 'データがありません';
+            fontNoDataMsg.textContent = 'データがありません（追加するか作品仕様を読み込みから読み込んでください）';
             fontPaletteDiv.appendChild(fontNoDataMsg);
         }
 

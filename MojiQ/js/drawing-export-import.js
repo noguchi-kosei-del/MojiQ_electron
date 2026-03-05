@@ -10,12 +10,8 @@ const DrawingExportImport = {
      * 描画データをJSONファイルとしてエクスポート
      */
     async exportToFile() {
-        console.log('[DrawingExportImport] exportToFile called');
-        console.log('[DrawingExportImport] MojiQDrawingObjects:', typeof MojiQDrawingObjects, MojiQDrawingObjects);
-
         // 描画データを取得
         const data = MojiQDrawingObjects.getAllPagesData();
-        console.log('[DrawingExportImport] data:', data);
 
         if (Object.keys(data).length === 0) {
             if (window.MojiQModal && window.MojiQModal.showAlert) {
@@ -45,14 +41,8 @@ const DrawingExportImport = {
         const defaultFileName = `${baseName}_描画.json`;
 
         // Electron環境の場合
-        console.log('[DrawingExportImport] electronAPI:', window.electronAPI);
-        console.log('[DrawingExportImport] showSaveDialog:', window.electronAPI?.showSaveDialog);
-        console.log('[DrawingExportImport] saveFile:', window.electronAPI?.saveFile);
-
         if (window.electronAPI && window.electronAPI.showSaveDialog && window.electronAPI.saveFile) {
-            console.log('[DrawingExportImport] Using Electron API');
             try {
-                console.log('[DrawingExportImport] Calling showSaveDialog...');
                 const result = await window.electronAPI.showSaveDialog({
                     title: '描画データを保存',
                     defaultPath: defaultFileName,
@@ -66,14 +56,11 @@ const DrawingExportImport = {
                     // JSONをBase64エンコードして保存
                     const base64Data = btoa(unescape(encodeURIComponent(jsonString)));
                     const saveResult = await window.electronAPI.saveFile(result.filePath, base64Data);
-                    if (saveResult && saveResult.success) {
-                        console.log('描画データをエクスポートしました:', result.filePath);
-                    } else {
+                    if (!saveResult || !saveResult.success) {
                         throw new Error(saveResult?.error || '保存に失敗しました');
                     }
                 }
             } catch (error) {
-                console.error('描画データのエクスポートに失敗:', error);
                 if (window.MojiQModal && window.MojiQModal.showAlert) {
                     await window.MojiQModal.showAlert('描画データのエクスポートに失敗しました。\n' + error.message, 'エラー');
                 }
@@ -88,7 +75,6 @@ const DrawingExportImport = {
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            console.log('描画データをエクスポートしました');
         }
     },
 
@@ -118,7 +104,6 @@ const DrawingExportImport = {
                     }
                 }
             } catch (error) {
-                console.error('描画データのインポートに失敗:', error);
                 if (window.MojiQModal && window.MojiQModal.showAlert) {
                     await window.MojiQModal.showAlert('描画データのインポートに失敗しました。\n' + error.message, 'エラー');
                 }
@@ -136,7 +121,6 @@ const DrawingExportImport = {
                         const jsonString = await file.text();
                         await this._processImportData(jsonString);
                     } catch (error) {
-                        console.error('描画データのインポートに失敗:', error);
                         if (window.MojiQModal && window.MojiQModal.showAlert) {
                             await window.MojiQModal.showAlert('描画データのインポートに失敗しました。\n' + error.message, 'エラー');
                         } else {
@@ -218,8 +202,6 @@ const DrawingExportImport = {
             window.MojiQPdfManager.renderPage(currentPage);
         }
 
-        console.log('描画データをインポートしました:', Object.keys(filteredData).length, 'ページ');
-
         if (window.MojiQModal && window.MojiQModal.showAlert) {
             await window.MojiQModal.showAlert(
                 `${Object.keys(filteredData).length} ページ分の描画データをインポートしました。`,
@@ -261,6 +243,71 @@ const DrawingExportImport = {
         }
 
         return { valid: true };
+    },
+
+    /**
+     * 指定されたパスに描画データを保存（PDF保存時の自動保存用）
+     * @param {string} filePath - 保存されたファイルのパス
+     * @returns {Promise<boolean>} 保存成功したかどうか
+     */
+    async exportToPath(filePath) {
+        // 描画データを取得
+        const data = MojiQDrawingObjects.getAllPagesData();
+
+        if (Object.keys(data).length === 0) {
+            return false;
+        }
+
+        const exportData = {
+            version: this.VERSION,
+            exportedAt: new Date().toISOString(),
+            pageCount: Object.keys(data).length,
+            data: data
+        };
+
+        const jsonString = JSON.stringify(exportData, null, 2);
+
+        // ファイルパスから描画データのパスを生成（拡張子を_描画.jsonに置換）
+        const drawingFilePath = filePath.replace(/\.(pdf|jpg|jpeg|png)$/i, '_描画.json');
+
+        // Electron環境の場合
+        if (window.electronAPI && window.electronAPI.saveFile) {
+            try {
+                // 同名ファイルの存在確認
+                if (window.electronAPI.fileExists) {
+                    const existsResult = await window.electronAPI.fileExists(drawingFilePath);
+                    if (existsResult && existsResult.success && existsResult.exists) {
+                        // ファイル名を取得して警告ダイアログを表示
+                        const fileName = drawingFilePath.split(/[/\\]/).pop();
+                        let proceed = false;
+                        if (window.MojiQModal && window.MojiQModal.showConfirm) {
+                            proceed = await window.MojiQModal.showConfirm(
+                                `「${fileName}」は既に存在します。\n上書きしますか？`,
+                                '描画データの保存'
+                            );
+                        } else {
+                            proceed = confirm(`「${fileName}」は既に存在します。\n上書きしますか？`);
+                        }
+                        if (!proceed) {
+                            return false;
+                        }
+                    }
+                }
+
+                // JSONをBase64エンコードして保存
+                const base64Data = btoa(unescape(encodeURIComponent(jsonString)));
+                const saveResult = await window.electronAPI.saveFile(drawingFilePath, base64Data);
+                if (saveResult && saveResult.success) {
+                    return true;
+                } else {
+                    return false;
+                }
+            } catch (error) {
+                return false;
+            }
+        }
+
+        return false;
     }
 };
 

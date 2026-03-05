@@ -1379,6 +1379,7 @@ window.MojiQPdfManager = (function() {
         if (state.pdfDocs && state.pdfDocs.length > 0) {
             const confirmed = await MojiQModal.showConfirm('読み込んだページ、描画は全て削除されます。よろしいですか？');
             if (!confirmed) {
+                window._pendingDrawingImport = false;
                 return;
             }
         }
@@ -1559,9 +1560,20 @@ window.MojiQPdfManager = (function() {
             renderPage(1);
             enableHeaderButtons();
 
+            // 描画を追加して読み込みモードの場合、描画データを読み込む
+            if (window._pendingDrawingImport) {
+                window._pendingDrawingImport = false;
+                setTimeout(() => {
+                    if (window.DrawingExportImport) {
+                        window.DrawingExportImport.importFromFile();
+                    }
+                }, 100);
+            }
+
         } catch (err) {
             console.error('画像読み込みエラー:', err);
             hideProgressOverlay();
+            window._pendingDrawingImport = false;
             MojiQModal.showAlert('画像読み込み失敗: ' + err.message, 'エラー');
         }
     }
@@ -1571,10 +1583,16 @@ window.MojiQPdfManager = (function() {
      * @param {FileList|File[]} files - ファイルのリスト
      */
     async function loadFilesFromInput(files) {
-        if (!files || files.length === 0) return;
+        if (!files || files.length === 0) {
+            window._pendingDrawingImport = false;
+            return;
+        }
 
         // 処理中（保存・読込・変換等）はファイルオープンを無視
-        if (isProcessing) return;
+        if (isProcessing) {
+            window._pendingDrawingImport = false;
+            return;
+        }
 
         // サムネイルキャッシュをクリア
         if (window.MojiQNavigation && window.MojiQNavigation.clearThumbnailCache) {
@@ -1609,6 +1627,7 @@ window.MojiQPdfManager = (function() {
         } else if (pdfFiles.length > 0) {
             await loadPdfFromFile(pdfFiles[0]);
         } else {
+            window._pendingDrawingImport = false;
             MojiQModal.showAlert('対応するファイル形式ではありません。\nPDF、JPEGファイルを選択してください。', 'エラー');
         }
     }
@@ -1620,6 +1639,7 @@ window.MojiQPdfManager = (function() {
     async function loadPdfFromFile(file) {
         if (!file || file.type !== 'application/pdf') {
             MojiQModal.showAlert('PDFファイルを選択してください。', 'エラー');
+            window._pendingDrawingImport = false;
             return;
         }
 
@@ -1627,6 +1647,7 @@ window.MojiQPdfManager = (function() {
         if (state.pdfDocs && state.pdfDocs.length > 0) {
             const confirmed = await MojiQModal.showConfirm('読み込んだページ、描画は全て削除されます。よろしいですか？');
             if (!confirmed) {
+                window._pendingDrawingImport = false;
                 return;
             }
         }
@@ -1644,6 +1665,7 @@ window.MojiQPdfManager = (function() {
 
             // キャンセルされた場合は読み込みを中止
             if (cancelled) {
+                window._pendingDrawingImport = false;
                 return;
             }
 
@@ -1815,10 +1837,22 @@ window.MojiQPdfManager = (function() {
             renderPage(1);
             enableHeaderButtons();
 
+            // 描画を追加して読み込みモードの場合、描画データを読み込む
+            if (window._pendingDrawingImport) {
+                window._pendingDrawingImport = false;
+                // 少し遅延を入れてUI更新を待つ
+                setTimeout(() => {
+                    if (window.DrawingExportImport) {
+                        window.DrawingExportImport.importFromFile();
+                    }
+                }, 100);
+            }
+
         } catch (err) {
             console.error(err);
             isProcessing = false;
             showLoadingOverlay(false);
+            window._pendingDrawingImport = false;
             MojiQModal.showAlert('PDF読み込み失敗', 'エラー');
         }
     }
@@ -1988,6 +2022,10 @@ window.MojiQPdfManager = (function() {
                     }
                     // 保存成功: 変更フラグをリセット
                     hasUnsavedChanges = false;
+                    // 描画データも保存チェックがオンの場合、描画データも保存
+                    if (window.isExportDrawingEnabled && window.isExportDrawingEnabled() && window.DrawingExportImport) {
+                        await window.DrawingExportImport.exportToPath(currentSaveFilePath);
+                    }
                     // 上書き保存完了のポップアップを表示
                     MojiQModal.showAlert('上書き保存が完了しました。', '保存完了');
                     // 警告があれば表示
@@ -2009,6 +2047,10 @@ window.MojiQPdfManager = (function() {
                         // ヘッダーのファイル名も更新
                         const savedFileName = dialogResult.filePath.split(/[/\\]/).pop();
                         updatePdfFileNameDisplay(savedFileName);
+                        // 描画データも保存チェックがオンの場合、描画データも保存
+                        if (window.isExportDrawingEnabled && window.isExportDrawingEnabled() && window.DrawingExportImport) {
+                            await window.DrawingExportImport.exportToPath(dialogResult.filePath);
+                        }
                         // 警告があれば表示
                         showSaveWarnings(result);
                     }
@@ -2159,6 +2201,10 @@ window.MojiQPdfManager = (function() {
                     // ヘッダーのファイル名も更新
                     const savedFileName = dialogResult.filePath.split(/[/\\]/).pop();
                     updatePdfFileNameDisplay(savedFileName);
+                    // 描画データも保存チェックがオンの場合、描画データも保存
+                    if (window.isExportDrawingEnabled && window.isExportDrawingEnabled() && window.DrawingExportImport) {
+                        await window.DrawingExportImport.exportToPath(dialogResult.filePath);
+                    }
                     // 警告があれば表示
                     showSaveWarnings(result);
                 }
@@ -3124,9 +3170,20 @@ window.MojiQPdfManager = (function() {
             renderPage(startPage);
             enableHeaderButtons();
 
+            // 描画を追加して読み込みモードの場合、描画データを読み込む
+            if (window._pendingDrawingImport) {
+                window._pendingDrawingImport = false;
+                setTimeout(() => {
+                    if (window.DrawingExportImport) {
+                        window.DrawingExportImport.importFromFile();
+                    }
+                }, 100);
+            }
+
         } catch (err) {
             console.error('PDF読み込みエラー:', err);
             hideProgressOverlay();
+            window._pendingDrawingImport = false;
             MojiQModal.showAlert('PDF読み込み失敗: ' + err.message, 'エラー');
         }
     }
@@ -3264,8 +3321,19 @@ window.MojiQPdfManager = (function() {
             if (window.MojiQPageManager) {
                 MojiQPageManager.updatePageControls();
             }
+
+            // 描画を追加して読み込みモードの場合、描画データを読み込む
+            if (window._pendingDrawingImport) {
+                window._pendingDrawingImport = false;
+                setTimeout(() => {
+                    if (window.DrawingExportImport) {
+                        window.DrawingExportImport.importFromFile();
+                    }
+                }, 100);
+            }
         } catch (e) {
             console.error('PDF読み込みエラー:', e);
+            window._pendingDrawingImport = false;
             MojiQModal.showAlert('PDFの読み込みに失敗しました: ' + e.message, 'エラー');
         }
     }

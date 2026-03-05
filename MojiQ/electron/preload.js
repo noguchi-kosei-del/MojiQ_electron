@@ -38,6 +38,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ファイルサイズを取得
   getFileSize: (filePath) => ipcRenderer.invoke('get-file-size', filePath),
 
+  // ファイルの存在確認
+  fileExists: (filePath) => ipcRenderer.invoke('file-exists', filePath),
+
   // ファイルをバイナリで読み込み（Base64変換なし、大きなファイル対応）
   readFileBinary: (filePath) => ipcRenderer.invoke('read-file-binary', filePath),
 

@@ -18,7 +18,7 @@ window.MojiQElectron = (function() {
   async function showOpenPdfDialog() {
     if (isElectron) {
       return await window.electronAPI.showOpenDialog({
-        title: 'PDFファイルを開く',
+        title: 'PDF/JPEGを選択',
         filters: [
           { name: 'PDFファイル', extensions: ['pdf'] }
         ],
@@ -50,7 +50,7 @@ window.MojiQElectron = (function() {
   async function showOpenImageDialog() {
     if (isElectron) {
       return await window.electronAPI.showOpenDialog({
-        title: '画像ファイルを開く',
+        title: 'PDF/JPEGを選択',
         filters: [
           { name: '画像ファイル', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }
         ],

@@ -405,7 +405,7 @@ function createMenuTemplate() {
           accelerator: 'CmdOrCtrl+O',
           click: async () => {
             const result = await dialog.showOpenDialog(mainWindow, {
-              title: 'PDFファイルを開く',
+              title: 'PDF/JPEGを選択',
               filters: [{ name: 'PDFファイル', extensions: ['pdf'] }],
               properties: ['openFile']
             });
@@ -856,6 +856,15 @@ ipcMain.handle('get-file-size', async (event, filePath) => {
   try {
     const stats = fs.statSync(filePath);
     return { success: true, size: stats.size };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// ファイルの存在確認
+ipcMain.handle('file-exists', async (event, filePath) => {
+  try {
+    return { success: true, exists: fs.existsSync(filePath) };
   } catch (error) {
     return { success: false, error: error.message };
   }

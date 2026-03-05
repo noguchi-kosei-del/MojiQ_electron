@@ -475,6 +475,8 @@ input[type="range"]#pageSlider::-webkit-slider-thumb {
 
 .page-edit-dropdown-content {
     padding: 8px 0;
+    overflow: hidden;
+    border-radius: 8px;
 }
 
 .page-edit-dropdown-item {
@@ -560,5 +562,125 @@ input[type="range"]#pageSlider::-webkit-slider-thumb {
 
 .save-pdf-dropdown .page-edit-dropdown-item:disabled:hover {
     background-color: transparent;
+}
+
+/* 描画データを保存（緑色） */
+.save-pdf-dropdown .page-edit-dropdown-item.drawing-export {
+    color: #2e7d32;
+}
+
+.save-pdf-dropdown .page-edit-dropdown-item.drawing-export .dropdown-icon svg {
+    stroke: #2e7d32;
+}
+
+.save-pdf-dropdown .page-edit-dropdown-item.drawing-export:hover {
+    background-color: #e8f5e9;
+}
+
+/* 描画データも保存チェックボックス */
+.save-pdf-dropdown .checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+}
+
+.save-pdf-dropdown .checkbox-item input[type="checkbox"] {
+    display: none;
+}
+
+.save-pdf-dropdown .checkbox-item .checkbox-icon {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #2e7d32;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background-color 0.15s;
+}
+
+.save-pdf-dropdown .checkbox-item input[type="checkbox"]:checked + .checkbox-icon {
+    background-color: #2e7d32;
+}
+
+.save-pdf-dropdown .checkbox-item input[type="checkbox"]:checked + .checkbox-icon::after {
+    content: '';
+    width: 4px;
+    height: 8px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+    margin-bottom: 2px;
+}
+
+/* 読み込んで描画を追加（緑色） */
+.pdf-upload-dropdown .page-edit-dropdown-item.drawing-import {
+    color: #2e7d32;
+}
+
+.pdf-upload-dropdown .page-edit-dropdown-item.drawing-import .dropdown-icon svg {
+    stroke: #2e7d32;
+}
+
+.pdf-upload-dropdown .page-edit-dropdown-item.drawing-import:hover {
+    background-color: #e8f5e9;
+}
+
+/* ========================================= */
+/* PDF/JPEG読み込みドロップダウン             */
+/* ========================================= */
+.pdf-upload-dropdown {
+    width: 200px;
+}
+
+/* 読み込みオプションのアイテムスタイル */
+.pdf-upload-dropdown .page-edit-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+}
+
+.pdf-upload-dropdown .dropdown-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* グレーアウト状態（PDF未読み込み時） */
+.pdf-upload-dropdown .page-edit-dropdown-item:disabled {
+    color: #aaa;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.pdf-upload-dropdown .page-edit-dropdown-item:disabled .dropdown-icon svg {
+    stroke: #aaa;
+}
+
+.pdf-upload-dropdown .page-edit-dropdown-item:disabled:hover {
+    background-color: transparent;
+}
+
+/* ========================================= */
+/* ページ編集ドロップダウン                   */
+/* ========================================= */
+/* ページ編集オプションのアイテムスタイル */
+.spread-binding-dropdown .page-edit-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+}
+
+.spread-binding-dropdown .dropdown-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 

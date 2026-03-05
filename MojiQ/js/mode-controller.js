@@ -393,7 +393,7 @@ window.MojiQModeController = (function() {
             document.activeElement.blur();
         }
 
-        // 展開中のトグルボタン（文字サイズ、フォント指定、校正ツール）を閉じる
+        // 展開中のトグルボタン（文字サイズ、フォント指定、指示ツール）を閉じる
         // ロックモードが有効な場合は閉じない（ただしショートカットキーからの呼び出し時は閉じる）
         if (fromShortcut || !window.isProofreadingLockModeEnabled || !window.isProofreadingLockModeEnabled()) {
             if (window.MojiQStamps && MojiQStamps.forceCloseAllDropdowns) {

@@ -238,7 +238,7 @@ body.workspace-flipped .tool-bar-vertical .toolbar-toggle-btn {
     transform: scaleX(-1);
 }
 
-/* 校正ツールのポップアップを右側に展開（反転時） */
+/* 指示ツールのポップアップを右側に展開（反転時） */
 body.workspace-flipped .proofreading-instruction-dropdown {
     right: auto;
     left: 100%;
@@ -251,7 +251,7 @@ body.workspace-flipped .proofreading-instruction-dropdown.open {
     transform: translateX(0);
 }
 
-/* 校正ツールのトグル矢印を反転 */
+/* 指示ツールのトグル矢印を反転 */
 body.workspace-flipped .proofreading-instruction-toggle-btn .toggle-arrow {
     transform: rotate(-90deg);
 }

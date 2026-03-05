@@ -737,7 +737,7 @@ body.dark-mode .proofreading-icon-btn.active:hover {
 
 .proofreading-check-empty {
     padding: 20px;
-    text-align: center;
+    text-align: left;
     color: #999;
     font-size: 13px;
 }

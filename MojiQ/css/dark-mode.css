@@ -726,6 +726,50 @@ body.dark-mode .save-pdf-dropdown .page-edit-dropdown-item:disabled .dropdown-ic
     stroke: #555;
 }
 
+/* 描画データを保存（緑色 - ダークモード） */
+body.dark-mode .save-pdf-dropdown .page-edit-dropdown-item.drawing-export {
+    color: #66bb6a;
+}
+
+body.dark-mode .save-pdf-dropdown .page-edit-dropdown-item.drawing-export .dropdown-icon svg {
+    stroke: #66bb6a;
+}
+
+body.dark-mode .save-pdf-dropdown .page-edit-dropdown-item.drawing-export:hover {
+    background-color: rgba(102, 187, 106, 0.15);
+}
+
+/* 描画データも保存チェックボックス（ダークモード） */
+body.dark-mode .save-pdf-dropdown .checkbox-item .checkbox-icon {
+    border-color: #66bb6a;
+}
+
+body.dark-mode .save-pdf-dropdown .checkbox-item input[type="checkbox"]:checked + .checkbox-icon {
+    background-color: #66bb6a;
+}
+
+/* 読み込んで描画を追加（緑色 - ダークモード） */
+body.dark-mode .pdf-upload-dropdown .page-edit-dropdown-item.drawing-import {
+    color: #66bb6a;
+}
+
+body.dark-mode .pdf-upload-dropdown .page-edit-dropdown-item.drawing-import .dropdown-icon svg {
+    stroke: #66bb6a;
+}
+
+body.dark-mode .pdf-upload-dropdown .page-edit-dropdown-item.drawing-import:hover {
+    background-color: rgba(102, 187, 106, 0.15);
+}
+
+/* PDF読み込みドロップダウン - グレーアウト状態（ダークモード） */
+body.dark-mode .pdf-upload-dropdown .page-edit-dropdown-item:disabled {
+    color: #666;
+}
+
+body.dark-mode .pdf-upload-dropdown .page-edit-dropdown-item:disabled .dropdown-icon svg {
+    stroke: #555;
+}
+
 /* ハンバーガーメニュー */
 body.dark-mode .hamburger-btn:hover {
     background: transparent !important;
