@@ -82,15 +82,24 @@ body.proofreading-mode.pdf-loaded .shared-canvas-area {
 }
 
 /* 校正モード時のページナビバー - キャンバス下部中央（PDF読み込み後のみ） */
+/* position: fixed でズーム時もスクロールの影響を受けないようにする */
+/* キャンバス表示エリアの中央に配置（右サイドバー+ツールバー分を考慮） */
 body.proofreading-mode.pdf-loaded .bottom-nav-bar {
-    position: absolute;
+    position: fixed;
     bottom: 15px;
-    left: 50%;
+    /* 右サイドバー(400px) + ツールバー(~50px) = ~450px の半分(225px)だけ左にずらす */
+    left: calc(50% - 225px);
     transform: translateX(-50%);
     width: 70%;
     max-width: 600px;
     /* 両モード共通：0.3秒でフェードイン/アウト */
     transition: opacity 0.3s ease;
+}
+
+/* 校正モード + サイドバー折りたたみ時はほぼウィンドウ中央 */
+body.proofreading-mode.pdf-loaded.proofreading-sidebar-collapsed .bottom-nav-bar {
+    /* ツールバー(~50px)の半分(25px)だけ左にずらす */
+    left: calc(50% - 25px);
 }
 
 /* 通常モードで非表示にする要素 */
@@ -1073,56 +1082,62 @@ body.dark-mode .mode-toggle-btn.active svg {
    ヘッダー用 作品仕様/校正チェックボタン（アイコンのみ）
    ===================================================== */
 
-/* 作品仕様を読み込みボタン（緑） */
+/* 作品仕様を読み込みボタン（緑色） */
 .header-spec-btn {
-    background: rgba(46, 125, 50, 0.1) !important;
+    background: transparent !important;
     border: 1.5px solid #2e7d32 !important;
-    border-radius: 6px;
+    border-radius: 5px;
 }
 
-.header-spec-btn svg {
-    stroke: #2e7d32;
+.header-spec-btn svg,
+.header-spec-btn svg path {
+    stroke: #2e7d32 !important;
 }
 
 .header-spec-btn:hover {
-    background: rgba(46, 125, 50, 0.2) !important;
+    background: transparent !important;
 }
 
-.header-spec-btn:hover svg {
-    stroke: #1b5e20;
+.header-spec-btn:hover svg,
+.header-spec-btn:hover svg path {
+    stroke: #2e7d32 !important;
 }
 
-/* 校正チェックボタン（青） */
+/* 校正チェックボタン（青色） */
 .header-calibration-btn {
-    background: rgba(21, 101, 192, 0.1) !important;
+    background: transparent !important;
     border: 1.5px solid #1565c0 !important;
-    border-radius: 6px;
+    border-radius: 5px;
 }
 
-.header-calibration-btn svg {
-    stroke: #1565c0;
+.header-calibration-btn svg,
+.header-calibration-btn svg path,
+.header-calibration-btn svg line,
+.header-calibration-btn svg polyline {
+    stroke: #1565c0 !important;
 }
 
 .header-calibration-btn:hover {
-    background: rgba(21, 101, 192, 0.2) !important;
+    background: transparent !important;
 }
 
-.header-calibration-btn:hover svg {
-    stroke: #0d47a1;
+.header-calibration-btn:hover svg,
+.header-calibration-btn:hover svg path,
+.header-calibration-btn:hover svg line,
+.header-calibration-btn:hover svg polyline {
+    stroke: #1565c0 !important;
 }
 
 /* disabled状態（グレーアウト） */
 .header-spec-btn:disabled,
 .header-calibration-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.3;
     cursor: not-allowed;
-    background: rgba(128, 128, 128, 0.1) !important;
-    border-color: #bbb !important;
 }
 
 .header-spec-btn:disabled svg,
 .header-calibration-btn:disabled svg {
-    stroke: #bbb;
+    stroke: #999;
 }
 
 /* モード切替による表示/非表示制御 */
@@ -1165,44 +1180,51 @@ body.proofreading-mode .header-calibration-btn {
 
 /* ダークモード対応 */
 body.dark-mode .header-spec-btn {
-    background: rgba(129, 199, 132, 0.15) !important;
+    background: transparent !important;
     border-color: #81c784 !important;
 }
 
-body.dark-mode .header-spec-btn svg {
-    stroke: #81c784;
+body.dark-mode .header-spec-btn svg,
+body.dark-mode .header-spec-btn svg path {
+    stroke: #81c784 !important;
 }
 
 body.dark-mode .header-spec-btn:hover {
-    background: rgba(129, 199, 132, 0.25) !important;
+    background: transparent !important;
 }
 
-body.dark-mode .header-spec-btn:hover svg {
-    stroke: #a5d6a7;
+body.dark-mode .header-spec-btn:hover svg,
+body.dark-mode .header-spec-btn:hover svg path {
+    stroke: #81c784 !important;
 }
 
 body.dark-mode .header-calibration-btn {
-    background: rgba(144, 202, 249, 0.15) !important;
+    background: transparent !important;
     border-color: #90caf9 !important;
 }
 
-body.dark-mode .header-calibration-btn svg {
-    stroke: #90caf9;
+body.dark-mode .header-calibration-btn svg,
+body.dark-mode .header-calibration-btn svg path,
+body.dark-mode .header-calibration-btn svg line,
+body.dark-mode .header-calibration-btn svg polyline {
+    stroke: #90caf9 !important;
 }
 
 body.dark-mode .header-calibration-btn:hover {
-    background: rgba(144, 202, 249, 0.25) !important;
+    background: transparent !important;
 }
 
-body.dark-mode .header-calibration-btn:hover svg {
-    stroke: #bbdefb;
+body.dark-mode .header-calibration-btn:hover svg,
+body.dark-mode .header-calibration-btn:hover svg path,
+body.dark-mode .header-calibration-btn:hover svg line,
+body.dark-mode .header-calibration-btn:hover svg polyline {
+    stroke: #90caf9 !important;
 }
 
 /* ダークモード disabled状態 */
 body.dark-mode .header-spec-btn:disabled,
 body.dark-mode .header-calibration-btn:disabled {
-    background: rgba(100, 100, 100, 0.1) !important;
-    border-color: #666 !important;
+    opacity: 0.3;
 }
 
 body.dark-mode .header-spec-btn:disabled svg,

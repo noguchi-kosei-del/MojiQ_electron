@@ -115,6 +115,18 @@ body.dark-mode label.header-icon-btn:hover svg {
     stroke: #90caf9;
 }
 
+body.dark-mode .header-icon-btn:hover svg circle,
+body.dark-mode .header-icon-btn:hover svg path,
+body.dark-mode label.header-icon-btn:hover svg circle,
+body.dark-mode label.header-icon-btn:hover svg path {
+    stroke: #90caf9;
+}
+
+/* ダークモードでの描画追加ボタンの+マーク */
+body.dark-mode #importDrawingOnlyBtn svg circle {
+    fill: #333;
+}
+
 body.dark-mode #workspaceFlipBtn {
     color: #fff;
 }
@@ -964,28 +976,22 @@ body.dark-mode .json-folder-file .json-folder-icon svg {
     stroke: #81c784;
 }
 
-/* 検索バー（ダークモード） */
-body.dark-mode .json-folder-search-bar input {
-    background: #333;
-    border-color: #444;
+/* モーダル共通検索バー（ダークモード） */
+body.dark-mode .modal-search-icon {
+    color: #888;
+}
+
+body.dark-mode .modal-search-input {
     color: #eee;
+    border-bottom-color: #555;
 }
 
-body.dark-mode .json-folder-search-bar input:focus {
-    border-color: #64b5f6;
-    box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
+body.dark-mode .modal-search-input:focus {
+    border-bottom-color: #64b5f6;
 }
 
-body.dark-mode .json-folder-search-bar input::placeholder {
+body.dark-mode .modal-search-input::placeholder {
     color: #777;
-}
-
-body.dark-mode .json-search-clear-btn {
-    color: #777;
-}
-
-body.dark-mode .json-search-clear-btn:hover {
-    background: #444;
     color: #ccc;
 }
 
@@ -1380,31 +1386,6 @@ body.dark-mode .calibration-empty {
     color: #777;
 }
 
-/* 校正チェック検索バー（ダークモード） */
-body.dark-mode .calibration-search-bar input {
-    background: #333;
-    border-color: #444;
-    color: #ddd;
-}
-
-body.dark-mode .calibration-search-bar input:focus {
-    border-color: #64b5f6;
-    box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
-}
-
-body.dark-mode .calibration-search-bar input::placeholder {
-    color: #777;
-}
-
-body.dark-mode .calibration-search-clear-btn {
-    color: #777;
-}
-
-body.dark-mode .calibration-search-clear-btn:hover {
-    background: #444;
-    color: #aaa;
-}
-
 body.dark-mode .calibration-search-results {
     background: #252525;
     border-color: #444;
@@ -1595,4 +1576,56 @@ body.dark-mode .sidebar-bottom-btn.hidden-state {
 
 body.dark-mode .sidebar-bottom-btn.hidden-state:hover {
     color: #f44336;
+}
+
+/* テキスト入力モーダル (Sim) */
+body.dark-mode #sim-textModal > div {
+    background: #2d2d2d !important;
+}
+
+body.dark-mode #sim-textModal strong {
+    color: #e0e0e0 !important;
+}
+
+body.dark-mode #sim-modalTextInput {
+    background: #1e1e1e;
+    border-color: #444 !important;
+    color: #e0e0e0;
+}
+
+body.dark-mode #sim-modalTextInput::-webkit-scrollbar {
+    width: 6px;
+}
+
+body.dark-mode #sim-modalTextInput::-webkit-scrollbar-track {
+    background: #333;
+    border-radius: 3px;
+}
+
+body.dark-mode #sim-modalTextInput::-webkit-scrollbar-thumb {
+    background: #666;
+    border-radius: 3px;
+}
+
+body.dark-mode #sim-modalTextInput::-webkit-scrollbar-thumb:hover {
+    background: #888;
+}
+
+/* テキスト入力モーダル (メイン) */
+body.dark-mode #modalTextInput::-webkit-scrollbar {
+    width: 6px;
+}
+
+body.dark-mode #modalTextInput::-webkit-scrollbar-track {
+    background: #333;
+    border-radius: 3px;
+}
+
+body.dark-mode #modalTextInput::-webkit-scrollbar-thumb {
+    background: #666;
+    border-radius: 3px;
+}
+
+body.dark-mode #modalTextInput::-webkit-scrollbar-thumb:hover {
+    background: #888;
 }

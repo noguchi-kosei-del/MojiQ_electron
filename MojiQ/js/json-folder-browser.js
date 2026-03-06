@@ -152,6 +152,10 @@ window.MojiQJsonFolderBrowser = (function() {
             return;
         }
 
+        // 上部メニューをグレーアウト
+        const menuLockableItems = document.querySelectorAll('.menu-lockable');
+        menuLockableItems.forEach(item => item.classList.add('menu-locked'));
+
         modal.style.display = 'flex';
         folderList.innerHTML = '<div class="json-folder-loading">読み込み中...</div>';
 
@@ -178,6 +182,9 @@ window.MojiQJsonFolderBrowser = (function() {
      */
     function closeModal() {
         modal.style.display = 'none';
+        // 上部メニューのグレーアウトを解除
+        const menuLockableItems = document.querySelectorAll('.menu-lockable');
+        menuLockableItems.forEach(item => item.classList.remove('menu-locked'));
     }
 
     /**

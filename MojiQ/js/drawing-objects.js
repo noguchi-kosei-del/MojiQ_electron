@@ -998,27 +998,32 @@ window.MojiQDrawingObjects = (function() {
 
         /**
          * 単一オブジェクトを復元（画像はBase64からHTMLImageElementに）
+         * 注意: インポートされたオブジェクトは必ずディープコピーして返す
+         * （元のJSONデータへの参照を持たないようにして、後からの変更で座標がずれるのを防ぐ）
          */
         deserializeObject: function(obj) {
             return new Promise((resolve, reject) => {
-                if (obj.type === 'image' && obj.imageDataUrl) {
+                // 最初にディープコピーして、元のJSONデータへの参照を断ち切る
+                const clonedObj = MojiQClone.deep(obj);
+
+                if (clonedObj.type === 'image' && clonedObj.imageDataUrl) {
                     const img = new Image();
                     img.onload = () => {
-                        obj.imageData = img;
-                        delete obj.imageDataUrl;
-                        resolve(obj);
+                        clonedObj.imageData = img;
+                        delete clonedObj.imageDataUrl;
+                        resolve(clonedObj);
                     };
                     img.onerror = (err) => {
                         // BUG-003修正: エラーをログに記録し、画像なしでオブジェクトを返す
-                        console.warn('画像の復元に失敗:', obj.id, err);
+                        console.warn('画像の復元に失敗:', clonedObj.id, err);
                         // 画像データが破損している場合はimageDataUrlを保持したまま返す
                         // これにより、後で再試行や別の処理が可能
-                        obj._imageLoadFailed = true;
-                        resolve(obj);  // アプリケーションの継続のためresolveを維持
+                        clonedObj._imageLoadFailed = true;
+                        resolve(clonedObj);  // アプリケーションの継続のためresolveを維持
                     };
-                    img.src = obj.imageDataUrl;
+                    img.src = clonedObj.imageDataUrl;
                 } else {
-                    resolve(obj);
+                    resolve(clonedObj);
                 }
             });
         },

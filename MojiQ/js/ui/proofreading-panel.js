@@ -75,8 +75,17 @@ const ProofreadingPanel = (() => {
                     setColor(color);
                     updateActiveColorSwatch(swatch);
                 } else if (swatch === customColorSwatch) {
-                    // カスタムカラーピッカーを開く
-                    colorPicker.click();
+                    // カスタムカラーパレットをクリック: 色が設定されている場合はその色を選択
+                    // カラーピッカーは開かない（レインボーピッカーで色を選択する）
+                    const customColor = customColorSwatch.style.backgroundColor;
+                    if (customColor && customColor !== 'transparent') {
+                        // RGB形式をHEX形式に変換
+                        const hexColor = rgbToHex(customColor);
+                        if (hexColor) {
+                            setColor(hexColor);
+                            updateActiveColorSwatch(customColorSwatch);
+                        }
+                    }
                 }
             });
         });
@@ -252,6 +261,56 @@ const ProofreadingPanel = (() => {
     }
 
     /**
+     * RGB形式の文字列をHEX形式に変換
+     * @param {string} rgb - 'rgb(r, g, b)' または 'rgba(r, g, b, a)' 形式
+     * @returns {string|null} HEX形式の色、または変換できない場合はnull
+     */
+    function rgbToHex(rgb) {
+        if (!rgb) return null;
+        // 既にHEX形式の場合はそのまま返す
+        if (rgb.startsWith('#')) return rgb;
+        // RGB形式をパース
+        const match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (!match) return null;
+        const r = parseInt(match[1], 10);
+        const g = parseInt(match[2], 10);
+        const b = parseInt(match[3], 10);
+        return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+    }
+
+    /**
+     * 指示入れモードのカスタムカラー情報を校正チェックモードに同期
+     */
+    function syncCustomColorFromMain() {
+        const mainRainbowSwatch = document.getElementById('rainbowColorSwatch');
+        if (mainRainbowSwatch && customColorSwatch) {
+            const bgColor = mainRainbowSwatch.style.backgroundColor;
+            if (bgColor && bgColor !== 'transparent') {
+                customColorSwatch.style.backgroundColor = bgColor;
+                customColorSwatch.style.border = '2px solid #ddd';
+            }
+        }
+    }
+
+    /**
+     * 校正チェックモードのカスタムカラー情報を指示入れモードに同期
+     */
+    function syncCustomColorToMain() {
+        const mainRainbowSwatch = document.getElementById('rainbowColorSwatch');
+        if (mainRainbowSwatch && customColorSwatch) {
+            const bgColor = customColorSwatch.style.backgroundColor;
+            if (bgColor && bgColor !== 'transparent') {
+                mainRainbowSwatch.style.backgroundColor = bgColor;
+                mainRainbowSwatch.style.border = '2px solid #ccc';
+                const hexColor = rgbToHex(bgColor);
+                if (hexColor) {
+                    mainRainbowSwatch.setAttribute('data-color', hexColor);
+                }
+            }
+        }
+    }
+
+    /**
      * 色を設定
      */
     function setColor(color) {
@@ -274,6 +333,12 @@ const ProofreadingPanel = (() => {
             mainPalette.querySelectorAll('.color-swatch').forEach(s => {
                 s.classList.toggle('active', s.dataset.color === color);
             });
+        }
+
+        // 選択中のオブジェクトがあればその色を変更（指示入れモードと挙動を共通化）
+        const currentMode = window.MojiQStore && window.MojiQStore.get('drawing.currentMode');
+        if (currentMode === 'select' && window.MojiQDrawingSelect && window.MojiQDrawingSelect.hasSelection()) {
+            window.MojiQDrawingSelect.setSelectedColor(color);
         }
     }
 
@@ -826,6 +891,9 @@ const ProofreadingPanel = (() => {
                 syncLineWidthFromMainUI();
             });
         });
+
+        // 指示入れモードのカスタムカラー情報を引き継ぐ
+        syncCustomColorFromMain();
     }
 
     /**
@@ -861,6 +929,9 @@ const ProofreadingPanel = (() => {
      * パネルを非表示
      */
     function hide() {
+        // 校正チェックモードのカスタムカラー情報を指示入れモードに引き継ぐ
+        syncCustomColorToMain();
+
         if (panel) {
             panel.style.display = 'none';
         }
@@ -1059,7 +1130,9 @@ const ProofreadingPanel = (() => {
         selectItem,
         clearItemSelection,
         clearSearch,
-        performSearch
+        performSearch,
+        syncCustomColorFromMain,
+        syncCustomColorToMain
     };
 
     // windowオブジェクトに登録（script.jsからのアクセス用）

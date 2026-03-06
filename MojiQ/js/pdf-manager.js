@@ -1434,6 +1434,11 @@ window.MojiQPdfManager = (function() {
                 SpreadState.clearSpreadPageCache();
                 SpreadState.setSpreadCacheReady(false);
             }
+            // 綴じ方向とスライダー方向をデフォルト（右綴じ）にリセット
+            SpreadState.setSpreadBindingDirection('right');
+            if (window.MojiQNavigation && MojiQNavigation.setSliderDirection) {
+                MojiQNavigation.setSliderDirection('right');
+            }
 
             // 単一ページキャッシュもクリア
             if (singlePageCache) singlePageCache.clear();
@@ -1787,6 +1792,11 @@ window.MojiQPdfManager = (function() {
                 // 見開きキャッシュをクリア
                 SpreadState.clearSpreadPageCache();
                 SpreadState.setSpreadCacheReady(false);
+            }
+            // 綴じ方向とスライダー方向をデフォルト（右綴じ）にリセット
+            SpreadState.setSpreadBindingDirection('right');
+            if (window.MojiQNavigation && MojiQNavigation.setSliderDirection) {
+                MojiQNavigation.setSliderDirection('right');
             }
 
             // 単一ページキャッシュもクリア
@@ -3122,6 +3132,11 @@ window.MojiQPdfManager = (function() {
                 SpreadState.clearSpreadPageCache();
                 SpreadState.setSpreadCacheReady(false);
             }
+            // 綴じ方向とスライダー方向をデフォルト（右綴じ）にリセット
+            SpreadState.setSpreadBindingDirection('right');
+            if (window.MojiQNavigation && MojiQNavigation.setSliderDirection) {
+                MojiQNavigation.setSliderDirection('right');
+            }
 
             // 単一ページキャッシュもクリア
             if (singlePageCache) singlePageCache.clear();
@@ -3263,6 +3278,11 @@ window.MojiQPdfManager = (function() {
                 }
                 SpreadState.clearSpreadPageCache();
                 SpreadState.setSpreadCacheReady(false);
+            }
+            // 綴じ方向とスライダー方向をデフォルト（右綴じ）にリセット
+            SpreadState.setSpreadBindingDirection('right');
+            if (window.MojiQNavigation && MojiQNavigation.setSliderDirection) {
+                MojiQNavigation.setSliderDirection('right');
             }
 
             // 単一ページキャッシュもクリア

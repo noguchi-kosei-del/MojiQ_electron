@@ -55,6 +55,16 @@
 
         <div class="header-divider"></div>
 
+        <!-- 作品仕様読み込み / 校正チェックボタン（モード切替の右隣） -->
+        <button id="headerGdriveJsonBtn" class="header-icon-btn header-spec-btn pdf-required menu-lockable" title="作品仕様を読み込み" disabled>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a1 1 0 011-1h5l2 2h7a1 1 0 011 1v8a1 1 0 01-1 1H5a1 1 0 01-1-1V7z"/></svg>
+        </button>
+        <button id="headerCalibrationBtn" class="header-icon-btn header-calibration-btn pdf-required menu-lockable" title="校正チェックを読み込み" disabled>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><polyline points="3,6 4,7 6,5"/><polyline points="3,12 4,13 6,11"/><polyline points="3,18 4,19 6,17"/></svg>
+        </button>
+
+        <div class="header-divider"></div>
+
         <!-- カスタムメニューバー -->
         <div class="custom-menu-bar menu-lockable" id="customMenuBar">
             <div class="menu-item" data-menu="file">
@@ -119,10 +129,15 @@
             </button>
         </div>
 
-        <div class="header-divider"></div>
+        <!-- ドラッグ領域（タイトルバー代わり） -->
+        <div class="titlebar-drag-region" id="titlebarDragRegion"></div>
 
-        <!-- 編集操作ボタン（左側） -->
-        <div class="header-edit-actions">
+        <div class="pdf-filename" id="pdfFileNameDisplay" title=""></div>
+
+        <!-- タブは統合されました -->
+
+        <div class="header-actions">
+            <!-- 編集操作ボタン -->
             <button id="undoBtn" class="header-icon-btn pdf-required menu-lockable" title="元に戻す" disabled>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 7h11a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5H6"/>
@@ -142,23 +157,7 @@
                     <line x1="15" y1="9" x2="9" y2="15"/>
                 </svg>
             </button>
-        </div>
-
-        <!-- ドラッグ領域（タイトルバー代わり） -->
-        <div class="titlebar-drag-region" id="titlebarDragRegion"></div>
-
-        <div class="pdf-filename" id="pdfFileNameDisplay" title=""></div>
-
-        <!-- タブは統合されました -->
-
-        <div class="header-actions">
-            <!-- 作品仕様読み込み / 校正チェックボタン（ヘッダー用、モードで切替） -->
-            <button id="headerGdriveJsonBtn" class="header-icon-btn header-spec-btn pdf-required" title="作品仕様を読み込み" disabled>
-                <svg width="24" height="24" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5a1 1 0 011-1h4l2 2h6a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1V5z"/></svg>
-            </button>
-            <button id="headerCalibrationBtn" class="header-icon-btn header-calibration-btn pdf-required" title="校正チェックを読み込み" disabled>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><polyline points="3,6 4,7 6,5"/><polyline points="3,12 4,13 6,11"/><polyline points="3,18 4,19 6,17"/></svg>
-            </button>
+            <div class="header-divider"></div>
             <button id="pdfUploadBtn" class="header-icon-btn menu-lockable" title="PDF/JPEG読込">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -166,8 +165,17 @@
                     <path d="M12 18v-6"/>
                     <path d="M9 15l3-3 3 3"/>
                 </svg>
+                <input type="file" id="pdfUpload" accept="application/pdf,image/jpeg,.jpg,.jpeg" multiple style="display:none;">
             </button>
-            <input type="file" id="pdfUpload" accept="application/pdf,image/jpeg,.jpg,.jpeg" multiple style="display:none;">
+            <button id="importDrawingOnlyBtn" class="header-icon-btn pdf-required menu-lockable" title="描画を読み込み" disabled>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <!-- 鉛筆 -->
+                    <path d="M15 5a2.12 2.12 0 1 1 3 3L6.5 19.5 2 21l1.5-4.5L15 5z"/>
+                    <!-- 上矢印（右下） -->
+                    <path d="M18 22v-8"/>
+                    <path d="M14 18l4-4 4 4"/>
+                </svg>
+            </button>
             <button id="savePdfBtn" class="header-icon-btn pdf-required menu-lockable" title="PDF保存" disabled>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
@@ -343,20 +351,6 @@
     </div>
     <div id="savePdfDropdownOverlay" class="page-edit-dropdown-overlay"></div>
 
-    <!-- PDF/JPEG読み込みドロップダウンメニュー -->
-    <div id="pdfUploadDropdown" class="page-edit-dropdown pdf-upload-dropdown">
-        <div class="page-edit-dropdown-content">
-            <button id="normalLoadBtn" class="page-edit-dropdown-item load-option">
-                <span class="dropdown-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3-3 3 3"/></svg></span>
-                <span>PDF/JPEGを読み込み</span>
-            </button>
-            <button id="importDrawingOnlyBtn" class="page-edit-dropdown-item load-option drawing-import pdf-required" disabled>
-                <span class="dropdown-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 13l2 2 4-4"/></svg></span>
-                <span>描画を追加</span>
-            </button>
-        </div>
-    </div>
-    <div id="pdfUploadDropdownOverlay" class="page-edit-dropdown-overlay"></div>
 
     <div id="textModal" class="modal-overlay" tabindex="-1">
         <div class="modal-content">
@@ -467,9 +461,9 @@
             <div class="modal-header">
                 <span>作品仕様jsonを選択してください</span>
             </div>
-            <div class="json-folder-search-bar">
-                <input type="text" id="jsonFolderSearchInput" placeholder="JSONファイルを検索..." autocomplete="off">
-                <button id="jsonFolderSearchClearBtn" class="json-search-clear-btn" title="クリア">&times;</button>
+            <div class="modal-search-bar">
+                <svg class="modal-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input type="text" id="jsonFolderSearchInput" class="modal-search-input" placeholder="検索..." autocomplete="off">
             </div>
             <!-- フォルダブラウザ -->
             <div class="json-folder-browser" id="jsonFolderBrowser">
@@ -495,9 +489,9 @@
             <div class="modal-header">
                 <span>校正チェックjsonを選択してください</span>
             </div>
-            <div class="calibration-search-bar">
-                <input type="text" id="calibrationSearchInput" placeholder="JSONファイルを検索..." autocomplete="off">
-                <button id="calibrationSearchClearBtn" class="calibration-search-clear-btn" title="クリア">&times;</button>
+            <div class="modal-search-bar">
+                <svg class="modal-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input type="text" id="calibrationSearchInput" class="modal-search-input" placeholder="検索..." autocomplete="off">
             </div>
             <!-- フォルダブラウザ -->
             <div class="calibration-browser" id="calibrationBrowser">

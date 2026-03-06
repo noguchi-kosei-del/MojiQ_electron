@@ -498,9 +498,6 @@ function initWindowControlsAndMenuBar() {
                 if (window._spreadBindingDropdownClose) {
                     window._spreadBindingDropdownClose();
                 }
-                if (window._pdfUploadDropdownClose) {
-                    window._pdfUploadDropdownClose();
-                }
                 slideMenu.classList.add('open');
                 if (slideMenuOverlay) slideMenuOverlay.classList.add('visible');
                 hamburgerBtn.classList.add('active');
@@ -1455,9 +1452,6 @@ window.addEventListener('load', () => {
                     if (window._savePdfDropdownClose) {
                         window._savePdfDropdownClose();
                     }
-                    if (window._pdfUploadDropdownClose) {
-                        window._pdfUploadDropdownClose();
-                    }
                     updateSelectionState();
                 }
             });
@@ -1592,9 +1586,6 @@ window.addEventListener('load', () => {
                     if (window._spreadBindingDropdownClose) {
                         window._spreadBindingDropdownClose();
                     }
-                    if (window._pdfUploadDropdownClose) {
-                        window._pdfUploadDropdownClose();
-                    }
                     updateSaveDropdownState();
                 }
             });
@@ -1637,60 +1628,32 @@ window.addEventListener('load', () => {
         window._savePdfDropdownClose = closeSavePdfDropdown;
     }
 
-    // --- PDF/JPEG読み込みボタン（ドロップダウン付き） ---
+    // --- PDF/JPEG読み込みボタン（直接ファイル選択） ---
     const pdfUploadBtn = document.getElementById('pdfUploadBtn');
     const pdfUpload = document.getElementById('pdfUpload');
-    const pdfUploadDropdown = document.getElementById('pdfUploadDropdown');
-    const pdfUploadDropdownOverlay = document.getElementById('pdfUploadDropdownOverlay');
 
-    if (pdfUploadBtn && pdfUploadDropdown) {
-        const normalLoadBtn = document.getElementById('normalLoadBtn');
-
-        function closePdfUploadDropdown() {
-            MojiQDropdownPositioner.close(pdfUploadDropdown, pdfUploadDropdownOverlay, pdfUploadBtn);
-        }
-
-        // 読み込みボタンのクリックでドロップダウン表示
+    if (pdfUploadBtn && pdfUpload) {
         pdfUploadBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            MojiQDropdownPositioner.toggle(pdfUploadBtn, pdfUploadDropdown, pdfUploadDropdownOverlay, {
-                onBeforeOpen: () => {
-                    // 他のドロップダウンを閉じる
-                    if (window._savePdfDropdownClose) {
-                        window._savePdfDropdownClose();
-                    }
-                    if (window._spreadBindingDropdownClose) {
-                        window._spreadBindingDropdownClose();
-                    }
-                }
-            });
+            // 他のドロップダウンを閉じる
+            if (window._savePdfDropdownClose) {
+                window._savePdfDropdownClose();
+            }
+            if (window._spreadBindingDropdownClose) {
+                window._spreadBindingDropdownClose();
+            }
+            pdfUpload.click();
         });
+    }
 
-        if (pdfUploadDropdownOverlay) {
-            pdfUploadDropdownOverlay.addEventListener('click', closePdfUploadDropdown);
-        }
-
-        // 通常の読み込みボタン
-        if (normalLoadBtn) {
-            normalLoadBtn.addEventListener('click', () => {
-                closePdfUploadDropdown();
-                pdfUpload.click();
-            });
-        }
-
-        // 描画を追加ボタン（PDF/JPEG読み込み済みの状態で描画JSONのみを読み込む）
-        const importDrawingOnlyBtn = document.getElementById('importDrawingOnlyBtn');
-        if (importDrawingOnlyBtn) {
-            importDrawingOnlyBtn.addEventListener('click', () => {
-                closePdfUploadDropdown();
-                if (window.DrawingExportImport) {
-                    window.DrawingExportImport.importFromFile();
-                }
-            });
-        }
-
-        // グローバルにアクセス可能にする
-        window._pdfUploadDropdownClose = closePdfUploadDropdown;
+    // --- 描画を追加ボタン（独立ボタン） ---
+    const importDrawingOnlyBtn = document.getElementById('importDrawingOnlyBtn');
+    if (importDrawingOnlyBtn) {
+        importDrawingOnlyBtn.addEventListener('click', () => {
+            if (window.DrawingExportImport) {
+                window.DrawingExportImport.importFromFile();
+            }
+        });
     }
 
     // --- 校正指示スタンプUI ---

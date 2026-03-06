@@ -1689,7 +1689,8 @@ window.MojiQDrawing = (function() {
                     // rect, ellipse, line: 図形部分のみ消去（annotationがある場合は引出線・テキストは残る）
                     // arrow, doubleArrow: 完全に消去
                     // polyline: 完全に消去
-                    const erasableTypes = ['pen', 'marker', 'rect', 'ellipse', 'line', 'arrow', 'doubleArrow', 'polyline'];
+                    // fontLabel: フォント指定枠線（完全に消去）
+                    const erasableTypes = ['pen', 'marker', 'rect', 'ellipse', 'line', 'arrow', 'doubleArrow', 'polyline', 'fontLabel'];
 
                     for (let i = 0; i < objects.length; i++) {
                         const obj = objects[i];

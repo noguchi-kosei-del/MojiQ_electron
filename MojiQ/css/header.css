@@ -42,6 +42,17 @@
     margin: 0 8px;
 }
 
+/* header-actions内の区切り線はgapと合わせて調整 */
+.header-actions .header-divider {
+    margin: 0;
+}
+
+/* 作品仕様/校正チェックボタン周辺の区切り線の間隔を統一 */
+.header-spec-btn + .header-divider,
+.header-calibration-btn + .header-divider {
+    margin: 0 0 0 8px;
+}
+
 /* カスタムメニューバー */
 .custom-menu-bar {
     display: none; /* ファイル・編集・表示メニューを非表示 */
@@ -361,6 +372,13 @@ label.header-icon-btn:hover svg {
     stroke: #1976d2;
 }
 
+.header-icon-btn:hover svg circle,
+.header-icon-btn:hover svg path,
+label.header-icon-btn:hover svg circle,
+label.header-icon-btn:hover svg path {
+    stroke: #1976d2;
+}
+
 #workspaceFlipBtn:hover {
     color: #1976d2;
 }
@@ -520,4 +538,5 @@ button.header-icon-btn:disabled svg {
 .header-zoom-btn.menu-lockable.menu-locked svg {
     stroke: #999;
 }
+
 
