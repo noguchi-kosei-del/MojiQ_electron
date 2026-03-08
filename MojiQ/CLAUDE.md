@@ -29,7 +29,33 @@ npm run start        # 開発用起動
 - **指示入れモード**: PDF/画像に校正指示を書き込む
 - **校正チェックモード**: 校正チェックリストを表示・管理
 
-## 最近の変更 (2026-03-06)
+## 最近の変更 (2026-03-08)
+
+### バグ修正
+- 見開きモードで描画JSONをインポートしても描画が表示されない問題を修正
+  - 単ページキーで保存されたデータを見開きキーにマージする`refreshSpreadDrawings`を追加
+- 描画JSONを上書き保存して再読み込みすると内容が正しく保存されていない問題を修正
+  - `getAllPagesData`でspread_*キーとNaNキーをスキップするよう修正
+- 描画を再読み込みすると位置がずれる問題を修正
+  - エクスポート時にバックアップ/復元パターンを使用し、座標の二重変換を防止
+- 描画データを追加保存にチェックを入れて上書き保存しても描画JSONが保存されない問題を修正
+  - `exportToPath`でElectron環境判定を`window.MojiQElectron.isElectron`に統一
+
+### UI改善
+- PDF保存完了後にダイアログを表示
+  - 描画JSON保存成功時: 「PDFと描画データの保存が完了しました。」
+  - PDF保存のみ: 「PDF保存が完了しました。」
+- 保存完了ダイアログからキャンセルボタンを削除
+
+### 関連ファイル
+- `MojiQ/js/drawing-export-import.js` - エクスポート時のバックアップ/復元、Electron判定統一
+- `MojiQ/js/drawing-objects.js` - getAllPagesDataでspread_*キースキップ、backup/restore関数追加
+- `MojiQ/js/pdf-manager.js` - refreshSpreadDrawings追加、保存完了ダイアログ、描画エクスポート結果反映
+- `MojiQ/js/modal.js` - showAlertでキャンセルボタン非表示
+
+---
+
+## 過去の変更 (2026-03-06)
 
 ### バグ修正
 - 見開きモード左綴じ時に新しいファイルを読み込むとページバーが逆のままになる問題を修正

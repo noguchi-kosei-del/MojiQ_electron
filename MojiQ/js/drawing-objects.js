@@ -914,11 +914,21 @@ window.MojiQDrawingObjects = (function() {
 
         /**
          * 全ページのオブジェクトをシリアライズ可能な形式で取得
+         * 注意: spread_で始まるキー（見開きページ用）はスキップする
          */
         getAllPagesData: function() {
             const result = {};
             for (const pageNum in state.pageObjects) {
-                const serialized = this.serializePageObjects(parseInt(pageNum));
+                // spread_で始まるキー（見開きページ用）はスキップ
+                if (typeof pageNum === 'string' && pageNum.startsWith('spread_')) {
+                    continue;
+                }
+                const numericPageNum = parseInt(pageNum);
+                // 数値に変換できないキーはスキップ
+                if (isNaN(numericPageNum)) {
+                    continue;
+                }
+                const serialized = this.serializePageObjects(numericPageNum);
                 if (serialized.length > 0) {
                     result[pageNum] = serialized;
                 }
@@ -1532,6 +1542,37 @@ window.MojiQDrawingObjects = (function() {
                 delete state.pageObjects[key];
                 delete state.undoStacks[key];
                 delete state.redoStacks[key];
+            }
+        },
+
+        /**
+         * 単ページのオブジェクトをバックアップ（エクスポート用）
+         * @returns {Object} バックアップデータ
+         */
+        backupSinglePageObjects: function() {
+            const backup = {};
+            for (const key in state.pageObjects) {
+                // spread_で始まるキーはスキップ
+                if (this.isSpreadPageKey(key)) {
+                    continue;
+                }
+                // オブジェクト配列のみをディープコピー
+                backup[key] = {
+                    objects: MojiQClone.deep(state.pageObjects[key].objects)
+                };
+            }
+            return backup;
+        },
+
+        /**
+         * 単ページのオブジェクトを復元（エクスポート用）
+         * @param {Object} backup - backupSinglePageObjectsで取得したバックアップ
+         */
+        restoreSinglePageObjects: function(backup) {
+            for (const key in backup) {
+                if (state.pageObjects[key]) {
+                    state.pageObjects[key].objects = backup[key].objects;
+                }
             }
         },
 

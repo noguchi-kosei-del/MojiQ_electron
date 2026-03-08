@@ -593,6 +593,7 @@ window.MojiQModal = (function() {
         const value = promptModalInput.value;
         promptModal.style.display = 'none';
         promptModalInput.style.display = '';  // 入力欄を復帰（showAlertで非表示にした場合）
+        promptModalCancelBtn.style.display = '';  // キャンセルボタンを復帰（showAlertで非表示にした場合）
         if (promptResolve) {
             promptResolve(value);
             promptResolve = null;
@@ -605,6 +606,7 @@ window.MojiQModal = (function() {
     function cancelPromptModal() {
         promptModal.style.display = 'none';
         promptModalInput.style.display = '';  // 入力欄を復帰（showAlertで非表示にした場合）
+        promptModalCancelBtn.style.display = '';  // キャンセルボタンを復帰（showAlertで非表示にした場合）
         if (promptResolve) {
             promptResolve(null);
             promptResolve = null;
@@ -671,6 +673,7 @@ window.MojiQModal = (function() {
             promptModalTitle.textContent = title;
             promptModalLabel.textContent = message;
             promptModalInput.style.display = 'none';
+            promptModalCancelBtn.style.display = 'none';  // キャンセルボタンを非表示
             promptModal.style.display = 'flex';
 
             // OKボタンにフォーカス

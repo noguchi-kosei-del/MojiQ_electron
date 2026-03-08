@@ -2034,11 +2034,16 @@ window.MojiQPdfManager = (function() {
                     // 保存成功: 変更フラグをリセット
                     hasUnsavedChanges = false;
                     // 描画データも保存チェックがオンの場合、描画データも保存
-                    if (window.isExportDrawingEnabled && window.isExportDrawingEnabled() && window.DrawingExportImport) {
-                        await window.DrawingExportImport.exportToPath(currentSaveFilePath);
+                    const exportDrawingEnabled = window.isExportDrawingEnabled && window.isExportDrawingEnabled();
+                    let drawingExportSuccess = false;
+                    if (exportDrawingEnabled && window.DrawingExportImport) {
+                        drawingExportSuccess = await window.DrawingExportImport.exportToPath(currentSaveFilePath);
                     }
-                    // 上書き保存完了のポップアップを表示
-                    MojiQModal.showAlert('上書き保存が完了しました。', '保存完了');
+                    // 上書き保存完了のポップアップを表示（描画データの保存結果を反映）
+                    const saveMessage = (exportDrawingEnabled && drawingExportSuccess)
+                        ? 'PDFと描画データの保存が完了しました。'
+                        : 'PDF保存が完了しました。';
+                    MojiQModal.showAlert(saveMessage, '保存完了');
                     // 警告があれば表示
                     showSaveWarnings(result);
                 } else {
@@ -2059,9 +2064,16 @@ window.MojiQPdfManager = (function() {
                         const savedFileName = dialogResult.filePath.split(/[/\\]/).pop();
                         updatePdfFileNameDisplay(savedFileName);
                         // 描画データも保存チェックがオンの場合、描画データも保存
-                        if (window.isExportDrawingEnabled && window.isExportDrawingEnabled() && window.DrawingExportImport) {
-                            await window.DrawingExportImport.exportToPath(dialogResult.filePath);
+                        const exportDrawingEnabledNew = window.isExportDrawingEnabled && window.isExportDrawingEnabled();
+                        let drawingExportSuccessNew = false;
+                        if (exportDrawingEnabledNew && window.DrawingExportImport) {
+                            drawingExportSuccessNew = await window.DrawingExportImport.exportToPath(dialogResult.filePath);
                         }
+                        // 保存完了のポップアップを表示（描画データの保存結果を反映）
+                        const saveMessageNew = (exportDrawingEnabledNew && drawingExportSuccessNew)
+                            ? 'PDFと描画データの保存が完了しました。'
+                            : 'PDF保存が完了しました。';
+                        MojiQModal.showAlert(saveMessageNew, '保存完了');
                         // 警告があれば表示
                         showSaveWarnings(result);
                     }
@@ -2077,6 +2089,8 @@ window.MojiQPdfManager = (function() {
                 URL.revokeObjectURL(url);
                 // 保存成功: 変更フラグをリセット
                 hasUnsavedChanges = false;
+                // 保存完了のポップアップを表示
+                MojiQModal.showAlert('PDF保存が完了しました。', '保存完了');
                 // 警告があれば表示
                 showSaveWarnings(result);
             }
@@ -2213,9 +2227,16 @@ window.MojiQPdfManager = (function() {
                     const savedFileName = dialogResult.filePath.split(/[/\\]/).pop();
                     updatePdfFileNameDisplay(savedFileName);
                     // 描画データも保存チェックがオンの場合、描画データも保存
-                    if (window.isExportDrawingEnabled && window.isExportDrawingEnabled() && window.DrawingExportImport) {
-                        await window.DrawingExportImport.exportToPath(dialogResult.filePath);
+                    const exportDrawingEnabledSaveAs = window.isExportDrawingEnabled && window.isExportDrawingEnabled();
+                    let drawingExportSuccessSaveAs = false;
+                    if (exportDrawingEnabledSaveAs && window.DrawingExportImport) {
+                        drawingExportSuccessSaveAs = await window.DrawingExportImport.exportToPath(dialogResult.filePath);
                     }
+                    // 保存完了のポップアップを表示（描画データの保存結果を反映）
+                    const saveMessageSaveAs = (exportDrawingEnabledSaveAs && drawingExportSuccessSaveAs)
+                        ? 'PDFと描画データの保存が完了しました。'
+                        : 'PDF保存が完了しました。';
+                    MojiQModal.showAlert(saveMessageSaveAs, '保存完了');
                     // 警告があれば表示
                     showSaveWarnings(result);
                 }
@@ -2230,6 +2251,8 @@ window.MojiQPdfManager = (function() {
                 URL.revokeObjectURL(url);
                 // 保存成功: 変更フラグをリセット
                 hasUnsavedChanges = false;
+                // 保存完了のポップアップを表示
+                MojiQModal.showAlert('PDF保存が完了しました。', '保存完了');
                 // 警告があれば表示
                 showSaveWarnings(result);
             }
@@ -2343,6 +2366,19 @@ window.MojiQPdfManager = (function() {
 
             // ヘッダーのファイル名も更新
             updatePdfFileNameDisplay(fileName + '.pdf');
+
+            // 描画データも保存チェックがオンの場合、描画データも保存
+            const exportDrawingEnabledPath = window.isExportDrawingEnabled && window.isExportDrawingEnabled();
+            let drawingExportSuccessPath = false;
+            if (exportDrawingEnabledPath && window.DrawingExportImport) {
+                drawingExportSuccessPath = await window.DrawingExportImport.exportToPath(filePath);
+            }
+
+            // 保存完了のポップアップを表示（描画データの保存結果を反映）
+            const saveMessagePath = (exportDrawingEnabledPath && drawingExportSuccessPath)
+                ? 'PDFと描画データの保存が完了しました。'
+                : 'PDF保存が完了しました。';
+            MojiQModal.showAlert(saveMessagePath, '保存完了');
 
             // 警告があれば表示
             showSaveWarnings(result);
@@ -5650,6 +5686,34 @@ window.MojiQPdfManager = (function() {
         return MojiQDrawingObjects.getSpreadPageKey(SpreadState.getCurrentSpreadIndex());
     }
 
+    /**
+     * 見開きモードで描画オブジェクトを再マージして再描画する
+     * 描画JSONのインポート後など、単ページのデータを見開きに反映する際に使用
+     */
+    function refreshSpreadDrawings() {
+        if (!SpreadState.isSpreadViewMode()) return;
+
+        // 既存のspreadオブジェクトをクリア
+        if (window.MojiQDrawingObjects) {
+            MojiQDrawingObjects.clearAllSpreadPages();
+        }
+
+        // 単ページのオブジェクトを見開きにマージ
+        mergeObjectsToSpreadPages();
+
+        // 再描画
+        displaySpreadFromCache(SpreadState.getCurrentSpreadIndex());
+    }
+
+    /**
+     * 見開きモードで描画データをエクスポート用に単ページに分割する
+     * エクスポート後は必ずrefreshSpreadDrawingsを呼んで見開きに戻すこと
+     */
+    function splitSpreadDrawingsForExport() {
+        if (!SpreadState.isSpreadViewMode()) return;
+        splitObjectsFromSpreadPages();
+    }
+
     return {
         init,
         cleanup,  // メモリリーク対策: イベントリスナー解除
@@ -5699,6 +5763,8 @@ window.MojiQPdfManager = (function() {
         getSpreadBindingDirection,  // 綴じ方向取得
         getCurrentSpreadPageKey,    // 現在の見開きページキー取得
         rebuildSpreadAfterPageChange,  // ページ追加/削除後の見開き再構築
+        refreshSpreadDrawings,         // 見開きモードで描画オブジェクトを再マージ（インポート後用）
+        splitSpreadDrawingsForExport,  // 見開きモードで描画を単ページに分割（エクスポート用）
         clearPageCache: () => { if (singlePageCache) singlePageCache.clear(); },
         invalidatePageCache,  // 指定ページのキャッシュ無効化（描画変更時用）
         // 変更フラグ関連（上書き保存時のスキップ判定用）

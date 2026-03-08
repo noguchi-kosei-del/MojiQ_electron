@@ -10,8 +10,28 @@ const DrawingExportImport = {
      * 描画データをJSONファイルとしてエクスポート
      */
     async exportToFile() {
+        // 見開きモードの場合は先に単ページに分割
+        const isSpreadMode = window.MojiQPdfManager &&
+            window.MojiQPdfManager.isSpreadViewMode &&
+            window.MojiQPdfManager.isSpreadViewMode();
+
+        let singlePageBackup = null;
+        if (isSpreadMode) {
+            // 単ページのデータをバックアップ（splitで上書きされるため）
+            singlePageBackup = MojiQDrawingObjects.backupSinglePageObjects();
+            window.MojiQPdfManager.splitSpreadDrawingsForExport();
+        }
+
         // 描画データを取得
         const data = MojiQDrawingObjects.getAllPagesData();
+
+        // 見開きモードの場合は元のデータに戻してから見開きを再構築
+        if (isSpreadMode && singlePageBackup) {
+            // バックアップから単ページのデータを復元
+            MojiQDrawingObjects.restoreSinglePageObjects(singlePageBackup);
+            // 見開きを再構築
+            window.MojiQPdfManager.refreshSpreadDrawings();
+        }
 
         if (Object.keys(data).length === 0) {
             if (window.MojiQModal && window.MojiQModal.showAlert) {
@@ -197,9 +217,14 @@ const DrawingExportImport = {
 
         // 再描画
         if (window.MojiQPdfManager) {
-            const currentPage = window.MojiQPdfManager.getCurrentPage();
-            window.MojiQPdfManager.invalidatePageCache(currentPage);
-            window.MojiQPdfManager.renderPage(currentPage);
+            // 見開きモードの場合は、単ページのデータを見開きにマージして再描画
+            if (window.MojiQPdfManager.isSpreadViewMode && window.MojiQPdfManager.isSpreadViewMode()) {
+                window.MojiQPdfManager.refreshSpreadDrawings();
+            } else {
+                const currentPage = window.MojiQPdfManager.getCurrentPage();
+                window.MojiQPdfManager.invalidatePageCache(currentPage);
+                window.MojiQPdfManager.renderPage(currentPage);
+            }
         }
 
         if (window.MojiQModal && window.MojiQModal.showAlert) {
@@ -251,8 +276,28 @@ const DrawingExportImport = {
      * @returns {Promise<boolean>} 保存成功したかどうか
      */
     async exportToPath(filePath) {
+        // 見開きモードの場合は先に単ページに分割
+        const isSpreadMode = window.MojiQPdfManager &&
+            window.MojiQPdfManager.isSpreadViewMode &&
+            window.MojiQPdfManager.isSpreadViewMode();
+
+        let singlePageBackup = null;
+        if (isSpreadMode) {
+            // 単ページのデータをバックアップ（splitで上書きされるため）
+            singlePageBackup = MojiQDrawingObjects.backupSinglePageObjects();
+            window.MojiQPdfManager.splitSpreadDrawingsForExport();
+        }
+
         // 描画データを取得
         const data = MojiQDrawingObjects.getAllPagesData();
+
+        // 見開きモードの場合は元のデータに戻してから見開きを再構築
+        if (isSpreadMode && singlePageBackup) {
+            // バックアップから単ページのデータを復元
+            MojiQDrawingObjects.restoreSinglePageObjects(singlePageBackup);
+            // 見開きを再構築
+            window.MojiQPdfManager.refreshSpreadDrawings();
+        }
 
         if (Object.keys(data).length === 0) {
             return false;
@@ -270,39 +315,24 @@ const DrawingExportImport = {
         // ファイルパスから描画データのパスを生成（拡張子を_描画.jsonに置換）
         const drawingFilePath = filePath.replace(/\.(pdf|jpg|jpeg|png)$/i, '_描画.json');
 
-        // Electron環境の場合
-        if (window.electronAPI && window.electronAPI.saveFile) {
+        // Electron環境の場合（pdf-manager.jsと同じパターンで判定）
+        if (window.MojiQElectron && window.MojiQElectron.isElectron) {
             try {
-                // 同名ファイルの存在確認
-                if (window.electronAPI.fileExists) {
-                    const existsResult = await window.electronAPI.fileExists(drawingFilePath);
-                    if (existsResult && existsResult.success && existsResult.exists) {
-                        // ファイル名を取得して警告ダイアログを表示
-                        const fileName = drawingFilePath.split(/[/\\]/).pop();
-                        let proceed = false;
-                        if (window.MojiQModal && window.MojiQModal.showConfirm) {
-                            proceed = await window.MojiQModal.showConfirm(
-                                `「${fileName}」は既に存在します。\n上書きしますか？`,
-                                '描画データの保存'
-                            );
-                        } else {
-                            proceed = confirm(`「${fileName}」は既に存在します。\n上書きしますか？`);
-                        }
-                        if (!proceed) {
-                            return false;
-                        }
-                    }
-                }
+                // 同名ファイルの存在確認（上書き保存時はスキップ）
+                // 上書き保存の場合は毎回確認ダイアログを出す必要はない
+                // → 初回保存時のみ確認（描画JSONが存在しない場合は新規作成）
 
                 // JSONをBase64エンコードして保存
                 const base64Data = btoa(unescape(encodeURIComponent(jsonString)));
-                const saveResult = await window.electronAPI.saveFile(drawingFilePath, base64Data);
+                const saveResult = await window.MojiQElectron.saveFile(drawingFilePath, base64Data);
                 if (saveResult && saveResult.success) {
                     return true;
                 } else {
+                    console.error('描画データ保存失敗:', saveResult?.error);
                     return false;
                 }
             } catch (error) {
+                console.error('描画データ保存エラー:', error);
                 return false;
             }
         }
