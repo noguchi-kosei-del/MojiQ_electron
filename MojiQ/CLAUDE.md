@@ -29,7 +29,23 @@ npm run start        # 開発用起動
 - **指示入れモード**: PDF/画像に校正指示を書き込む
 - **校正チェックモード**: 校正チェックリストを表示・管理
 
-## 最近の変更 (2026-03-08)
+## 最近の変更 (2026-03-09)
+
+### バグ修正
+- ウィンドウサイズ変更後に描画JSONを読み込むと位置がずれる問題を修正
+  - 保存時にキャンバスサイズ（pageSizes）をJSONに含める
+  - 読み込み時に保存時と現在のキャンバスサイズの比率でスケーリング
+  - VERSION を '1.1' に更新（v1.0は後方互換性のためスケーリングしない）
+  - 全座標プロパティ対応: startPos, endPos, points, bounds, leaderLine, textX/Y, annotation等
+  - サイズプロパティ対応: lineWidth, fontSize, size
+
+### 関連ファイル
+- `MojiQ/js/drawing-export-import.js` - ページサイズ保存・スケーリング処理追加
+- `MojiQ/js/pdf-manager.js` - getIntrinsicPageSize関数追加
+
+---
+
+## 過去の変更 (2026-03-08)
 
 ### バグ修正
 - 見開きモードで描画JSONをインポートしても描画が表示されない問題を修正

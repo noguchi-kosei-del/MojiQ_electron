@@ -4181,6 +4181,44 @@ window.MojiQPdfManager = (function() {
     }
 
     /**
+     * ページの元のサイズを取得（ウィンドウサイズに依存しない固有のサイズ）
+     * PDFの場合: scale=1のviewportサイズ
+     * 画像の場合: 元のピクセルサイズ
+     * @param {number} pageNum - ページ番号
+     * @returns {Promise<{width: number, height: number}>}
+     */
+    async function getIntrinsicPageSize(pageNum) {
+        const mapItem = state.pageMapping[pageNum - 1];
+        if (!mapItem) {
+            return { width: 595, height: 842 };
+        }
+
+        // PDFページの場合: scale=1のviewportサイズを取得
+        if (mapItem.docIndex >= 0 && state.pdfDocs[mapItem.docIndex]) {
+            try {
+                const page = await state.pdfDocs[mapItem.docIndex].getPage(mapItem.pageNum);
+                const viewport = page.getViewport({ scale: 1 });
+                return { width: viewport.width, height: viewport.height };
+            } catch (e) {
+                console.error('ページサイズ取得エラー:', e);
+            }
+        }
+
+        // 画像ページの場合: 元のピクセルサイズを取得
+        if (mapItem.docIndex === -2 && imagePageData[mapItem.imageIndex]) {
+            const imgData = imagePageData[mapItem.imageIndex];
+            return { width: imgData.width, height: imgData.height };
+        }
+
+        // 白紙ページの場合
+        if (mapItem.docIndex === -1) {
+            return { width: mapItem.width || 595, height: mapItem.height || 842 };
+        }
+
+        return { width: 595, height: 842 };
+    }
+
+    /**
      * ページのサイズを非同期で取得（PDFから直接サイズを取得）
      * @param {number} pageNum - ページ番号
      * @returns {Promise<{width: number, height: number}>}
@@ -5738,6 +5776,7 @@ window.MojiQPdfManager = (function() {
         applyBgOpacity,
         getBgOpacity,
         getOriginalPageSize,  // ページサイズ取得（描画座標変換用）
+        getIntrinsicPageSize, // ページの固有サイズ取得（描画JSONの座標正規化用）
         triggerInsertPdf,
         updateSaveButtonState,  // 保存ボタン状態更新
         getImagePageData,  // 画像ページデータ取得

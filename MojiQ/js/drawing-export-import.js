@@ -1,10 +1,209 @@
 /**
  * 描画データのエクスポート/インポート機能
  * 描画情報をJSONファイルとして保存・読み込みできるようにする
+ *
+ * v1.1: 座標をインtrinsicサイズ（PDFのscale=1サイズ、画像の元サイズ）ベースで保存
+ *       ウィンドウサイズに依存しない座標系で保存し、読み込み時に現在の表示サイズにスケーリング
  */
 const DrawingExportImport = {
-    VERSION: '1.0',
+    VERSION: '1.1',
     FILE_EXTENSION: '.mojiq.json',
+
+    /**
+     * オブジェクトの座標をスケーリング
+     * @param {Object} obj - 描画オブジェクト
+     * @param {number} scaleX - X方向のスケール
+     * @param {number} scaleY - Y方向のスケール
+     * @returns {Object} スケーリングされたオブジェクト
+     */
+    _scaleObjectCoordinates(obj, scaleX, scaleY) {
+        const scaled = { ...obj };
+
+        // startPos / endPos
+        if (scaled.startPos) {
+            scaled.startPos = {
+                x: scaled.startPos.x * scaleX,
+                y: scaled.startPos.y * scaleY
+            };
+        }
+        if (scaled.endPos) {
+            scaled.endPos = {
+                x: scaled.endPos.x * scaleX,
+                y: scaled.endPos.y * scaleY
+            };
+        }
+
+        // points 配列 (ポリライン、フリーハンドなど)
+        if (scaled.points && Array.isArray(scaled.points)) {
+            scaled.points = scaled.points.map(p => ({
+                x: p.x * scaleX,
+                y: p.y * scaleY
+            }));
+        }
+
+        // bounds (テキスト入力など)
+        if (scaled.bounds) {
+            scaled.bounds = {
+                x: scaled.bounds.x * scaleX,
+                y: scaled.bounds.y * scaleY,
+                width: scaled.bounds.width * scaleX,
+                height: scaled.bounds.height * scaleY
+            };
+        }
+
+        // width / height (画像オブジェクトなど)
+        if (typeof scaled.width === 'number') {
+            scaled.width = scaled.width * scaleX;
+        }
+        if (typeof scaled.height === 'number') {
+            scaled.height = scaled.height * scaleY;
+        }
+
+        // leaderLine (引出線)
+        if (scaled.leaderLine) {
+            scaled.leaderLine = { ...scaled.leaderLine };
+            if (scaled.leaderLine.start) {
+                scaled.leaderLine.start = {
+                    x: scaled.leaderLine.start.x * scaleX,
+                    y: scaled.leaderLine.start.y * scaleY
+                };
+            }
+            if (scaled.leaderLine.end) {
+                scaled.leaderLine.end = {
+                    x: scaled.leaderLine.end.x * scaleX,
+                    y: scaled.leaderLine.end.y * scaleY
+                };
+            }
+        }
+
+        // textX / textY (フォント指定など)
+        if (typeof scaled.textX === 'number') {
+            scaled.textX = scaled.textX * scaleX;
+        }
+        if (typeof scaled.textY === 'number') {
+            scaled.textY = scaled.textY * scaleY;
+        }
+
+        // annotation (注釈オブジェクト)
+        if (scaled.annotation) {
+            scaled.annotation = { ...scaled.annotation };
+            if (typeof scaled.annotation.x === 'number') {
+                scaled.annotation.x = scaled.annotation.x * scaleX;
+            }
+            if (typeof scaled.annotation.y === 'number') {
+                scaled.annotation.y = scaled.annotation.y * scaleY;
+            }
+            if (typeof scaled.annotation.fontSize === 'number') {
+                scaled.annotation.fontSize = scaled.annotation.fontSize * Math.min(scaleX, scaleY);
+            }
+            // annotation内の引出線
+            if (scaled.annotation.leaderLine) {
+                scaled.annotation.leaderLine = { ...scaled.annotation.leaderLine };
+                if (scaled.annotation.leaderLine.start) {
+                    scaled.annotation.leaderLine.start = {
+                        x: scaled.annotation.leaderLine.start.x * scaleX,
+                        y: scaled.annotation.leaderLine.start.y * scaleY
+                    };
+                }
+                if (scaled.annotation.leaderLine.end) {
+                    scaled.annotation.leaderLine.end = {
+                        x: scaled.annotation.leaderLine.end.x * scaleX,
+                        y: scaled.annotation.leaderLine.end.y * scaleY
+                    };
+                }
+            }
+        }
+
+        // lineWidth (線幅)
+        if (typeof scaled.lineWidth === 'number') {
+            scaled.lineWidth = scaled.lineWidth * Math.min(scaleX, scaleY);
+        }
+
+        // fontSize (フォントサイズ)
+        if (typeof scaled.fontSize === 'number') {
+            scaled.fontSize = scaled.fontSize * Math.min(scaleX, scaleY);
+        }
+
+        // size (スタンプのサイズ)
+        if (typeof scaled.size === 'number') {
+            scaled.size = scaled.size * Math.min(scaleX, scaleY);
+        }
+
+        return scaled;
+    },
+
+    /**
+     * 現在のキャンバスサイズを取得
+     * @returns {{width: number, height: number}}
+     */
+    _getCurrentCanvasSize() {
+        const canvas = document.getElementById('mojiqCanvas');
+        if (canvas) {
+            const dpr = window.devicePixelRatio || 1;
+            return {
+                width: canvas.width / dpr,
+                height: canvas.height / dpr
+            };
+        }
+        // フォールバック
+        return window.MojiQPdfManager.getOriginalPageSize(1);
+    },
+
+    /**
+     * エクスポート用データを準備（座標はそのまま、ページサイズ情報を追加）
+     * @param {Object} data - ページごとの描画データ
+     * @returns {Promise<{data: Object, pageSizes: Object}>} データとページサイズ情報
+     */
+    async _prepareExportData(data) {
+        const pageSizes = {};
+        // 現在のキャンバスサイズを取得（全ページ共通）
+        const canvasSize = this._getCurrentCanvasSize();
+
+        for (const pageNum in data) {
+            pageSizes[pageNum] = {
+                width: canvasSize.width,
+                height: canvasSize.height
+            };
+        }
+
+        return { data, pageSizes };
+    },
+
+    /**
+     * インポート時に座標を現在の表示サイズにスケーリング
+     * @param {Object} data - ページごとの描画データ
+     * @param {Object} savedPageSizes - 保存時のページサイズ情報
+     * @param {string} version - データのバージョン
+     * @returns {Object} スケーリングされたデータ
+     */
+    _scaleCoordinatesForImport(data, savedPageSizes, version) {
+        // v1.0以前のデータ、またはページサイズ情報がない場合はスケーリングしない
+        if (version === '1.0' || !savedPageSizes) {
+            return data;
+        }
+
+        const scaledData = {};
+        // 現在のキャンバスサイズを取得
+        const currentSize = this._getCurrentCanvasSize();
+
+        for (const pageNum in data) {
+            const objects = data[pageNum];
+
+            // 保存時のサイズと現在のサイズを比較
+            const savedSize = savedPageSizes[pageNum];
+
+            if (savedSize && (savedSize.width !== currentSize.width || savedSize.height !== currentSize.height)) {
+                const scaleX = currentSize.width / savedSize.width;
+                const scaleY = currentSize.height / savedSize.height;
+
+                scaledData[pageNum] = objects.map(obj => this._scaleObjectCoordinates(obj, scaleX, scaleY));
+            } else {
+                scaledData[pageNum] = objects;
+            }
+        }
+
+        return scaledData;
+    },
 
     /**
      * 描画データをJSONファイルとしてエクスポート
@@ -42,11 +241,15 @@ const DrawingExportImport = {
             return;
         }
 
+        // ページサイズ情報を準備（読み込み時のスケーリング用）
+        const { data: exportDataContent, pageSizes } = await this._prepareExportData(data);
+
         const exportData = {
             version: this.VERSION,
             exportedAt: new Date().toISOString(),
-            pageCount: Object.keys(data).length,
-            data: data
+            pageCount: Object.keys(exportDataContent).length,
+            pageSizes: pageSizes,
+            data: exportDataContent
         };
 
         const jsonString = JSON.stringify(exportData, null, 2);
@@ -212,8 +415,11 @@ const DrawingExportImport = {
             }
         }
 
+        // 座標を現在の表示サイズにスケーリング（v1.1以降のデータ）
+        const scaledData = this._scaleCoordinatesForImport(filteredData, importData.pageSizes, importData.version);
+
         // 描画データを復元
-        await MojiQDrawingObjects.deserializeAllPagesData(filteredData);
+        await MojiQDrawingObjects.deserializeAllPagesData(scaledData);
 
         // 再描画
         if (window.MojiQPdfManager) {
@@ -303,11 +509,15 @@ const DrawingExportImport = {
             return false;
         }
 
+        // ページサイズ情報を準備（読み込み時のスケーリング用）
+        const { data: exportDataContent, pageSizes } = await this._prepareExportData(data);
+
         const exportData = {
             version: this.VERSION,
             exportedAt: new Date().toISOString(),
-            pageCount: Object.keys(data).length,
-            data: data
+            pageCount: Object.keys(exportDataContent).length,
+            pageSizes: pageSizes,
+            data: exportDataContent
         };
 
         const jsonString = JSON.stringify(exportData, null, 2);
