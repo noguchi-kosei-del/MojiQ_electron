@@ -59,6 +59,9 @@
       "js/**/*",
       "logo/**/*"
     ],
+    "asarUnpack": [
+      "node_modules/pdf-to-printer/**/*"
+    ],
     "win": {
       "target": [
         {

@@ -38,10 +38,13 @@ npm run start        # 開発用起動
   - VERSION を '1.1' に更新（v1.0は後方互換性のためスケーリングしない）
   - 全座標プロパティ対応: startPos, endPos, points, bounds, leaderLine, textX/Y, annotation等
   - サイズプロパティ対応: lineWidth, fontSize, size
+- 印刷機能が動作しない問題を修正
+  - `asarUnpack`設定を追加し、SumatraPDFをasar外に展開
 
 ### 関連ファイル
 - `MojiQ/js/drawing-export-import.js` - ページサイズ保存・スケーリング処理追加
 - `MojiQ/js/pdf-manager.js` - getIntrinsicPageSize関数追加
+- `MojiQ/package.json` - asarUnpack設定追加
 
 ---
 
