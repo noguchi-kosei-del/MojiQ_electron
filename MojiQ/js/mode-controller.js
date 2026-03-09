@@ -907,6 +907,8 @@ window.MojiQModeController = (function() {
         deactivateStamps,
         toggleDeleteModeForSection,
         toggleEditModeForSection,
-        turnOffAllSectionModes
+        turnOffAllSectionModes,
+        loadImageFile,      // ドラッグ&ドロップからの画像配置用
+        loadPdfAsImage      // ドラッグ&ドロップからのPDF画像配置用
     };
 })();

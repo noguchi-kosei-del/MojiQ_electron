@@ -31,7 +31,18 @@ npm run start        # 開発用起動
 
 ## 最近の変更 (2026-03-09)
 
+### 新機能: PDF/JPEG画像のドラッグ配置
+- 原稿読み込み後にPDF/JPEGをドロップすると選択ダイアログを表示
+  - 「画像として配置」: 画像ツールと同じ動作で中央に配置
+  - 「原稿として読み込み」: 従来の原稿再読み込み処理
+- PDF/JPEG以外の画像形式（PNG/GIF/BMP/WebP）は対応形式表示ダイアログ後に画像として配置
+- modal.jsに`showChoice()`関数を追加（複数選択肢ダイアログ）
+- mode-controller.jsに`loadImageFile`, `loadPdfAsImage`をエクスポート追加
+- pdf-manager.jsに`handleDroppedFiles()`関数を追加
+
 ### バグ修正
+- 画像オブジェクトの上下左右中央ハンドルで縮小・拡大できない問題を修正
+  - 辺のハンドル（tm/bm/ml/mr）でもアスペクト比を保持してリサイズ可能に
 - ウィンドウサイズ変更後に描画JSONを読み込むと位置がずれる問題を修正
   - 保存時にキャンバスサイズ（pageSizes）をJSONに含める
   - 読み込み時に保存時と現在のキャンバスサイズの比率でスケーリング
@@ -42,8 +53,11 @@ npm run start        # 開発用起動
   - `asarUnpack`設定を追加し、SumatraPDFをasar外に展開
 
 ### 関連ファイル
+- `MojiQ/js/modal.js` - showChoice()関数追加
+- `MojiQ/js/mode-controller.js` - loadImageFile, loadPdfAsImageエクスポート追加
+- `MojiQ/js/pdf-manager.js` - handleDroppedFiles()追加、getIntrinsicPageSize関数追加
+- `MojiQ/js/drawing-select.js` - 画像リサイズの辺ハンドル対応
 - `MojiQ/js/drawing-export-import.js` - ページサイズ保存・スケーリング処理追加
-- `MojiQ/js/pdf-manager.js` - getIntrinsicPageSize関数追加
 - `MojiQ/package.json` - asarUnpack設定追加
 
 ---

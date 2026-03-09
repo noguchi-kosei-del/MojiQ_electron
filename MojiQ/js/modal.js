@@ -710,6 +710,95 @@ window.MojiQModal = (function() {
     }
 
     /**
+     * 複数選択肢のダイアログを表示
+     * @param {string} message - 表示するメッセージ
+     * @param {Array<{label: string, value: any}>} choices - 選択肢の配列
+     * @param {string} title - タイトル（省略可）
+     * @returns {Promise<any|null>} 選択された値、キャンセル時はnull
+     */
+    function showChoice(message, choices, title = '選択') {
+        return new Promise((resolve) => {
+            // 動的にモーダルを生成
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.tabIndex = -1;
+            modal.style.display = 'flex';
+
+            const content = document.createElement('div');
+            content.className = 'modal-content';
+            content.style.width = '360px';
+
+            const header = document.createElement('div');
+            header.className = 'modal-header';
+            header.innerHTML = `<span>${title}</span>`;
+
+            const messageP = document.createElement('p');
+            messageP.style.cssText = 'margin:15px 0; line-height:1.5; white-space:pre-wrap;';
+            messageP.textContent = message;
+
+            const actions = document.createElement('div');
+            actions.className = 'modal-actions';
+            actions.style.flexDirection = 'column';
+            actions.style.gap = '8px';
+
+            const closeModal = (value) => {
+                if (modal.parentNode) {
+                    document.body.removeChild(modal);
+                }
+                resolve(value);
+            };
+
+            // 選択肢ボタンを生成
+            choices.forEach((choice, index) => {
+                const btn = document.createElement('button');
+                btn.textContent = choice.label;
+                btn.style.width = '100%';
+                if (index === 0) {
+                    btn.classList.add('active');
+                    btn.style.backgroundColor = '#2196f3';
+                    btn.style.color = 'white';
+                }
+                btn.addEventListener('click', () => closeModal(choice.value));
+                actions.appendChild(btn);
+            });
+
+            // キャンセルボタン
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = 'キャンセル';
+            cancelBtn.style.width = '100%';
+            cancelBtn.addEventListener('click', () => closeModal(null));
+            actions.appendChild(cancelBtn);
+
+            content.appendChild(header);
+            content.appendChild(messageP);
+            content.appendChild(actions);
+            modal.appendChild(content);
+
+            // 背景クリックでキャンセル
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeModal(null);
+                }
+            });
+
+            // Escキーでキャンセル
+            modal.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    closeModal(null);
+                }
+            });
+
+            // コンテンツのクリックは伝播を止める
+            content.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+
+            document.body.appendChild(modal);
+            modal.focus();
+        });
+    }
+
+    /**
      * 確認ダイアログを閉じる（OK）
      */
     function submitConfirmModal() {
@@ -928,6 +1017,7 @@ window.MojiQModal = (function() {
         showPrompt,  // 汎用プロンプトモーダル
         showAlert,   // 汎用アラートモーダル
         showConfirm,  // 汎用確認ダイアログ
+        showChoice,  // 複数選択肢ダイアログ
         showSingleCharInput  // 一文字入力モーダル
     };
 })();

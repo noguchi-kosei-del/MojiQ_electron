@@ -1728,7 +1728,18 @@ window.MojiQDrawingSelect = (function() {
                 const imgAspect = origImgW / origImgH;
 
                 // 均一スケール（アスペクト比保持）
-                const uniformScale = Math.max(scaleX, scaleY);
+                let uniformScale;
+                // 辺のハンドル（中央ハンドル）の場合は、その方向のスケールを使用
+                if (handle === 'tm' || handle === 'bm') {
+                    // 上下辺中央: 縦方向のスケールを使用
+                    uniformScale = scaleY;
+                } else if (handle === 'ml' || handle === 'mr') {
+                    // 左右辺中央: 横方向のスケールを使用
+                    uniformScale = scaleX;
+                } else {
+                    // 角のハンドル: 大きい方を使用
+                    uniformScale = Math.max(scaleX, scaleY);
+                }
                 const newImgW = origImgW * uniformScale;
                 const newImgH = origImgH * uniformScale;
 

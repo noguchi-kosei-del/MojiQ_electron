@@ -1634,7 +1634,7 @@ window.MojiQPdfManager = (function() {
             await loadPdfFromFile(pdfFiles[0]);
         } else {
             window._pendingDrawingImport = false;
-            MojiQModal.showAlert('対応するファイル形式ではありません。\nPDF、JPEGファイルを選択してください。', 'エラー');
+            MojiQModal.showAlert('対応するファイル形式ではありません。\n\n原稿対応形式: PDF / JPEG\n画像配置対応形式: PNG / GIF / BMP / WebP', 'エラー');
         }
     }
 
@@ -2829,6 +2829,86 @@ window.MojiQPdfManager = (function() {
     }
 
     /**
+     * ドロップされたファイルを処理
+     * 原稿読み込み済みの場合:
+     * - PDF/JPEG: 選択ダイアログを表示（「画像として配置」or「原稿として読み込み」）
+     * - その他の画像形式: ダイアログなしで直接「画像として配置」
+     * @param {FileList} files - ドロップされたファイル
+     */
+    async function handleDroppedFiles(files) {
+        // 原稿が読み込まれていない場合は従来の処理
+        if (!window.MojiQGlobal || !window.MojiQGlobal.pdfLoaded) {
+            loadFilesFromInput(files);
+            return;
+        }
+
+        // ファイルタイプを確認
+        const file = files[0];
+        const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+        const isJpeg = isImageFile(file); // JPEGのみ
+        const isOtherImage = !isJpeg && file.type.startsWith('image/');
+
+        // PDF/画像以外のファイルは従来の処理へ
+        if (!isPdf && !isJpeg && !isOtherImage) {
+            loadFilesFromInput(files);
+            return;
+        }
+
+        // 単一ファイルの処理
+        if (files.length === 1) {
+            // PDF/JPEG以外の画像形式は対応形式を表示してから配置
+            if (isOtherImage) {
+                const confirmed = await MojiQModal.showConfirm(
+                    'この形式は原稿として読み込めません。\n\n原稿対応形式: PDF / JPEG\n画像配置対応形式: PNG / GIF / BMP / WebP\n\n画像として配置しますか？',
+                    '対応外の形式'
+                );
+                if (confirmed) {
+                    try {
+                        await MojiQModeController.loadImageFile(file);
+                    } catch (error) {
+                        console.error('画像配置エラー:', error);
+                        MojiQModal.showAlert('画像の配置に失敗しました', 'エラー');
+                    }
+                }
+                return;
+            }
+
+            // PDF/JPEGの場合は選択ダイアログを表示
+            const fileTypeLabel = isPdf ? 'PDF' : 'JPEG';
+
+            const choice = await MojiQModal.showChoice(
+                `${fileTypeLabel}ファイルが選択されました。\nどのように処理しますか？`,
+                [
+                    { label: '画像として配置', value: 'place' },
+                    { label: '原稿として読み込み', value: 'reload' }
+                ],
+                'ファイルの処理方法'
+            );
+
+            if (choice === 'place') {
+                // 画像として配置
+                try {
+                    if (isPdf) {
+                        await MojiQModeController.loadPdfAsImage(file);
+                    } else {
+                        await MojiQModeController.loadImageFile(file);
+                    }
+                } catch (error) {
+                    console.error('画像配置エラー:', error);
+                    MojiQModal.showAlert('画像の配置に失敗しました', 'エラー');
+                }
+            } else if (choice === 'reload') {
+                // 原稿として読み込み（従来の処理）
+                loadFilesFromInput(files);
+            }
+            // choice === null (キャンセル) の場合は何もしない
+        } else {
+            // 複数ファイルの場合は従来の処理
+            loadFilesFromInput(files);
+        }
+    }
+
+    /**
      * ドラッグ＆ドロップのセットアップ
      */
     function setupDragAndDrop() {
@@ -2861,14 +2941,14 @@ window.MojiQPdfManager = (function() {
         };
         canvasArea.addEventListener('dragleave', boundHandlers.canvasAreaDragleave);
 
-        boundHandlers.canvasAreaDrop = (e) => {
+        boundHandlers.canvasAreaDrop = async (e) => {
             canvasArea.classList.remove('drag-over');
             // 処理中はファイルオープンを無視
             if (isProcessing) return;
             const files = e.dataTransfer.files;
             if (files && files.length > 0) {
-                // PDF/画像ファイルを読み込み
-                loadFilesFromInput(files);
+                // PDF/画像ファイルを読み込み（選択ダイアログ対応）
+                await handleDroppedFiles(files);
             }
         };
         canvasArea.addEventListener('drop', boundHandlers.canvasAreaDrop);
