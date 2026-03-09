@@ -156,13 +156,23 @@ const DrawingExportImport = {
      */
     async _prepareExportData(data) {
         const pageSizes = {};
-        // 現在のキャンバスサイズを取得（全ページ共通）
-        const canvasSize = this._getCurrentCanvasSize();
+        // 現在のキャンバスサイズをフォールバック用に取得
+        const fallbackSize = this._getCurrentCanvasSize();
 
         for (const pageNum in data) {
+            // 各ページのサイズを取得（ページごとに異なる場合に対応）
+            let pageSize = null;
+            if (window.MojiQPdfManager && window.MojiQPdfManager.getDisplayPageSize) {
+                // 表示サイズ（CSS座標系）を取得
+                pageSize = window.MojiQPdfManager.getDisplayPageSize(parseInt(pageNum));
+            }
+            if (!pageSize || !pageSize.width || !pageSize.height) {
+                // フォールバック: 現在のキャンバスサイズを使用
+                pageSize = fallbackSize;
+            }
             pageSizes[pageNum] = {
-                width: canvasSize.width,
-                height: canvasSize.height
+                width: pageSize.width,
+                height: pageSize.height
             };
         }
 
@@ -290,14 +300,22 @@ const DrawingExportImport = {
             }
         } else {
             // ブラウザ環境: ダウンロードリンクを使用
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = defaultFileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            try {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = defaultFileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                if (window.MojiQModal && window.MojiQModal.showAlert) {
+                    await window.MojiQModal.showAlert('描画データのエクスポートに失敗しました。\n' + error.message, 'エラー');
+                } else {
+                    alert('描画データのエクスポートに失敗しました。\n' + error.message);
+                }
+            }
         }
     },
 

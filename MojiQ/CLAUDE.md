@@ -31,34 +31,46 @@ npm run start        # 開発用起動
 
 ## 最近の変更 (2026-03-09)
 
+### リファクタリング: モジュール分割
+- `drawing-clipboard.js`（新規）: クリップボード操作（カット/ペースト）をdrawing-select.jsから分離
+- `pdf-annotation-loader.js`（新規）: PDF注釈読み込み機能をpdf-manager.jsから分離
+
+### デッドコード削除
+- `pdf-manager.js`: applyRotationToCanvasコメント削除
+- `lock.js`: 未定義のwindow.unlockTabsチェック削除
+- `core/store.js`: 未使用のgetSnapshot関数削除
+- `drawing.js`: 未使用のgetSnapshot関数削除
+
+### バグ修正（致命的）
+- 画像モードで0除算が発生する問題を修正（naturalWidth/Height未ロード時）
+- 配列境界外アクセスによるオブジェクト誤操作を修正（drawing-select.js）
+- getSelectedObjectsのインデックス不整合を修正（drawing-objects.js）
+- ImageBitmapメモリリークを修正（pdf-manager.js invalidatePageCache）
+- Undo/Redo競合状態によるタイマーリークを修正（page-manager.js）
+- 座標計算時のNaN発生を防止（drawing-select.js 9箇所）
+- ボタン要素のnullチェック漏れを修正（mode-controller.js 8箇所）
+
 ### 新機能: PDF/JPEG画像のドラッグ配置
 - 原稿読み込み後にPDF/JPEGをドロップすると選択ダイアログを表示
   - 「画像として配置」: 画像ツールと同じ動作で中央に配置
   - 「原稿として読み込み」: 従来の原稿再読み込み処理
 - PDF/JPEG以外の画像形式（PNG/GIF/BMP/WebP）は対応形式表示ダイアログ後に画像として配置
-- modal.jsに`showChoice()`関数を追加（複数選択肢ダイアログ）
-- mode-controller.jsに`loadImageFile`, `loadPdfAsImage`をエクスポート追加
-- pdf-manager.jsに`handleDroppedFiles()`関数を追加
 
-### バグ修正
+### その他バグ修正
 - 画像オブジェクトの上下左右中央ハンドルで縮小・拡大できない問題を修正
-  - 辺のハンドル（tm/bm/ml/mr）でもアスペクト比を保持してリサイズ可能に
 - ウィンドウサイズ変更後に描画JSONを読み込むと位置がずれる問題を修正
-  - 保存時にキャンバスサイズ（pageSizes）をJSONに含める
-  - 読み込み時に保存時と現在のキャンバスサイズの比率でスケーリング
-  - VERSION を '1.1' に更新（v1.0は後方互換性のためスケーリングしない）
-  - 全座標プロパティ対応: startPos, endPos, points, bounds, leaderLine, textX/Y, annotation等
-  - サイズプロパティ対応: lineWidth, fontSize, size
 - 印刷機能が動作しない問題を修正
-  - `asarUnpack`設定を追加し、SumatraPDFをasar外に展開
 
 ### 関連ファイル
-- `MojiQ/js/modal.js` - showChoice()関数追加
-- `MojiQ/js/mode-controller.js` - loadImageFile, loadPdfAsImageエクスポート追加
-- `MojiQ/js/pdf-manager.js` - handleDroppedFiles()追加、getIntrinsicPageSize関数追加
-- `MojiQ/js/drawing-select.js` - 画像リサイズの辺ハンドル対応
-- `MojiQ/js/drawing-export-import.js` - ページサイズ保存・スケーリング処理追加
-- `MojiQ/package.json` - asarUnpack設定追加
+- `MojiQ/js/drawing-clipboard.js` - 新規（クリップボードモジュール）
+- `MojiQ/js/pdf-annotation-loader.js` - 新規（PDF注釈読み込みモジュール）
+- `MojiQ/js/drawing-select.js` - クリップボード分離、座標チェック追加
+- `MojiQ/js/pdf-manager.js` - 注釈分離、ImageBitmapリーク修正
+- `MojiQ/js/drawing.js` - 0除算防止
+- `MojiQ/js/drawing-objects.js` - インデックスチェック追加
+- `MojiQ/js/page-manager.js` - タイマーリーク修正
+- `MojiQ/js/mode-controller.js` - nullチェック追加
+- `MojiQ/index.html` - 新規モジュール読み込み追加
 
 ---
 

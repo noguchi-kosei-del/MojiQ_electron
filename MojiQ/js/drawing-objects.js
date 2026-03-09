@@ -409,7 +409,10 @@ window.MojiQDrawingObjects = (function() {
             initPageData(pageNum);
             const objects = state.pageObjects[pageNum].objects;
             const indices = state.pageObjects[pageNum].selectedIndices;
-            return indices.map(i => objects[i]).filter(obj => obj !== undefined);
+            // 範囲チェックを優先してから取得
+            return indices
+                .filter(i => i >= 0 && i < objects.length)
+                .map(i => objects[i]);
         },
 
         /**
@@ -1387,6 +1390,9 @@ window.MojiQDrawingObjects = (function() {
                 let centerX = 0;
                 if (obj.startPos && obj.endPos) {
                     centerX = (obj.startPos.x + obj.endPos.x) / 2;
+                } else if (obj.bounds) {
+                    // テキスト入力などのboundsベースのオブジェクト
+                    centerX = obj.bounds.x + (obj.bounds.width || 0) / 2;
                 } else if (obj.startPos) {
                     centerX = obj.startPos.x;
                 } else if (obj.points && obj.points.length > 0) {
@@ -1416,11 +1422,33 @@ window.MojiQDrawingObjects = (function() {
                         this._scaleObject(clonedObj, scaleInfo.rightScaleX, scaleInfo.rightScaleY);
                     }
                     state.pageObjects[rightPageNum].objects.push(clonedObj);
+                } else if (isLeftPage && leftPageNum === null && rightPageNum !== null) {
+                    // フォールバック: 左ページがnullの場合は右ページに追加
+                    this._offsetObjectX(clonedObj, -rightOffset);
+                    if (scaleInfo && (scaleInfo.rightScaleX !== 1 || scaleInfo.rightScaleY !== 1)) {
+                        this._scaleObject(clonedObj, scaleInfo.rightScaleX, scaleInfo.rightScaleY);
+                    }
+                    state.pageObjects[rightPageNum].objects.push(clonedObj);
+                } else if (!isLeftPage && rightPageNum === null && leftPageNum !== null) {
+                    // フォールバック: 右ページがnullの場合は左ページに追加
+                    if (scaleInfo && (scaleInfo.leftScaleX !== 1 || scaleInfo.leftScaleY !== 1)) {
+                        this._scaleObject(clonedObj, scaleInfo.leftScaleX, scaleInfo.leftScaleY);
+                    }
+                    state.pageObjects[leftPageNum].objects.push(clonedObj);
                 }
             }
 
             // 見開きページのオブジェクトをクリア
             state.pageObjects[spreadKey].objects = [];
+
+            // IDインデックスを再構築（配列を直接初期化したため）
+            if (leftPageNum !== null) {
+                rebuildPageIndex(leftPageNum);
+            }
+            if (rightPageNum !== null) {
+                rebuildPageIndex(rightPageNum);
+            }
+            rebuildPageIndex(spreadKey);
         },
 
         /**
@@ -1436,14 +1464,17 @@ window.MojiQDrawingObjects = (function() {
             if (obj.points) {
                 obj.points = obj.points.map(p => ({ x: p.x + offsetX, y: p.y }));
             }
-            if (obj.annotation) {
+            if (obj.bounds) {
+                obj.bounds.x += offsetX;
+            }
+            if (obj.annotation && typeof obj.annotation.x === 'number') {
                 obj.annotation.x += offsetX;
-                if (obj.annotation.leaderLine) {
+                if (obj.annotation.leaderLine && obj.annotation.leaderLine.start && obj.annotation.leaderLine.end) {
                     obj.annotation.leaderLine.start.x += offsetX;
                     obj.annotation.leaderLine.end.x += offsetX;
                 }
             }
-            if (obj.leaderLine) {
+            if (obj.leaderLine && obj.leaderLine.start && obj.leaderLine.end) {
                 obj.leaderLine.start.x += offsetX;
                 obj.leaderLine.end.x += offsetX;
             }
@@ -1470,17 +1501,31 @@ window.MojiQDrawingObjects = (function() {
             if (obj.points) {
                 obj.points = obj.points.map(p => ({ x: p.x * scaleX, y: p.y * scaleY }));
             }
-            if (obj.annotation) {
+            // bounds (テキスト入力など)
+            if (obj.bounds) {
+                obj.bounds.x *= scaleX;
+                obj.bounds.y *= scaleY;
+                if (obj.bounds.width !== undefined) obj.bounds.width *= scaleX;
+                if (obj.bounds.height !== undefined) obj.bounds.height *= scaleY;
+            }
+            // width / height (画像オブジェクトなど)
+            if (typeof obj.width === 'number') {
+                obj.width *= scaleX;
+            }
+            if (typeof obj.height === 'number') {
+                obj.height *= scaleY;
+            }
+            if (obj.annotation && typeof obj.annotation.x === 'number') {
                 obj.annotation.x *= scaleX;
                 obj.annotation.y *= scaleY;
-                if (obj.annotation.leaderLine) {
+                if (obj.annotation.leaderLine && obj.annotation.leaderLine.start && obj.annotation.leaderLine.end) {
                     obj.annotation.leaderLine.start.x *= scaleX;
                     obj.annotation.leaderLine.start.y *= scaleY;
                     obj.annotation.leaderLine.end.x *= scaleX;
                     obj.annotation.leaderLine.end.y *= scaleY;
                 }
             }
-            if (obj.leaderLine) {
+            if (obj.leaderLine && obj.leaderLine.start && obj.leaderLine.end) {
                 obj.leaderLine.start.x *= scaleX;
                 obj.leaderLine.start.y *= scaleY;
                 obj.leaderLine.end.x *= scaleX;

@@ -713,27 +713,27 @@ window.MojiQModeController = (function() {
         boundHandlers.imgInsertBtn = () => imageInput.click();
 
         if (selectBtn) selectBtn.addEventListener('click', boundHandlers.selectBtn);
-        drawBtn.addEventListener('click', boundHandlers.drawBtn);
-        handBtn.addEventListener('click', boundHandlers.handBtn);
-        markerBtn.addEventListener('click', boundHandlers.markerBtn);
-        rectBtn.addEventListener('click', boundHandlers.rectBtn);
+        if (drawBtn) drawBtn.addEventListener('click', boundHandlers.drawBtn);
+        if (handBtn) handBtn.addEventListener('click', boundHandlers.handBtn);
+        if (markerBtn) markerBtn.addEventListener('click', boundHandlers.markerBtn);
+        if (rectBtn) rectBtn.addEventListener('click', boundHandlers.rectBtn);
         if (rectAnnotatedBtn) rectAnnotatedBtn.addEventListener('click', boundHandlers.rectAnnotatedBtn);
         if (labeledRectBtn) labeledRectBtn.addEventListener('click', boundHandlers.labeledRectBtn);
-        ellipseBtn.addEventListener('click', boundHandlers.ellipseBtn);
+        if (ellipseBtn) ellipseBtn.addEventListener('click', boundHandlers.ellipseBtn);
         if (ellipseAnnotatedBtn) ellipseAnnotatedBtn.addEventListener('click', boundHandlers.ellipseAnnotatedBtn);
         if (semicircleBtn) semicircleBtn.addEventListener('click', boundHandlers.semicircleBtn);
         if (chevronBtn) chevronBtn.addEventListener('click', boundHandlers.chevronBtn);
         if (lshapeBtn) lshapeBtn.addEventListener('click', boundHandlers.lshapeBtn);
         if (zshapeBtn) zshapeBtn.addEventListener('click', boundHandlers.zshapeBtn);
         if (bracketBtn) bracketBtn.addEventListener('click', boundHandlers.bracketBtn);
-        lineBtn.addEventListener('click', boundHandlers.lineBtn);
+        if (lineBtn) lineBtn.addEventListener('click', boundHandlers.lineBtn);
         if (lineAnnotatedBtn) lineAnnotatedBtn.addEventListener('click', boundHandlers.lineAnnotatedBtn);
         if (arrowBtn) arrowBtn.addEventListener('click', boundHandlers.arrowBtn);
         if (doubleArrowBtn) doubleArrowBtn.addEventListener('click', boundHandlers.doubleArrowBtn);
         if (doubleArrowAnnotatedBtn) doubleArrowAnnotatedBtn.addEventListener('click', boundHandlers.doubleArrowAnnotatedBtn);
         if (polylineBtn) polylineBtn.addEventListener('click', boundHandlers.polylineBtn);
-        textBtn.addEventListener('click', boundHandlers.textBtn);
-        eraserBtn.addEventListener('click', boundHandlers.eraserBtn);
+        if (textBtn) textBtn.addEventListener('click', boundHandlers.textBtn);
+        if (eraserBtn) eraserBtn.addEventListener('click', boundHandlers.eraserBtn);
         if (doneStampBtn) doneStampBtn.addEventListener('click', boundHandlers.doneStampBtn);
         if (rubyStampBtn) rubyStampBtn.addEventListener('click', boundHandlers.rubyStampBtn);
         if (toruStampBtn) toruStampBtn.addEventListener('click', boundHandlers.toruStampBtn);
@@ -745,7 +745,7 @@ window.MojiQModeController = (function() {
         if (kaigyouStampBtn) kaigyouStampBtn.addEventListener('click', boundHandlers.kaigyouStampBtn);
         if (tojiruStampBtn) tojiruStampBtn.addEventListener('click', boundHandlers.tojiruStampBtn);
         if (hirakuStampBtn) hirakuStampBtn.addEventListener('click', boundHandlers.hirakuStampBtn);
-        imgInsertBtn.addEventListener('click', boundHandlers.imgInsertBtn);
+        if (imgInsertBtn) imgInsertBtn.addEventListener('click', boundHandlers.imgInsertBtn);
 
         // 画像読み込みイベント（JPEG, PNG, TIF, PDF対応）
         boundHandlers.imageInputChange = async (e) => {

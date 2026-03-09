@@ -108,34 +108,44 @@ window.MojiQPageManager = (function() {
         isUndoRedoInProgress = true;
         const currentOperationId = ++undoRedoOperationId;
 
+        let timeoutId = null;
         try {
             // タイムアウト付きで画像読み込み（5秒でタイムアウト）
             await Promise.race([
                 new Promise((resolve, reject) => {
                     const img = new Image();
                     img.onload = () => {
+                        // タイムアウトタイマーをクリア
+                        if (timeoutId) clearTimeout(timeoutId);
                         // 新しい操作が開始されていた場合は描画をスキップ
                         if (currentOperationId !== undoRedoOperationId) {
                             resolve();
                             return;
                         }
-                        ctx.clearRect(0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
-                        ctx.drawImage(img, 0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
+                        try {
+                            ctx.clearRect(0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
+                            ctx.drawImage(img, 0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
+                        } catch (e) {
+                            console.error('Undo描画エラー:', e);
+                        }
                         resolve();
                     };
                     img.onerror = (err) => {
+                        if (timeoutId) clearTimeout(timeoutId);
                         console.warn('Undo image load failed:', err);
                         reject(new Error('Undo画像の読み込みに失敗しました'));
                     };
                     img.src = prevData;
                 }),
-                new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('Undo処理がタイムアウトしました')), 5000)
-                )
+                new Promise((_, reject) => {
+                    timeoutId = setTimeout(() => reject(new Error('Undo処理がタイムアウトしました')), 5000);
+                })
             ]).catch((err) => {
                 console.error('Undo処理中にエラーが発生:', err);
             });
         } finally {
+            // タイムアウトタイマーを確実にクリア
+            if (timeoutId) clearTimeout(timeoutId);
             // 現在の操作が最新の場合のみフラグをリセット（競合防止）
             if (currentOperationId === undoRedoOperationId) {
                 isUndoRedoInProgress = false;
@@ -178,34 +188,44 @@ window.MojiQPageManager = (function() {
         isUndoRedoInProgress = true;
         const currentOperationId = ++undoRedoOperationId;
 
+        let timeoutId = null;
         try {
             // タイムアウト付きで画像読み込み（5秒でタイムアウト）
             await Promise.race([
                 new Promise((resolve, reject) => {
                     const img = new Image();
                     img.onload = () => {
+                        // タイムアウトタイマーをクリア
+                        if (timeoutId) clearTimeout(timeoutId);
                         // 新しい操作が開始されていた場合は描画をスキップ
                         if (currentOperationId !== undoRedoOperationId) {
                             resolve();
                             return;
                         }
-                        ctx.clearRect(0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
-                        ctx.drawImage(img, 0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
+                        try {
+                            ctx.clearRect(0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
+                            ctx.drawImage(img, 0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
+                        } catch (e) {
+                            console.error('Redo描画エラー:', e);
+                        }
                         resolve();
                     };
                     img.onerror = (err) => {
+                        if (timeoutId) clearTimeout(timeoutId);
                         console.warn('Redo image load failed:', err);
                         reject(new Error('Redo画像の読み込みに失敗しました'));
                     };
                     img.src = popped;
                 }),
-                new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('Redo処理がタイムアウトしました')), 5000)
-                )
+                new Promise((_, reject) => {
+                    timeoutId = setTimeout(() => reject(new Error('Redo処理がタイムアウトしました')), 5000);
+                })
             ]).catch((err) => {
                 console.error('Redo処理中にエラーが発生:', err);
             });
         } finally {
+            // タイムアウトタイマーを確実にクリア
+            if (timeoutId) clearTimeout(timeoutId);
             // 現在の操作が最新の場合のみフラグをリセット（競合防止）
             if (currentOperationId === undoRedoOperationId) {
                 isUndoRedoInProgress = false;

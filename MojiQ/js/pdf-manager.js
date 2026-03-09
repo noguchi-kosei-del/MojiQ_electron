@@ -172,155 +172,8 @@ window.MojiQPdfManager = (function() {
     }
 
     // ========================================
-    // PDF注釈読み込み機能
+    // PDF注釈読み込み機能は MojiQPdfAnnotationLoader に移動
     // ========================================
-
-    /**
-     * PDF座標からMojiQ座標に変換
-     * PDFは左下原点、MojiQは左上原点
-     * @param {number} pdfX - PDF X座標
-     * @param {number} pdfY - PDF Y座標
-     * @param {number} pdfHeight - PDFページの高さ
-     * @param {number} scaleX - X方向スケール係数
-     * @param {number} scaleY - Y方向スケール係数
-     * @returns {{x: number, y: number}} MojiQ座標
-     */
-    function pdfToMojiQCoordinates(pdfX, pdfY, pdfHeight, scaleX, scaleY) {
-        return {
-            x: pdfX * scaleX,
-            y: (pdfHeight - pdfY) * scaleY
-        };
-    }
-
-    /**
-     * PDF色配列からHEX文字列に変換
-     * @param {Array<number>|null} pdfColor - RGB配列（各0-1）またはnull
-     * @returns {string} HEX色文字列
-     */
-    function pdfColorToHex(pdfColor) {
-        if (!pdfColor || pdfColor.length < 3) {
-            return '#ff0000';  // デフォルト: 赤
-        }
-        const r = Math.round(pdfColor[0] * 255);
-        const g = Math.round(pdfColor[1] * 255);
-        const b = Math.round(pdfColor[2] * 255);
-        return '#' + r.toString(16).padStart(2, '0') + g.toString(16).padStart(2, '0') + b.toString(16).padStart(2, '0');
-    }
-
-    /**
-     * PDF注釈をMojiQテキストオブジェクトに変換
-     * @param {Object} annot - PDF.jsの注釈オブジェクト
-     * @param {number} pdfHeight - PDFページの高さ
-     * @param {number} scaleX - X方向スケール係数
-     * @param {number} scaleY - Y方向スケール係数
-     * @returns {Object|null} MojiQテキストオブジェクト、変換不可の場合null
-     */
-    function convertPdfAnnotationToTextObject(annot, pdfHeight, scaleX, scaleY) {
-        // contentsがない注釈はスキップ
-        if (!annot.contents || annot.contents.trim() === '') {
-            return null;
-        }
-
-        // サポートする注釈タイプをチェック
-        const supportedTypes = ['Text', 'FreeText', 'Highlight', 'Underline', 'StrikeOut'];
-        if (!supportedTypes.includes(annot.subtype)) {
-            return null;
-        }
-
-        const rect = annot.rect;  // [x1, y1, x2, y2]
-
-        // 注釈の左上位置をMojiQ座標に変換
-        const pos = pdfToMojiQCoordinates(rect[0], rect[3], pdfHeight, scaleX, scaleY);
-
-        // 色の変換
-        const color = pdfColorToHex(annot.color);
-
-        // フォントサイズ（FreeTextの場合は大きめ、それ以外は標準）
-        const fontSize = annot.subtype === 'FreeText' ? 16 : 14;
-
-        return {
-            type: 'text',
-            text: annot.contents,
-            startPos: { x: pos.x, y: pos.y },
-            fontSize: fontSize,
-            color: color,
-            align: 'left',
-            isVertical: false,
-            _pdfAnnotationSource: annot.subtype
-        };
-    }
-
-    /**
-     * PDFページから注釈を抽出してMojiQオブジェクトを作成
-     * @param {PDFPageProxy} page - PDF.jsのページオブジェクト
-     * @param {number} displayWidth - 表示時のページ幅
-     * @param {number} displayHeight - 表示時のページ高さ
-     * @returns {Promise<Array>} MojiQ描画オブジェクトの配列
-     */
-    async function extractPdfAnnotations(page, displayWidth, displayHeight) {
-        const annotations = await page.getAnnotations();
-        const viewport = page.getViewport({ scale: 1 });
-
-        const scaleX = displayWidth / viewport.width;
-        const scaleY = displayHeight / viewport.height;
-
-        const objects = [];
-
-        for (const annot of annotations) {
-            const obj = convertPdfAnnotationToTextObject(
-                annot,
-                viewport.height,
-                scaleX,
-                scaleY
-            );
-            if (obj) {
-                objects.push(obj);
-            }
-        }
-
-        return objects;
-    }
-
-    /**
-     * 全ページのPDF注釈を読み込んでMojiQオブジェクトとして追加
-     * @param {PDFDocumentProxy} pdf - PDFドキュメント
-     */
-    async function loadPdfAnnotationsForAllPages(pdf) {
-        // BUG-006修正: fixedContainerWidth/Heightのnullチェック
-        // nullの場合はデフォルト値を使用（A4サイズ相当）
-        const containerWidth = fixedContainerWidth || 595;
-        const containerHeight = fixedContainerHeight || 842;
-
-        let totalAnnotations = 0;
-
-        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-            try {
-                const page = await pdf.getPage(pageNum);
-                const viewport = page.getViewport({ scale: 1 });
-
-                // 表示サイズを計算（renderPageと同じロジック）
-                const scale = Math.min(
-                    containerWidth / viewport.width,
-                    containerHeight / viewport.height
-                );
-                const displayWidth = viewport.width * scale;
-                const displayHeight = viewport.height * scale;
-
-                const objects = await extractPdfAnnotations(page, displayWidth, displayHeight);
-
-                for (const obj of objects) {
-                    window.MojiQDrawingObjects.addObject(pageNum, obj);
-                }
-
-                if (objects.length > 0) {
-                    totalAnnotations += objects.length;
-                }
-            } catch (e) {
-                console.warn('[MojiQ PdfManager] ページ ' + pageNum + ' の注釈読み込みに失敗:', e);
-            }
-        }
-
-    }
 
     /**
      * MojiQメタデータ（コメントテキスト非表示状態など）をPDFから読み込み復元
@@ -505,8 +358,14 @@ window.MojiQPdfManager = (function() {
 
         keysToDelete.forEach(key => {
             const entry = singlePageCache._map.get(key);
-            if (entry && entry.bitmap && typeof entry.bitmap.close === 'function') {
-                entry.bitmap.close();
+            if (!entry) return;  // 既に削除されている場合はスキップ
+
+            try {
+                if (entry.bitmap && typeof entry.bitmap.close === 'function') {
+                    entry.bitmap.close();
+                }
+            } catch (e) {
+                console.warn('[MojiQ PdfManager] ImageBitmapクローズに失敗:', e);
             }
             singlePageCache._map.delete(key);
         });
@@ -1101,10 +960,6 @@ window.MojiQPdfManager = (function() {
         MojiQPageManager.updatePageControls();
 
         if (window.syncSimulatorFromScript) window.syncSimulatorFromScript(pageNum);
-
-        // --- 回転を適用（グローバル回転） ---
-        // TODO: applyRotationToCanvas関数が未定義のため一時的に無効化
-        // applyRotationToCanvas();
 
         // --- 隣接ページのプリフェッチを開始 ---
         schedulePrefetch(pageNum, containerWidth, containerHeight);
@@ -1835,7 +1690,7 @@ window.MojiQPdfManager = (function() {
 
             // PDF注釈を読み込み
             updateProgressOverlayText('注釈を読み込み中...');
-            await loadPdfAnnotationsForAllPages(pdf);
+            await window.MojiQPdfAnnotationLoader.loadPdfAnnotationsForAllPages(pdf, fixedContainerWidth, fixedContainerHeight);
 
             // MojiQメタデータ（コメントテキスト非表示状態など）を読み込み
             // 元のPDFファイルデータからメタデータを読み込む（最適化前のデータを使用）
@@ -3291,7 +3146,7 @@ window.MojiQPdfManager = (function() {
 
             // PDF注釈を読み込み
             updateProgressOverlayText('注釈を読み込み中...');
-            await loadPdfAnnotationsForAllPages(pdf);
+            await window.MojiQPdfAnnotationLoader.loadPdfAnnotationsForAllPages(pdf, fixedContainerWidth, fixedContainerHeight);
 
             // MojiQメタデータ（コメントテキスト非表示状態など）を読み込み
             // 元のPDFデータからメタデータを読み込む（最適化/圧縮前のデータを使用）
@@ -3440,7 +3295,7 @@ window.MojiQPdfManager = (function() {
 
             // PDF注釈を読み込み
             showProgressOverlay('注釈を読み込み中...');
-            await loadPdfAnnotationsForAllPages(pdf);
+            await window.MojiQPdfAnnotationLoader.loadPdfAnnotationsForAllPages(pdf, fixedContainerWidth, fixedContainerHeight);
 
             // MojiQメタデータ（コメントテキスト非表示状態など）を読み込み
             // 元のPDFデータからメタデータを読み込む
@@ -4258,6 +4113,28 @@ window.MojiQPdfManager = (function() {
             }
         }
         return { width: 595, height: 842 };
+    }
+
+    /**
+     * ページの表示サイズを取得（CSS座標系、描画JSONの保存に使用）
+     * @param {number} pageNum - ページ番号
+     * @returns {{width: number, height: number}|null}
+     */
+    function getDisplayPageSize(pageNum) {
+        const mapItem = state.pageMapping[pageNum - 1];
+        if (mapItem && mapItem.displayWidth && mapItem.displayHeight) {
+            return { width: mapItem.displayWidth, height: mapItem.displayHeight };
+        }
+        // フォールバック: 現在のキャンバスサイズ
+        const canvas = document.getElementById('mojiqCanvas');
+        if (canvas) {
+            const dprVal = window.devicePixelRatio || 1;
+            return {
+                width: canvas.width / dprVal,
+                height: canvas.height / dprVal
+            };
+        }
+        return null;
     }
 
     /**
@@ -5856,6 +5733,7 @@ window.MojiQPdfManager = (function() {
         applyBgOpacity,
         getBgOpacity,
         getOriginalPageSize,  // ページサイズ取得（描画座標変換用）
+        getDisplayPageSize,   // 表示サイズ取得（描画JSON保存用）
         getIntrinsicPageSize, // ページの固有サイズ取得（描画JSONの座標正規化用）
         triggerInsertPdf,
         updateSaveButtonState,  // 保存ボタン状態更新

@@ -1470,7 +1470,8 @@ window.MojiQDrawing = (function() {
                     ctx.moveTo(startPosCanvas.x, startPosCanvas.y);
                     ctx.lineTo(canvasPos.x, canvasPos.y);
                     ctx.stroke();
-                } else if (state.currentMode === 'image' && state.pendingImage) {
+                } else if (state.currentMode === 'image' && state.pendingImage &&
+                           state.pendingImage.naturalWidth > 0 && state.pendingImage.naturalHeight > 0) {
                     // プレビューはキャンバス座標で描画
                     // アスペクト比を保持して画像サイズを計算
                     const imgAspect = state.pendingImage.naturalWidth / state.pendingImage.naturalHeight;
@@ -2419,13 +2420,6 @@ window.MojiQDrawing = (function() {
     }
 
     /**
-     * スナップショットを取得
-     */
-    function getSnapshot() {
-        return snapshot;
-    }
-
-    /**
      * スナップショットを復元
      */
     function restoreSnapshot() {
@@ -2629,7 +2623,6 @@ window.MojiQDrawing = (function() {
         init,
         cleanup,  // メモリリーク対策: イベントリスナー解除
         getPos,
-        getSnapshot,
         restoreSnapshot,
         redrawCanvas,
         requestRedraw,  // Phase 7で追加: イベント経由の再描画リクエスト

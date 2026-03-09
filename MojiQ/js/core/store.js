@@ -390,14 +390,6 @@ window.MojiQStore = (function() {
     }
 
     /**
-     * 状態の完全なスナップショットを取得（デバッグ用）
-     * @returns {Object}
-     */
-    function getSnapshot() {
-        return MojiQClone.deep(state);
-    }
-
-    /**
      * 状態を復元（デバッグ/永続化用）
      * @param {Object} snapshot - 復元するスナップショット
      */
@@ -449,7 +441,6 @@ window.MojiQStore = (function() {
         subscribe: subscribe,
         subscriberCount: subscriberCount,
         reset: reset,
-        getSnapshot: getSnapshot,
         restore: restore,
         setDebugMode: setDebugMode,
         init: init

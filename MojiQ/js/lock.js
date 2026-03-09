@@ -124,11 +124,6 @@ const AppLock = {
                 el.style.filter = 'none';
             }
         });
-
-        // 既存のタブロック解除関数があれば実行
-        if (typeof window.unlockTabs === 'function') {
-            window.unlockTabs();
-        }
     },
 
     /**
