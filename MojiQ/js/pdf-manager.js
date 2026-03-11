@@ -1735,14 +1735,20 @@ window.MojiQPdfManager = (function() {
         const baseTimeout = window.MojiQConstants?.SAVE?.LOCK_TIMEOUT_MS || 60000;
         const pageCount = state?.totalPages || 1;
 
-        // 描画オブジェクト数をカウント
+        // 描画オブジェクト数をカウント（MojiQDrawingObjectsから正しく取得）
         let totalObjects = 0;
-        if (state && state.pageDrawings) {
-            for (const pageNum in state.pageDrawings) {
-                const drawings = state.pageDrawings[pageNum];
-                if (Array.isArray(drawings)) {
-                    totalObjects += drawings.length;
+        const DrawingObjects = window.MojiQDrawingObjects;
+        if (DrawingObjects && typeof DrawingObjects.getAllPagesData === 'function') {
+            try {
+                const allPagesData = DrawingObjects.getAllPagesData();
+                for (const pageNum in allPagesData) {
+                    const objects = allPagesData[pageNum];
+                    if (Array.isArray(objects)) {
+                        totalObjects += objects.length;
+                    }
                 }
+            } catch (e) {
+                console.warn('[MojiQ] 描画オブジェクト数のカウントに失敗:', e);
             }
         }
 

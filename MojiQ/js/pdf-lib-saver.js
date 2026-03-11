@@ -58,14 +58,45 @@ window.MojiQPdfLibSaver = (function() {
     }
 
     /**
-     * オブジェクト数に応じて最適なスケールを計算
-     * @param {number} objectCount - オブジェクト数
-     * @returns {number} - スケール値（2〜4）
+     * キャンバスの最大メモリサイズ（ピクセル数）
+     * 約200MB相当 (RGBA 4バイト/ピクセル)
      */
-    function getOptimalScale(objectCount) {
-        if (objectCount > 200) return 2;  // 大量オブジェクト: 低解像度で高速化
-        if (objectCount > 100) return 3;  // 中量オブジェクト: 中解像度
-        return 4;  // 少量オブジェクト: 高解像度
+    const MAX_CANVAS_PIXELS = 50000000; // 50メガピクセル
+
+    /**
+     * オブジェクト数とページサイズに応じて最適なスケールを計算
+     * メモリ枯渇を防ぐため、キャンバスサイズを制限する
+     * @param {number} objectCount - オブジェクト数
+     * @param {number} width - ページ幅（省略可）
+     * @param {number} height - ページ高さ（省略可）
+     * @returns {number} - スケール値（1〜4）
+     */
+    function getOptimalScale(objectCount, width, height) {
+        // オブジェクト数に基づく基本スケール
+        let baseScale;
+        if (objectCount > 200) {
+            baseScale = 2;  // 大量オブジェクト: 低解像度で高速化
+        } else if (objectCount > 100) {
+            baseScale = 3;  // 中量オブジェクト: 中解像度
+        } else {
+            baseScale = 4;  // 少量オブジェクト: 高解像度
+        }
+
+        // ページサイズが指定されている場合、メモリ制限を考慮
+        if (width && height && width > 0 && height > 0) {
+            // 現在のスケールでのピクセル数を計算
+            let currentScale = baseScale;
+            while (currentScale > 1) {
+                const pixels = (width * currentScale) * (height * currentScale);
+                if (pixels <= MAX_CANVAS_PIXELS) {
+                    break;
+                }
+                currentScale--;
+            }
+            return currentScale;
+        }
+
+        return baseScale;
     }
 
     /**
@@ -101,9 +132,9 @@ window.MojiQPdfLibSaver = (function() {
             return { data: null, timedOut: false };
         }
 
-        // オブジェクト数に応じてスケールとタイムアウトを動的調整
+        // オブジェクト数とページサイズに応じてスケールとタイムアウトを動的調整
         const objectCount = objects.length;
-        const scale = getOptimalScale(objectCount);
+        const scale = getOptimalScale(objectCount, width, height);
         const timeout = getOptimalTimeout(objectCount);
 
         const canvas = document.createElement('canvas');
@@ -203,11 +234,11 @@ window.MojiQPdfLibSaver = (function() {
             return { data: null, timedOut: false };
         }
 
-        // オブジェクト数に応じてスケールとタイムアウトを動的調整
+        // オブジェクト数と見開きサイズに応じてスケールとタイムアウトを動的調整
         const totalObjectCount = (spreadObjects ? spreadObjects.length : 0) +
                                  (leftObjects ? leftObjects.length : 0) +
                                  (rightObjects ? rightObjects.length : 0);
-        const scale = getOptimalScale(totalObjectCount);
+        const scale = getOptimalScale(totalObjectCount, spreadWidth, spreadHeight);
         const timeout = getOptimalTimeout(totalObjectCount);
 
         const canvas = document.createElement('canvas');

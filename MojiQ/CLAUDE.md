@@ -29,7 +29,23 @@ npm run start        # 開発用起動
 - **指示入れモード**: PDF/画像に校正指示を書き込む
 - **校正チェックモード**: 校正チェックリストを表示・管理
 
-## 最近の変更 (2026-03-09)
+## 最近の変更 (2026-03-11)
+
+### バグ修正（保存機能の致命的バグ）
+- 保存タイムアウト計算が描画オブジェクト数を正しくカウントできていない問題を修正
+  - `state.pageDrawings`（存在しない変数）→ `MojiQDrawingObjects.getAllPagesData()` に修正
+  - これにより大量の描画オブジェクトがある場合でも適切なタイムアウトが設定される
+- 大きなPDFページでのメモリ枯渇によるフリーズを防止
+  - `getOptimalScale`にページサイズを考慮したメモリ制限を追加
+  - MAX_CANVAS_PIXELS（50メガピクセル、約200MB）を超える場合は自動的にスケールを下げる
+
+### 関連ファイル
+- `MojiQ/js/pdf-manager.js` - calculateSaveTimeout関数を修正
+- `MojiQ/js/pdf-lib-saver.js` - getOptimalScale関数にメモリ制限を追加
+
+---
+
+## 過去の変更 (2026-03-09)
 
 ### リファクタリング: モジュール分割
 - `drawing-clipboard.js`（新規）: クリップボード操作（カット/ペースト）をdrawing-select.jsから分離
