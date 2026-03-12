@@ -22,7 +22,10 @@ const ProofreadingPanel = (() => {
     let currentColor = '#ff0000';
     let isCollapsed = false;
     let checkedCategories = new Set(); // 確認済みカテゴリを保持
+    let checkedComments = new Set(); // 確認済みコメントインデックス
+    let commentDoneStamps = new Map(); // コメントインデックス → 済スタンプオブジェクトIDのマッピング
     let pdfCommentsData = []; // PDFコメントデータ
+    let checkedItems = new Set(); // 確認済み項目（正誤・提案）のキー
 
     /**
      * 初期化
@@ -444,7 +447,8 @@ const ProofreadingPanel = (() => {
             return;
         }
 
-        // 新しいデータ読み込み時はPDFコメントをリセット
+        // 新しいデータ読み込み時は確認済み状態とPDFコメントをリセット
+        checkedItems.clear();
         pdfCommentsData = [];
         if (commentsContent) {
             commentsContent.innerHTML = '<div class="proofreading-check-empty">PDFコメントがありません</div>';
@@ -748,8 +752,17 @@ const ProofreadingPanel = (() => {
             html += '<div class="proofreading-category-body">';
             html += '<table class="proofreading-table"><tbody>';
 
-            catItems.forEach(item => {
-                html += '<tr class="proofreading-item" data-content="' + escapeAttr(item.content || '') + '" onclick="ProofreadingPanel.selectItem(this)">';
+            catItems.forEach((item, idx) => {
+                const itemKey = category + '_' + idx;
+                const isItemChecked = checkedItems.has(itemKey);
+                const itemCheckedClass = isItemChecked ? ' checked' : '';
+                html += '<tr class="proofreading-item' + itemCheckedClass + '" data-item-key="' + escapeAttr(itemKey) + '" data-content="' + escapeAttr(item.content || '') + '" onclick="ProofreadingPanel.selectItem(this)">';
+                html += '<td class="cal-checkbox" onclick="event.stopPropagation()">';
+                html += '<label class="proofreading-item-checkbox">';
+                html += '<input type="checkbox" ' + (isItemChecked ? 'checked' : '') + ' onchange="ProofreadingPanel.toggleItemChecked(this, \'' + escapeAttr(itemKey) + '\')">';
+                html += '<span class="proofreading-item-checkbox-icon"></span>';
+                html += '</label>';
+                html += '</td>';
                 html += '<td class="cal-page" onclick="event.stopPropagation(); ProofreadingPanel.jumpToPage(\'' + escapeAttr(item.page) + '\')">' + formatPage(item.page) + '</td>';
                 html += '<td class="cal-excerpt">' + escapeHtml(item.excerpt || '') + '</td>';
                 html += '<td class="cal-content">' + escapeHtml(item.content || '') + '</td>';
@@ -868,6 +881,167 @@ const ProofreadingPanel = (() => {
      */
     function resetCheckedCategories() {
         checkedCategories.clear();
+    }
+
+    /**
+     * コメントの確認済み状態をトグル
+     * @param {HTMLInputElement} checkbox - チェックボックス要素
+     * @param {number} commentIndex - コメントのインデックス
+     */
+    function toggleCommentChecked(checkbox, commentIndex) {
+        const commentItem = checkbox.closest('.proofreading-comment-item');
+        if (!commentItem) return;
+
+        if (checkbox.checked) {
+            checkedComments.add(commentIndex);
+            commentItem.classList.add('checked');
+            // 済スタンプを追加
+            addDoneStampForComment(commentIndex);
+        } else {
+            checkedComments.delete(commentIndex);
+            commentItem.classList.remove('checked');
+            // 済スタンプを削除
+            removeDoneStampForComment(commentIndex);
+        }
+    }
+
+    /**
+     * 項目（正誤・提案）の確認済み状態をトグル
+     * @param {HTMLInputElement} checkbox - チェックボックス要素
+     * @param {string} itemKey - 項目のキー（カテゴリ_インデックス）
+     */
+    function toggleItemChecked(checkbox, itemKey) {
+        const itemRow = checkbox.closest('.proofreading-item');
+        if (!itemRow) return;
+
+        if (checkbox.checked) {
+            checkedItems.add(itemKey);
+            itemRow.classList.add('checked');
+        } else {
+            checkedItems.delete(itemKey);
+            itemRow.classList.remove('checked');
+        }
+    }
+
+    /**
+     * コメントに対応する済スタンプを追加
+     * @param {number} commentIndex - コメントのインデックス
+     */
+    function addDoneStampForComment(commentIndex) {
+        const comment = pdfCommentsData[commentIndex];
+        if (!comment) return;
+
+        const pdfPage = comment.pdfPage;
+        const contents = comment.contents;
+
+        // 既存のテキストオブジェクト（PDF注釈から読み込まれたもの）を検索
+        let canvasX, canvasY;
+        if (window.MojiQDrawingObjects && window.MojiQDrawingObjects.getPageObjects) {
+            const pageObjects = window.MojiQDrawingObjects.getPageObjects(pdfPage);
+            if (pageObjects) {
+                // コメント内容と一致するテキストオブジェクトを検索
+                const textObj = pageObjects.find(obj =>
+                    obj.type === 'text' &&
+                    obj.text === contents &&
+                    obj._pdfAnnotationSource // PDF注釈から読み込まれたもの
+                );
+                if (textObj && textObj.startPos) {
+                    canvasX = textObj.startPos.x;
+                    canvasY = textObj.startPos.y;
+                }
+            }
+        }
+
+        // テキストオブジェクトが見つからない場合はrectから計算（フォールバック）
+        if (canvasX === undefined && comment.rect) {
+            const rect = comment.rect;
+            const viewportHeight = comment.viewportHeight || 792;
+            canvasX = rect[0];
+            canvasY = viewportHeight - rect[3];
+        }
+
+        if (canvasX === undefined) {
+            console.warn('コメントの座標を取得できませんでした:', comment);
+            return;
+        }
+
+        // 済スタンプのサイズ
+        const stampSize = 20;
+
+        // 済スタンプオブジェクトを作成
+        const doneStamp = {
+            type: 'doneStamp',
+            startPos: { x: canvasX, y: canvasY },
+            color: '#4caf50', // 緑色
+            size: stampSize,
+            commentIndex: commentIndex // コメントとの関連付け
+        };
+
+        // 描画オブジェクトとして保存
+        if (window.MojiQDrawingObjects && window.MojiQDrawingObjects.addObject) {
+            const stampId = window.MojiQDrawingObjects.addObject(pdfPage, doneStamp);
+            if (stampId) {
+                commentDoneStamps.set(commentIndex, { page: pdfPage, stampId: stampId });
+            }
+
+            // 現在のページなら再描画
+            if (window.MojiQPdfManager && window.MojiQPdfManager.getCurrentPage) {
+                const currentPage = window.MojiQPdfManager.getCurrentPage();
+                if (currentPage === pdfPage) {
+                    if (window.redrawCanvas) {
+                        window.redrawCanvas(false);
+                    } else if (window.MojiQDrawing && window.MojiQDrawing.redrawCanvas) {
+                        window.MojiQDrawing.redrawCanvas(false);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * コメントに対応する済スタンプを削除
+     * @param {number} commentIndex - コメントのインデックス
+     */
+    function removeDoneStampForComment(commentIndex) {
+        const stampInfo = commentDoneStamps.get(commentIndex);
+        if (!stampInfo) return;
+
+        const { page, stampId } = stampInfo;
+
+        // 描画オブジェクトから削除（IDで削除）
+        if (window.MojiQDrawingObjects && window.MojiQDrawingObjects.removeObjectById) {
+            window.MojiQDrawingObjects.removeObjectById(page, stampId);
+        }
+
+        commentDoneStamps.delete(commentIndex);
+
+        // 現在のページなら再描画
+        if (window.MojiQPdfManager && window.MojiQPdfManager.getCurrentPage) {
+            const currentPage = window.MojiQPdfManager.getCurrentPage();
+            if (currentPage === page) {
+                if (window.redrawCanvas) {
+                    window.redrawCanvas(false);
+                } else if (window.MojiQDrawing && window.MojiQDrawing.redrawCanvas) {
+                    window.MojiQDrawing.redrawCanvas(false);
+                }
+            }
+        }
+    }
+
+    /**
+     * コメント確認済み状態をリセット
+     */
+    function resetCheckedComments() {
+        // 全ての済スタンプを削除（Mapのkeysを配列にコピーしてからループ）
+        const commentIndices = Array.from(commentDoneStamps.keys());
+        for (const commentIndex of commentIndices) {
+            const stampInfo = commentDoneStamps.get(commentIndex);
+            if (stampInfo && window.MojiQDrawingObjects && window.MojiQDrawingObjects.removeObjectById) {
+                window.MojiQDrawingObjects.removeObjectById(stampInfo.page, stampInfo.stampId);
+            }
+        }
+        checkedComments.clear();
+        commentDoneStamps.clear();
     }
 
     /**
@@ -1115,6 +1289,7 @@ const ProofreadingPanel = (() => {
 
         try {
             pdfCommentsData = [];
+            resetCheckedComments(); // 確認済み状態をリセット
 
             // 各ページを走査して注釈を取得
             for (let i = 0; i < pageMapping.length; i++) {
@@ -1157,13 +1332,29 @@ const ProofreadingPanel = (() => {
                                     }
                                 }
 
+                                // PDF座標をキャンバス座標に変換
+                                // rectは[x1, y1, x2, y2]形式（左下, 右上）
+                                let canvasRect = null;
+                                if (annot.rect && annot.rect.length >= 4) {
+                                    // viewportのtransformを使って座標変換
+                                    // transform: [scaleX, 0, 0, -scaleY, 0, height]
+                                    const [x1, y1, x2, y2] = annot.rect;
+                                    // 左上座標をキャンバス座標に変換
+                                    const canvasX = x1;
+                                    const canvasY = viewport.height - y2; // Y軸反転
+                                    canvasRect = { x: canvasX, y: canvasY };
+                                }
+
                                 pdfCommentsData.push({
                                     page: displayNombre,
                                     pdfPage: pdfPageNum, // 実際のPDFページ（ジャンプ用）
                                     type: annot.subtype,
                                     contents: annot.contents,
                                     color: annot.color,
-                                    rect: annot.rect
+                                    rect: annot.rect,
+                                    canvasRect: canvasRect, // 変換済みキャンバス座標
+                                    viewportHeight: viewport.height,
+                                    viewportWidth: viewport.width
                                 });
                             }
                         }
@@ -1204,13 +1395,26 @@ const ProofreadingPanel = (() => {
             const typeClass = 'type-' + comment.type.toLowerCase();
             // ジャンプ用のページ番号（pdfPageがあればそれを使用、なければpage）
             const jumpPage = comment.pdfPage || comment.page;
+            // 確認済み状態
+            const isChecked = checkedComments.has(index);
+            const checkedClass = isChecked ? ' checked' : '';
+            const checkedAttr = isChecked ? ' checked' : '';
 
-            html += `<div class="proofreading-comment-item" data-index="${index}" data-page="${jumpPage}" onclick="ProofreadingPanel.jumpToCommentPage('${jumpPage}')">`;
+            html += `<div class="proofreading-comment-item${checkedClass}" data-index="${index}" data-page="${jumpPage}">`;
+            // チェックボックス
+            html += `<label class="proofreading-comment-checkbox" onclick="event.stopPropagation()">`;
+            html += `<input type="checkbox"${checkedAttr} onchange="ProofreadingPanel.toggleCommentChecked(this, ${index})">`;
+            html += `<span class="proofreading-comment-checkbox-icon"></span>`;
+            html += `</label>`;
+            // コメント本体
+            html += `<div class="proofreading-comment-body" onclick="ProofreadingPanel.jumpToCommentPage('${jumpPage}')">`;
             html += `<div class="proofreading-comment-header">`;
+            html += `<span class="proofreading-comment-done">済</span>`;
             html += `<span class="proofreading-comment-page" onclick="event.stopPropagation(); ProofreadingPanel.jumpToCommentPage('${jumpPage}')">${comment.page}P</span>`;
             html += `<span class="proofreading-comment-type ${typeClass}">${escapeHtml(typeLabel)}</span>`;
             html += `</div>`;
             html += `<div class="proofreading-comment-content">${escapeHtml(comment.contents)}</div>`;
+            html += `</div>`;
             html += `</div>`;
         });
 
@@ -1412,6 +1616,9 @@ const ProofreadingPanel = (() => {
         renderComments,
         toggleCategoryChecked,
         resetCheckedCategories,
+        toggleCommentChecked,
+        toggleItemChecked,
+        resetCheckedComments,
         jumpToPage,
         jumpToCommentPage,
         copyContent,
