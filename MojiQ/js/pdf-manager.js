@@ -5780,6 +5780,9 @@ window.MojiQPdfManager = (function() {
         saveAsNew,
         // ページ情報取得（描画データエクスポート/インポート用）
         getPageCount: () => state?.totalPages || 0,
-        getCurrentPage: () => state?.currentPageNum || 1
+        getCurrentPage: () => state?.currentPageNum || 1,
+        // PDFドキュメント取得（注釈読み込み用）
+        getPdfDocs: () => state?.pdfDocs || [],
+        getPageMapping: () => state?.pageMapping || []
     };
 })();

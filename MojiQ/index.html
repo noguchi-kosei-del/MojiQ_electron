@@ -917,27 +917,32 @@
                 </div>
             </div>
 
-            <!-- 正誤チェックセクション -->
-            <div class="proofreading-check-section correctness-section" id="correctnessSection">
-                <div class="proofreading-check-header correctness-header" onclick="ProofreadingPanel.toggleCheckSection('correctness')">
-                    <span class="proofreading-check-toggle">▼</span>
-                    <span class="proofreading-check-title">正誤チェック</span>
-                    <span class="proofreading-check-count" id="correctnessCount">(0)</span>
-                </div>
-                <div class="proofreading-check-content" id="correctnessContent">
-                    <div class="proofreading-check-empty">データがありません（校正チェックを読み込みから読み込んでください）</div>
-                </div>
+            <!-- タブバー -->
+            <div class="proofreading-tab-bar">
+                <button class="proofreading-tab active" data-tab="correctness">
+                    <span class="proofreading-tab-label">正誤</span>
+                    <span class="proofreading-tab-count" id="correctnessCount">(0)</span>
+                </button>
+                <button class="proofreading-tab" data-tab="proposal">
+                    <span class="proofreading-tab-label">提案</span>
+                    <span class="proofreading-tab-count" id="proposalCount">(0)</span>
+                </button>
+                <button class="proofreading-tab" data-tab="comments">
+                    <span class="proofreading-tab-label">コメント</span>
+                    <span class="proofreading-tab-count" id="commentsCount">(0)</span>
+                </button>
             </div>
 
-            <!-- 提案チェックセクション -->
-            <div class="proofreading-check-section proposal-section" id="proposalSection">
-                <div class="proofreading-check-header proposal-header" onclick="ProofreadingPanel.toggleCheckSection('proposal')">
-                    <span class="proofreading-check-toggle">▼</span>
-                    <span class="proofreading-check-title">提案チェック</span>
-                    <span class="proofreading-check-count" id="proposalCount">(0)</span>
-                </div>
-                <div class="proofreading-check-content" id="proposalContent">
+            <!-- タブコンテンツ領域 -->
+            <div class="proofreading-tab-contents">
+                <div class="proofreading-tab-content active" id="correctnessContent" data-tab="correctness">
                     <div class="proofreading-check-empty">データがありません（校正チェックを読み込みから読み込んでください）</div>
+                </div>
+                <div class="proofreading-tab-content" id="proposalContent" data-tab="proposal">
+                    <div class="proofreading-check-empty">データがありません（校正チェックを読み込みから読み込んでください）</div>
+                </div>
+                <div class="proofreading-tab-content" id="commentsContent" data-tab="comments">
+                    <div class="proofreading-check-empty">PDFコメントがありません</div>
                 </div>
             </div>
 

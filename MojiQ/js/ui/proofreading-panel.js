@@ -14,12 +14,15 @@ const ProofreadingPanel = (() => {
     let panel, panelToggle, colorSwatches, customColorSwatch, eyedropperBtn, colorPicker, rainbowPicker;
     let lineWidthInput, lineWidthSlider;
     let correctnessContent, proposalContent, correctnessCount, proposalCount;
+    let commentsContent, commentsCount;
+    let tabButtons, tabContents;
     let searchInput, searchClearBtn, searchCountEl;
 
     // 現在の状態
     let currentColor = '#ff0000';
     let isCollapsed = false;
     let checkedCategories = new Set(); // 確認済みカテゴリを保持
+    let pdfCommentsData = []; // PDFコメントデータ
 
     /**
      * 初期化
@@ -47,6 +50,12 @@ const ProofreadingPanel = (() => {
         proposalContent = document.getElementById('proposalContent');
         correctnessCount = document.getElementById('correctnessCount');
         proposalCount = document.getElementById('proposalCount');
+        commentsContent = document.getElementById('commentsContent');
+        commentsCount = document.getElementById('commentsCount');
+
+        // タブ関連
+        tabButtons = panel.querySelectorAll('.proofreading-tab');
+        tabContents = panel.querySelectorAll('.proofreading-tab-content');
 
         // 検索関連
         searchInput = document.getElementById('proofreadingSearchInput');
@@ -66,6 +75,13 @@ const ProofreadingPanel = (() => {
                 toggleCollapse();
             });
         }
+
+        // タブクリックイベント
+        tabButtons.forEach(tab => {
+            tab.addEventListener('click', () => {
+                switchTab(tab.dataset.tab);
+            });
+        });
 
         // カラースウォッチのクリック
         colorSwatches.forEach(swatch => {
@@ -194,6 +210,19 @@ const ProofreadingPanel = (() => {
                     proofLineWidthSlider.value = value;
                     updateSliderGradient(value);
                 }
+            });
+
+            // PDF読み込み完了を監視してコメント数を取得
+            let prevTotalPages = 0;
+            window.MojiQStore.subscribe('page.totalPages', (totalPages) => {
+                // 0から正の値に変わった場合（PDF読み込み完了）にコメントを読み込み
+                if (prevTotalPages === 0 && totalPages > 0) {
+                    // 少し遅延を入れてPDF読み込み処理が完全に終わるのを待つ
+                    setTimeout(() => {
+                        loadPdfComments();
+                    }, 200);
+                }
+                prevTotalPages = totalPages;
             });
         }
 
@@ -415,6 +444,15 @@ const ProofreadingPanel = (() => {
             return;
         }
 
+        // 新しいデータ読み込み時はPDFコメントをリセット
+        pdfCommentsData = [];
+        if (commentsContent) {
+            commentsContent.innerHTML = '<div class="proofreading-check-empty">PDFコメントがありません</div>';
+        }
+        if (commentsCount) {
+            commentsCount.textContent = '(0)';
+        }
+
         // 全アイテムを収集
         const allItems = [];
         if (data.checks.variation && data.checks.variation.items) {
@@ -465,61 +503,68 @@ const ProofreadingPanel = (() => {
             return;
         }
 
+        const activeTab = getActiveTab();
+
+        // コメントタブの場合は専用の検索
+        if (activeTab === 'comments') {
+            performCommentsSearch(query);
+            return;
+        }
+
         const lowerQuery = query.toLowerCase();
         let totalMatches = 0;
 
-        // 正誤チェックと提案チェックの両方を検索
-        [correctnessContent, proposalContent].forEach(content => {
-            if (!content) return;
+        // 現在のアクティブタブのコンテンツのみ検索
+        const activeContent = activeTab === 'correctness' ? correctnessContent : proposalContent;
+        if (!activeContent) return;
 
-            const categories = content.querySelectorAll('.proofreading-category');
-            categories.forEach(category => {
-                const items = category.querySelectorAll('.proofreading-item');
-                let categoryHasMatch = false;
+        const categories = activeContent.querySelectorAll('.proofreading-category');
+        categories.forEach(category => {
+            const items = category.querySelectorAll('.proofreading-item');
+            let categoryHasMatch = false;
 
-                items.forEach(item => {
-                    // 検索対象: content, excerpt
-                    const contentText = item.getAttribute('data-content') || '';
-                    const excerptEl = item.querySelector('.cal-excerpt');
-                    const contentEl = item.querySelector('.cal-content');
-                    const excerptText = excerptEl ? excerptEl.textContent : '';
-                    const displayContentText = contentEl ? contentEl.textContent : '';
+            items.forEach(item => {
+                // 検索対象: content, excerpt
+                const contentText = item.getAttribute('data-content') || '';
+                const excerptEl = item.querySelector('.cal-excerpt');
+                const contentEl = item.querySelector('.cal-content');
+                const excerptText = excerptEl ? excerptEl.textContent : '';
+                const displayContentText = contentEl ? contentEl.textContent : '';
 
-                    const matchesContent = contentText.toLowerCase().includes(lowerQuery);
-                    const matchesExcerpt = excerptText.toLowerCase().includes(lowerQuery);
-                    const matchesDisplay = displayContentText.toLowerCase().includes(lowerQuery);
+                const matchesContent = contentText.toLowerCase().includes(lowerQuery);
+                const matchesExcerpt = excerptText.toLowerCase().includes(lowerQuery);
+                const matchesDisplay = displayContentText.toLowerCase().includes(lowerQuery);
 
-                    if (matchesContent || matchesExcerpt || matchesDisplay) {
-                        item.classList.remove('search-hidden');
-                        categoryHasMatch = true;
-                        totalMatches++;
+                if (matchesContent || matchesExcerpt || matchesDisplay) {
+                    item.classList.remove('search-hidden');
+                    categoryHasMatch = true;
+                    totalMatches++;
 
-                        // ハイライト表示
-                        if (excerptEl) {
-                            highlightText(excerptEl, query);
-                        }
-                        if (contentEl) {
-                            highlightText(contentEl, query);
-                        }
-                    } else {
-                        item.classList.add('search-hidden');
-                        // ハイライトをクリア
-                        if (excerptEl) {
-                            clearHighlight(excerptEl);
-                        }
-                        if (contentEl) {
-                            clearHighlight(contentEl);
-                        }
+                    // ハイライト表示
+                    if (excerptEl) {
+                        highlightText(excerptEl, query);
                     }
-                });
-
-                // カテゴリ内にマッチがない場合は非表示
-                if (categoryHasMatch) {
-                    category.classList.remove('search-hidden');
+                    if (contentEl) {
+                        highlightText(contentEl, query);
+                    }
                 } else {
-                    category.classList.add('search-hidden');
+                    item.classList.add('search-hidden');
+                    // ハイライトをクリア
+                    if (excerptEl) {
+                        clearHighlight(excerptEl);
+                    }
+                    if (contentEl) {
+                        clearHighlight(contentEl);
+                    }
                 }
             });
+
+            // カテゴリ内にマッチがない場合は非表示
+            if (categoryHasMatch) {
+                category.classList.remove('search-hidden');
+            } else {
+                category.classList.add('search-hidden');
+            }
         });
 
         // 検索結果件数を表示
@@ -530,9 +575,41 @@ const ProofreadingPanel = (() => {
     }
 
     /**
+     * コメントタブ用の検索
+     * @param {string} query - 検索クエリ
+     */
+    function performCommentsSearch(query) {
+        if (!commentsContent) return;
+
+        const lowerQuery = query.toLowerCase();
+        let matchCount = 0;
+
+        const items = commentsContent.querySelectorAll('.proofreading-comment-item');
+        items.forEach(item => {
+            const contentEl = item.querySelector('.proofreading-comment-content');
+            const text = contentEl ? contentEl.textContent.toLowerCase() : '';
+
+            if (text.includes(lowerQuery)) {
+                item.classList.remove('search-hidden');
+                matchCount++;
+                if (contentEl) highlightText(contentEl, query);
+            } else {
+                item.classList.add('search-hidden');
+                if (contentEl) clearHighlight(contentEl);
+            }
+        });
+
+        if (searchCountEl) {
+            searchCountEl.style.display = 'inline';
+            searchCountEl.textContent = `${matchCount}件`;
+        }
+    }
+
+    /**
      * 検索フィルタをリセット
      */
     function resetSearchFilter() {
+        // 正誤・提案コンテンツ
         [correctnessContent, proposalContent].forEach(content => {
             if (!content) return;
 
@@ -552,6 +629,16 @@ const ProofreadingPanel = (() => {
                 });
             });
         });
+
+        // コメントコンテンツ
+        if (commentsContent) {
+            const items = commentsContent.querySelectorAll('.proofreading-comment-item');
+            items.forEach(item => {
+                item.classList.remove('search-hidden');
+                const contentEl = item.querySelector('.proofreading-comment-content');
+                if (contentEl) clearHighlight(contentEl);
+            });
+        }
     }
 
     /**
@@ -833,6 +920,20 @@ const ProofreadingPanel = (() => {
     }
 
     /**
+     * コメントのページにジャンプ（PDFの物理ページ番号で直接移動）
+     * @param {string|number} pageNum - PDFのページ番号
+     */
+    function jumpToCommentPage(pageNum) {
+        const num = parseInt(pageNum, 10);
+        if (isNaN(num) || num < 1) return;
+
+        // PDFの物理ページに直接移動（ノンブル変換なし）
+        if (window.MojiQPdfManager && window.MojiQPdfManager.renderPage) {
+            window.MojiQPdfManager.renderPage(num);
+        }
+    }
+
+    /**
      * コンテンツをクリップボードにコピー
      */
     function copyContent(btn) {
@@ -953,15 +1054,205 @@ const ProofreadingPanel = (() => {
     }
 
     /**
-     * チェックセクション（正誤/提案）の折りたたみをトグル
-     * @param {string} sectionType - 'correctness' または 'proposal'
+     * タブを切り替え
+     * @param {string} tabName - 'correctness', 'proposal', 'comments'
      */
-    function toggleCheckSection(sectionType) {
-        const sectionId = sectionType === 'correctness' ? 'correctnessSection' : 'proposalSection';
-        const section = document.getElementById(sectionId);
-        if (section) {
-            section.classList.toggle('collapsed');
+    function switchTab(tabName) {
+        // タブボタンの状態更新
+        tabButtons.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tabName);
+        });
+
+        // コンテンツの表示切り替え
+        tabContents.forEach(content => {
+            content.classList.toggle('active', content.dataset.tab === tabName);
+        });
+
+        // コメントタブ選択時、まだデータがなければPDF注釈を読み込み
+        if (tabName === 'comments' && pdfCommentsData.length === 0) {
+            loadPdfComments();
         }
+
+        // 検索をクリア
+        clearSearch();
+    }
+
+    /**
+     * 現在のアクティブタブを取得
+     * @returns {string} タブ名
+     */
+    function getActiveTab() {
+        const activeTab = panel ? panel.querySelector('.proofreading-tab.active') : null;
+        return activeTab ? activeTab.dataset.tab : 'correctness';
+    }
+
+    /**
+     * PDFからコメント/注釈を読み込んで表示
+     */
+    async function loadPdfComments() {
+        // PDF読み込み済みかチェック
+        if (!window.MojiQPdfManager) {
+            renderCommentsEmpty('PDFが読み込まれていません');
+            return;
+        }
+
+        const pdfDocs = window.MojiQPdfManager.getPdfDocs();
+        const pageMapping = window.MojiQPdfManager.getPageMapping();
+
+        if (!pdfDocs || pdfDocs.length === 0 || !pageMapping || pageMapping.length === 0) {
+            renderCommentsEmpty('PDFが読み込まれていません');
+            return;
+        }
+
+        // 横長原稿（見開き内容PDF）かどうかを判定
+        let isLandscapeSpread = false;
+        if (window.MojiQPdfManager.getOriginalPageSize) {
+            const pageSize = window.MojiQPdfManager.getOriginalPageSize(1);
+            if (pageSize && pageSize.width > pageSize.height) {
+                isLandscapeSpread = true;
+            }
+        }
+
+        try {
+            pdfCommentsData = [];
+
+            // 各ページを走査して注釈を取得
+            for (let i = 0; i < pageMapping.length; i++) {
+                const mapItem = pageMapping[i];
+                const pdfPageNum = i + 1; // PDFの物理ページ番号
+
+                // PDFページの場合のみ注釈を取得（画像ページや白紙ページはスキップ）
+                if (mapItem.docIndex >= 0 && pdfDocs[mapItem.docIndex]) {
+                    const pdf = pdfDocs[mapItem.docIndex];
+                    try {
+                        const page = await pdf.getPage(mapItem.pageNum);
+                        const annotations = await page.getAnnotations();
+                        const viewport = page.getViewport({ scale: 1 });
+                        const pageWidth = viewport.width;
+
+                        for (const annot of annotations) {
+                            // コメント（contents）を持つ注釈のみ対象
+                            if (annot.contents && annot.contents.trim()) {
+                                // 表示用ノンブルを計算
+                                let displayNombre = pdfPageNum;
+
+                                if (isLandscapeSpread && pdfPageNum >= 2) {
+                                    // 横長原稿の場合: 2ページ目以降は見開き計算
+                                    // PDFページ2 → ノンブル2-3、PDFページ3 → ノンブル4-5...
+                                    const baseNombre = (pdfPageNum - 1) * 2;
+
+                                    // 注釈の位置から左/右ページを判定（右綴じ: 右=偶数、左=奇数）
+                                    if (annot.rect && annot.rect[0] !== undefined) {
+                                        const annotX = annot.rect[0];
+                                        if (annotX < pageWidth / 2) {
+                                            // 左側 = 奇数ノンブル（大きい数）
+                                            displayNombre = baseNombre + 1;
+                                        } else {
+                                            // 右側 = 偶数ノンブル（小さい数）
+                                            displayNombre = baseNombre;
+                                        }
+                                    } else {
+                                        // 位置不明の場合は範囲表示
+                                        displayNombre = baseNombre + '-' + (baseNombre + 1);
+                                    }
+                                }
+
+                                pdfCommentsData.push({
+                                    page: displayNombre,
+                                    pdfPage: pdfPageNum, // 実際のPDFページ（ジャンプ用）
+                                    type: annot.subtype,
+                                    contents: annot.contents,
+                                    color: annot.color,
+                                    rect: annot.rect
+                                });
+                            }
+                        }
+                    } catch (pageError) {
+                        console.warn(`ページ${pdfPageNum}の注釈取得に失敗:`, pageError);
+                    }
+                }
+            }
+
+            renderComments(pdfCommentsData);
+        } catch (e) {
+            console.error('PDF注釈の読み込みに失敗:', e);
+            renderCommentsEmpty('PDF注釈の読み込みに失敗しました');
+        }
+    }
+
+    /**
+     * コメントをレンダリング
+     * @param {Array} comments - コメントデータ配列
+     */
+    function renderComments(comments) {
+        if (!commentsContent) return;
+
+        // カウント更新
+        if (commentsCount) {
+            commentsCount.textContent = `(${comments.length})`;
+        }
+
+        if (comments.length === 0) {
+            renderCommentsEmpty('PDFコメントがありません');
+            return;
+        }
+
+        let html = '';
+
+        comments.forEach((comment, index) => {
+            const typeLabel = getCommentTypeLabel(comment.type);
+            const typeClass = 'type-' + comment.type.toLowerCase();
+            // ジャンプ用のページ番号（pdfPageがあればそれを使用、なければpage）
+            const jumpPage = comment.pdfPage || comment.page;
+
+            html += `<div class="proofreading-comment-item" data-index="${index}" data-page="${jumpPage}" onclick="ProofreadingPanel.jumpToCommentPage('${jumpPage}')">`;
+            html += `<div class="proofreading-comment-header">`;
+            html += `<span class="proofreading-comment-page" onclick="event.stopPropagation(); ProofreadingPanel.jumpToCommentPage('${jumpPage}')">${comment.page}P</span>`;
+            html += `<span class="proofreading-comment-type ${typeClass}">${escapeHtml(typeLabel)}</span>`;
+            html += `</div>`;
+            html += `<div class="proofreading-comment-content">${escapeHtml(comment.contents)}</div>`;
+            html += `</div>`;
+        });
+
+        commentsContent.innerHTML = html;
+    }
+
+    /**
+     * 空のコメントコンテンツをレンダリング
+     * @param {string} message - 表示メッセージ
+     */
+    function renderCommentsEmpty(message) {
+        if (commentsContent) {
+            commentsContent.innerHTML = `<div class="proofreading-check-empty">${escapeHtml(message)}</div>`;
+        }
+        if (commentsCount) {
+            commentsCount.textContent = '(0)';
+        }
+    }
+
+    /**
+     * 注釈タイプのラベルを取得
+     * @param {string} type - 注釈タイプ
+     * @returns {string} 日本語ラベル
+     */
+    function getCommentTypeLabel(type) {
+        const labels = {
+            'Text': 'テキスト',
+            'FreeText': 'フリーテキスト',
+            'Highlight': 'ハイライト',
+            'Underline': '下線',
+            'StrikeOut': '取り消し線',
+            'Ink': '手書き',
+            'Square': '四角形',
+            'Circle': '円形',
+            'Line': '線',
+            'Polygon': '多角形',
+            'PolyLine': '折れ線',
+            'Stamp': 'スタンプ',
+            'Caret': 'キャレット',
+            'FileAttachment': '添付ファイル'
+        };
+        return labels[type] || type;
     }
 
     /**
@@ -1115,10 +1406,14 @@ const ProofreadingPanel = (() => {
         hide,
         toggleSection,
         toggleCategory,
-        toggleCheckSection,
+        switchTab,
+        getActiveTab,
+        loadPdfComments,
+        renderComments,
         toggleCategoryChecked,
         resetCheckedCategories,
         jumpToPage,
+        jumpToCommentPage,
         copyContent,
         renderCheckData,
         onEyedropperColorPicked,

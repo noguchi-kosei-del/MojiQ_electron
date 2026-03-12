@@ -85,6 +85,35 @@ window.MojiQZoom = (function() {
     }
 
     /**
+     * 指定した点に向かってズーム実行
+     * @param {number} newZoom - 新しいズーム値
+     * @param {number} clientX - マウスのクライアントX座標
+     * @param {number} clientY - マウスのクライアントY座標
+     */
+    function performZoomToPoint(newZoom, clientX, clientY) {
+        const oldZoom = state.currentZoom;
+        const zoomLimits = window.MojiQConstants?.ZOOM || {};
+        const minZoom = zoomLimits.MIN || 0.25;
+        const maxZoom = zoomLimits.MAX || 4.0;
+        const nextZoom = Math.min(Math.max(newZoom, minZoom), maxZoom);
+        if (oldZoom === nextZoom) return;
+
+        const rect = canvasArea.getBoundingClientRect();
+        // マウス位置からcanvasArea内のオフセットを計算
+        const offsetX = clientX - rect.left;
+        const offsetY = clientY - rect.top;
+        const scrollLeft = canvasArea.scrollLeft;
+        const scrollTop = canvasArea.scrollTop;
+
+        state.currentZoom = nextZoom;
+        updateZoomDisplay();
+
+        const ratio = state.currentZoom / oldZoom;
+        canvasArea.scrollLeft = (scrollLeft + offsetX) * ratio - offsetX;
+        canvasArea.scrollTop = (scrollTop + offsetY) * ratio - offsetY;
+    }
+
+    /**
      * ズームをリセット
      */
     function resetZoom() {
@@ -105,11 +134,19 @@ window.MojiQZoom = (function() {
         // ズーム: マウスホイール制御
         boundHandlers.wheelHandler = (e) => {
             if (e.ctrlKey || e.metaKey) {
+                // Ctrl/Cmd + ホイール: 画面中央を基準にズーム
                 e.preventDefault();
                 e.stopPropagation();
                 const direction = e.deltaY < 0 ? 1 : -1;
                 const step = 0.05;
                 performZoom(state.currentZoom + (direction * step));
+            } else if (e.altKey) {
+                // Alt + ホイール: ポインター位置に向かってズーム
+                e.preventDefault();
+                e.stopPropagation();
+                const direction = e.deltaY < 0 ? 1 : -1;
+                const step = 0.05;
+                performZoomToPoint(state.currentZoom + (direction * step), e.clientX, e.clientY);
             }
         };
         window.addEventListener('wheel', boundHandlers.wheelHandler, { passive: false });

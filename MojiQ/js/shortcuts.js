@@ -89,9 +89,9 @@ window.MojiQShortcuts = (function() {
         }
         isInitialized = true;
 
-        // ブラウザのCtrl+ホイールズームを常に防止
+        // ブラウザのCtrl+ホイールズームおよびAlt+ホイールを常に防止
         boundHandlers.wheelHandler = (e) => {
-            if (e.ctrlKey || e.metaKey) {
+            if (e.ctrlKey || e.metaKey || e.altKey) {
                 e.preventDefault();
             }
         };

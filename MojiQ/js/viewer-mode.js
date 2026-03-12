@@ -311,6 +311,9 @@ window.MojiQViewerMode = (function() {
         boundHandlers.wheel = (e) => {
             if (!isActive) return;
 
+            // Alt+ホイール、Ctrl/Cmd+ホイールはズーム処理のため無視
+            if (e.altKey || e.ctrlKey || e.metaKey) return;
+
             e.preventDefault();
 
             // ナビゲーション中は無視（wheelイベントは連続で発火するため）

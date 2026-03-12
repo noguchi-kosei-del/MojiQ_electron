@@ -282,6 +282,9 @@ window.MojiQNavigation = (function() {
             // ビューワーモード中はviewer-mode.jsで処理するため無視
             if (window.MojiQViewerMode && window.MojiQViewerMode.isActive()) return;
 
+            // Alt+ホイール、Ctrl/Cmd+ホイールはズーム処理のため無視
+            if (e.altKey || e.ctrlKey || e.metaKey) return;
+
             // 描画中やパン操作中は無視（ただしpreventDefaultは呼ばない = ブラウザのデフォルト動作を許可）
             if (state.interactionState !== 0 || state.isPanning) return;
 
