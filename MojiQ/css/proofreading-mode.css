@@ -245,6 +245,45 @@ body.proofreading-mode.pdf-loaded .sidebar.right.collapsed .proofreading-panel-h
     min-width: 120px;
 }
 
+/* 済スタンプ・ルビスタンプセクション */
+.proofreading-stamp-section {
+    padding: 8px 12px;
+    flex-shrink: 0;
+    border-top: 1px solid #e0e0e0;
+}
+
+.proofreading-stamp-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.proofreading-stamp-btn {
+    flex: 1;
+    height: 32px;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #c62828;
+    background: #fff;
+    border: 2px solid #ef9a9a;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: center;
+}
+
+.proofreading-stamp-btn:hover {
+    background: #ffebee;
+    border-color: #e57373;
+}
+
+.proofreading-stamp-btn.active {
+    background: #fff;
+    border-color: #c62828;
+    box-shadow: 0 0 0 2px rgba(198, 40, 40, 0.3);
+    color: #c62828;
+}
+
 /* チェックセクションのラッパー */
 .proofreading-checks-wrapper {
     display: flex;

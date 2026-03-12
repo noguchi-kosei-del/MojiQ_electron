@@ -568,6 +568,27 @@ body.dark-mode .proofreading-symbol-buttons .symbol-btn .symbol-label {
     color: #8a8a8a;
 }
 
+/* 校正チェックモード用スタンプボタン */
+body.dark-mode .proofreading-stamp-section {
+    border-top-color: #444;
+}
+
+body.dark-mode .proofreading-stamp-btn {
+    background: #333;
+    border-color: #b71c1c;
+    color: #ef9a9a;
+}
+
+body.dark-mode .proofreading-stamp-btn:hover {
+    background: #3a2020;
+}
+
+body.dark-mode .proofreading-stamp-btn.active {
+    background: #3a2020;
+    border-color: #c62828;
+    color: #ef9a9a;
+}
+
 /* スタンプトグル */
 body.dark-mode .stamp-toggle-btn {
     background: #333;

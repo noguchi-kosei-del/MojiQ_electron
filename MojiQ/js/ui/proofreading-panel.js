@@ -17,6 +17,7 @@ const ProofreadingPanel = (() => {
     let commentsContent, commentsCount;
     let tabButtons, tabContents;
     let searchInput, searchClearBtn, searchCountEl;
+    let proofDoneStampBtn, proofRubyStampBtn;
 
     // 現在の状態
     let currentColor = '#ff0000';
@@ -64,6 +65,10 @@ const ProofreadingPanel = (() => {
         searchInput = document.getElementById('proofreadingSearchInput');
         searchClearBtn = document.getElementById('proofreadingSearchClearBtn');
         searchCountEl = document.getElementById('proofreadingSearchCount');
+
+        // 済スタンプ・ルビスタンプボタン
+        proofDoneStampBtn = document.getElementById('proofDoneStampBtn');
+        proofRubyStampBtn = document.getElementById('proofRubyStampBtn');
 
         setupEventListeners();
     }
@@ -143,6 +148,26 @@ const ProofreadingPanel = (() => {
                 if (window.MojiQModeController && window.MojiQModeController.setMode) {
                     window.MojiQModeController.setMode('eyedropper');
                     eyedropperBtn.classList.add('active');
+                }
+            });
+        }
+
+        // 済スタンプボタン
+        if (proofDoneStampBtn) {
+            proofDoneStampBtn.addEventListener('click', () => {
+                if (window.MojiQModeController && window.MojiQModeController.setMode) {
+                    window.MojiQModeController.setMode('doneStamp');
+                    updateActiveStampButton(proofDoneStampBtn);
+                }
+            });
+        }
+
+        // ルビスタンプボタン
+        if (proofRubyStampBtn) {
+            proofRubyStampBtn.addEventListener('click', () => {
+                if (window.MojiQModeController && window.MojiQModeController.setMode) {
+                    window.MojiQModeController.setMode('rubyStamp');
+                    updateActiveStampButton(proofRubyStampBtn);
                 }
             });
         }
@@ -255,6 +280,19 @@ const ProofreadingPanel = (() => {
                 clearSearch();
             });
         }
+
+        // モード変更イベントを監視してスタンプボタンの状態を更新
+        window.addEventListener('mojiq:mode-changed', (e) => {
+            const mode = e.detail?.mode;
+            // スタンプモード以外になったらスタンプボタンの選択を解除
+            if (mode !== 'doneStamp' && mode !== 'rubyStamp') {
+                resetStampButtons();
+            } else if (mode === 'doneStamp') {
+                updateActiveStampButton(proofDoneStampBtn);
+            } else if (mode === 'rubyStamp') {
+                updateActiveStampButton(proofRubyStampBtn);
+            }
+        });
     }
 
     /**
@@ -393,6 +431,41 @@ const ProofreadingPanel = (() => {
         if (eyedropperBtn) {
             eyedropperBtn.classList.remove('active');
         }
+
+        // スタンプボタンの選択状態をリセット
+        if (proofDoneStampBtn) proofDoneStampBtn.classList.remove('active');
+        if (proofRubyStampBtn) proofRubyStampBtn.classList.remove('active');
+    }
+
+    /**
+     * アクティブなスタンプボタンを更新
+     * @param {HTMLElement} activeBtn - アクティブにするボタン
+     */
+    function updateActiveStampButton(activeBtn) {
+        // 両方のスタンプボタンからactiveクラスを削除
+        if (proofDoneStampBtn) proofDoneStampBtn.classList.remove('active');
+        if (proofRubyStampBtn) proofRubyStampBtn.classList.remove('active');
+
+        // 指定されたボタンにactiveクラスを追加
+        if (activeBtn) {
+            activeBtn.classList.add('active');
+        }
+
+        // カラースウォッチの選択状態をリセット
+        colorSwatches.forEach(s => s.classList.remove('active'));
+
+        // スポイトの選択状態をリセット
+        if (eyedropperBtn) {
+            eyedropperBtn.classList.remove('active');
+        }
+    }
+
+    /**
+     * スタンプボタンの選択状態をリセット
+     */
+    function resetStampButtons() {
+        if (proofDoneStampBtn) proofDoneStampBtn.classList.remove('active');
+        if (proofRubyStampBtn) proofRubyStampBtn.classList.remove('active');
     }
 
     /**
@@ -447,15 +520,10 @@ const ProofreadingPanel = (() => {
             return;
         }
 
-        // 新しいデータ読み込み時は確認済み状態とPDFコメントをリセット
+        // 新しいデータ読み込み時は確認済み状態のみリセット（コメントは維持）
         checkedItems.clear();
-        pdfCommentsData = [];
-        if (commentsContent) {
-            commentsContent.innerHTML = '<div class="proofreading-check-empty">PDFコメントがありません</div>';
-        }
-        if (commentsCount) {
-            commentsCount.textContent = '(0)';
-        }
+        // コメントの確認済み状態もリセット
+        resetCheckedComments();
 
         // 全アイテムを収集
         const allItems = [];
@@ -1042,6 +1110,16 @@ const ProofreadingPanel = (() => {
         }
         checkedComments.clear();
         commentDoneStamps.clear();
+
+        // コメントアイテムのUI状態もリセット
+        if (commentsContent) {
+            const commentItems = commentsContent.querySelectorAll('.proofreading-comment-item');
+            commentItems.forEach(item => {
+                item.classList.remove('checked');
+                const checkbox = item.querySelector('.comment-check-input');
+                if (checkbox) checkbox.checked = false;
+            });
+        }
     }
 
     /**
@@ -1407,10 +1485,10 @@ const ProofreadingPanel = (() => {
             html += `<span class="proofreading-comment-checkbox-icon"></span>`;
             html += `</label>`;
             // コメント本体
-            html += `<div class="proofreading-comment-body" onclick="ProofreadingPanel.jumpToCommentPage('${jumpPage}')">`;
+            html += `<div class="proofreading-comment-body">`;
             html += `<div class="proofreading-comment-header">`;
             html += `<span class="proofreading-comment-done">済</span>`;
-            html += `<span class="proofreading-comment-page" onclick="event.stopPropagation(); ProofreadingPanel.jumpToCommentPage('${jumpPage}')">${comment.page}P</span>`;
+            html += `<span class="proofreading-comment-page" onclick="ProofreadingPanel.jumpToCommentPage('${jumpPage}')">${comment.page}P</span>`;
             html += `<span class="proofreading-comment-type ${typeClass}">${escapeHtml(typeLabel)}</span>`;
             html += `</div>`;
             html += `<div class="proofreading-comment-content">${escapeHtml(comment.contents)}</div>`;

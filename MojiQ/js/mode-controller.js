@@ -519,6 +519,11 @@ window.MojiQModeController = (function() {
         deactivateStamps();
 
         MojiQCanvasContext.initContext();
+
+        // モード変更イベントを発火
+        window.dispatchEvent(new CustomEvent('mojiq:mode-changed', {
+            detail: { mode: mode, prevMode: prevMode }
+        }));
     }
 
     /**
