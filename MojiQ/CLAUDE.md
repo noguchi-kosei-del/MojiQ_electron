@@ -80,10 +80,20 @@ npm run start        # 開発用起動
 ### UI改善: コメントタブのジャンプ操作
 - コメントブロック全体クリックではなく、ページ数部分のみクリックでジャンプするよう変更
 
+### バグ修正: PDFコメントテキストの見切れ防止
+- PDFの端にあるコメントテキストが見切れる問題を修正
+- テキストサイズを計算し、PDF領域からはみ出す場合は位置を自動補正
+- 5pxのマージンを確保
+
+### バグ修正: コメントテキストが白文字になる問題
+- PDF注釈の色が白（または白に近い色）の場合、テキストが見えなくなる問題を修正
+- 輝度が高すぎる色（RGB平均 > 240）は赤色にフォールバック
+
 ### 関連ファイル
 - `MojiQ/index.html` - タブバー・タブコンテンツのHTML構造
 - `MojiQ/css/proofreading-mode.css` - タブUI・コメントアイテムのスタイル
 - `MojiQ/js/ui/proofreading-panel.js` - タブ切り替え、PDFコメント読み込み機能、ページ判定修正、自動読み込み
+- `MojiQ/js/pdf-annotation-loader.js` - コメントテキスト見切れ防止、白文字フォールバック
 - `MojiQ/js/zoom.js` - performZoomToPoint関数を追加、Alt+ホイール対応
 - `MojiQ/js/navigation.js` - Alt+ホイール時にページ移動をスキップ
 - `MojiQ/js/viewer-mode.js` - Alt+ホイール時にページ移動をスキップ
