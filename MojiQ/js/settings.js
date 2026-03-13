@@ -58,7 +58,12 @@ window.MojiQSettings = (function() {
             toolEyedropper: { key: 'i', modifiers: [], description: 'スポイト' },
             // 編集操作
             cut: { key: 'x', modifiers: ['ctrl'], description: 'カット' },
-            paste: { key: 'v', modifiers: ['ctrl'], description: 'ペースト' }
+            paste: { key: 'v', modifiers: ['ctrl'], description: 'ペースト' },
+            // オブジェクト移動
+            moveUp: { key: 'ArrowUp', modifiers: ['ctrl'], description: '上に移動' },
+            moveDown: { key: 'ArrowDown', modifiers: ['ctrl'], description: '下に移動' },
+            moveLeft: { key: 'ArrowLeft', modifiers: ['ctrl'], description: '左に移動' },
+            moveRight: { key: 'ArrowRight', modifiers: ['ctrl'], description: '右に移動' }
         },
         scroll: {
             direction: 'normal'  // 'normal' | 'inverted'

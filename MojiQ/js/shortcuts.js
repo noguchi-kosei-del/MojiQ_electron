@@ -131,34 +131,51 @@ window.MojiQShortcuts = (function() {
                     return;
                 }
 
-                // Ctrl/Cmd + 矢印は即時移動（最初/最後のページへ）- INPUT要素にフォーカスがあっても動作させる
-                if (matchesShortcut(e, 'pageFirst') || matchesShortcut(e, 'pageLast') ||
-                    (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-                    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                // オブジェクト移動ショートカット（選択中のみ）
+                if (window.MojiQDrawingSelect && window.MojiQDrawingSelect.hasSelection()) {
+                    const moveStep = 5; // 移動量（ピクセル）
+                    let dx = 0, dy = 0;
+                    if (matchesShortcut(e, 'moveLeft')) {
+                        dx = -moveStep;
+                    } else if (matchesShortcut(e, 'moveRight')) {
+                        dx = moveStep;
+                    } else if (matchesShortcut(e, 'moveUp')) {
+                        dy = -moveStep;
+                    } else if (matchesShortcut(e, 'moveDown')) {
+                        dy = moveStep;
+                    }
+                    if (dx !== 0 || dy !== 0) {
                         e.preventDefault();
-                        // フォーカスを外す（スライダーなどからフォーカスを解除）
-                        if (document.activeElement && document.activeElement !== document.body) {
-                            document.activeElement.blur();
-                        }
-                        // 見開きモードかつ左綴じの場合はキー方向を反転
-                        const PdfManager = window.MojiQPdfManager;
-                        const isLeftBinding = PdfManager && PdfManager.isSpreadViewMode() &&
-                                              PdfManager.getSpreadBindingDirection() === 'left';
-                        // ユーザー設定による反転
-                        const isUserInverted = window.MojiQSettings && window.MojiQSettings.getArrowKeyInverted();
-                        // 両方の反転を組み合わせる（XOR: 一方だけtrueなら反転）
-                        const shouldInvert = isLeftBinding !== isUserInverted;
-                        let navAction;
-                        if (shouldInvert) {
-                            // 反転: 左キーで最初、右キーで最後
-                            navAction = e.key === 'ArrowLeft' ? 'first' : 'last';
-                        } else {
-                            // 通常: 左キーで最後、右キーで最初
-                            navAction = e.key === 'ArrowLeft' ? 'last' : 'first';
-                        }
-                        window.dispatchEvent(new CustomEvent('mojiq:page-navigate', { detail: { action: navAction } }));
+                        window.MojiQDrawingSelect.moveSelectedByDelta(dx, dy);
                         return;
                     }
+                }
+
+                // Ctrl/Cmd + 左右矢印: ページナビゲーション（選択がない場合）
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    // フォーカスを外す（スライダーなどからフォーカスを解除）
+                    if (document.activeElement && document.activeElement !== document.body) {
+                        document.activeElement.blur();
+                    }
+                    // 見開きモードかつ左綴じの場合はキー方向を反転
+                    const PdfManager = window.MojiQPdfManager;
+                    const isLeftBinding = PdfManager && PdfManager.isSpreadViewMode() &&
+                                          PdfManager.getSpreadBindingDirection() === 'left';
+                    // ユーザー設定による反転
+                    const isUserInverted = window.MojiQSettings && window.MojiQSettings.getArrowKeyInverted();
+                    // 両方の反転を組み合わせる（XOR: 一方だけtrueなら反転）
+                    const shouldInvert = isLeftBinding !== isUserInverted;
+                    let navAction;
+                    if (shouldInvert) {
+                        // 反転: 左キーで最初、右キーで最後
+                        navAction = e.key === 'ArrowLeft' ? 'first' : 'last';
+                    } else {
+                        // 通常: 左キーで最後、右キーで最初
+                        navAction = e.key === 'ArrowLeft' ? 'last' : 'first';
+                    }
+                    window.dispatchEvent(new CustomEvent('mojiq:page-navigate', { detail: { action: navAction } }));
+                    return;
                 }
             }
 
@@ -205,8 +222,23 @@ window.MojiQShortcuts = (function() {
                     // 両方の反転を組み合わせる（XOR: 一方だけtrueなら反転）
                     const shouldInvert = isLeftBinding !== isUserInverted;
 
-                    // Ctrl/Cmd + 矢印は即時移動（最初/最後のページへ）
+                    // Ctrl/Cmd + 矢印は選択中オブジェクトの移動（選択がなければページ移動）
                     if (isCtrlOrMeta) {
+                        // 選択中のオブジェクトがある場合はオブジェクト移動（設定に従う）
+                        if (window.MojiQDrawingSelect && window.MojiQDrawingSelect.hasSelection()) {
+                            const moveStep = 5;
+                            let dx = 0;
+                            if (matchesShortcut(e, 'moveLeft')) {
+                                dx = -moveStep;
+                            } else if (matchesShortcut(e, 'moveRight')) {
+                                dx = moveStep;
+                            }
+                            if (dx !== 0) {
+                                window.MojiQDrawingSelect.moveSelectedByDelta(dx, 0);
+                                return;
+                            }
+                        }
+                        // 選択がない場合はページ移動
                         let action;
                         if (shouldInvert) {
                             // 反転: 左キーで最初、右キーで最後
@@ -252,6 +284,22 @@ window.MojiQShortcuts = (function() {
                         action = e.key === 'ArrowLeft' ? 'next' : 'prev';
                     }
                     window.dispatchEvent(new CustomEvent('mojiq:page-navigate', { detail: { action: action } }));
+                }
+            }
+
+            // Ctrl + 上下矢印でオブジェクト移動（設定に従う）
+            if (window.MojiQDrawingSelect && window.MojiQDrawingSelect.hasSelection()) {
+                const moveStep = 5;
+                let dy = 0;
+                if (matchesShortcut(e, 'moveUp')) {
+                    dy = -moveStep;
+                } else if (matchesShortcut(e, 'moveDown')) {
+                    dy = moveStep;
+                }
+                if (dy !== 0) {
+                    e.preventDefault();
+                    window.MojiQDrawingSelect.moveSelectedByDelta(0, dy);
+                    return;
                 }
             }
 

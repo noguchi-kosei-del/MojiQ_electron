@@ -240,17 +240,15 @@ const ProofreadingPanel = (() => {
                 }
             });
 
-            // PDF読み込み完了を監視してコメント数を取得
-            let prevTotalPages = 0;
-            window.MojiQStore.subscribe('page.totalPages', (totalPages) => {
-                // 0から正の値に変わった場合（PDF読み込み完了）にコメントを読み込み
-                if (prevTotalPages === 0 && totalPages > 0) {
-                    // 少し遅延を入れてPDF読み込み処理が完全に終わるのを待つ
-                    setTimeout(() => {
-                        loadPdfComments();
-                    }, 200);
-                }
-                prevTotalPages = totalPages;
+            // ファイル読み込み完了イベントを監視してデータをリセット＆再読み込み
+            window.addEventListener('mojiq:file-loaded', () => {
+                // 少し遅延を入れてファイル読み込み処理が完全に終わるのを待つ
+                setTimeout(() => {
+                    // 全データをリセット
+                    resetAllProofreadingData();
+                    // コメントを再読み込み
+                    loadPdfComments();
+                }, 200);
             });
         }
 
@@ -942,6 +940,26 @@ const ProofreadingPanel = (() => {
             // チェック解除時に展開
             category.classList.remove('collapsed');
         }
+
+        // カテゴリ内のすべての項目のチェック状態を同期
+        const items = category.querySelectorAll('.proofreading-item');
+        items.forEach(item => {
+            const itemCheckbox = item.querySelector('input[type="checkbox"]');
+            const itemKey = item.dataset.itemKey;
+            if (itemCheckbox && itemKey) {
+                itemCheckbox.checked = checkbox.checked;
+                if (checkbox.checked) {
+                    checkedItems.add(itemKey);
+                    item.classList.add('checked');
+                } else {
+                    checkedItems.delete(itemKey);
+                    item.classList.remove('checked');
+                }
+            }
+        });
+
+        // タブの済状態を更新
+        updateTabDoneStatus();
     }
 
     /**
@@ -949,6 +967,41 @@ const ProofreadingPanel = (() => {
      */
     function resetCheckedCategories() {
         checkedCategories.clear();
+    }
+
+    /**
+     * 全ての校正チェックデータをリセット（PDF読み込み時用）
+     */
+    function resetAllProofreadingData() {
+        // 正誤・提案の確認済み状態をリセット
+        checkedCategories.clear();
+        checkedItems.clear();
+
+        // 正誤・提案の表示をリセット
+        renderEmpty();
+
+        // コメントデータをリセット
+        pdfCommentsData = [];
+        resetCheckedComments();
+
+        // コメントタブの表示をリセット
+        if (commentsContent) {
+            commentsContent.innerHTML = '';
+        }
+        if (commentsCount) {
+            commentsCount.textContent = '(0)';
+        }
+
+        // タブの済状態をリセット
+        resetTabDoneStatus();
+    }
+
+    /**
+     * タブの済状態をリセット
+     */
+    function resetTabDoneStatus() {
+        const tabs = document.querySelectorAll('.proofreading-tab');
+        tabs.forEach(tab => tab.classList.remove('all-checked'));
     }
 
     /**
@@ -971,6 +1024,9 @@ const ProofreadingPanel = (() => {
             // 済スタンプを削除
             removeDoneStampForComment(commentIndex);
         }
+
+        // タブの済状態を更新
+        updateCommentsTabDone();
     }
 
     /**
@@ -988,6 +1044,78 @@ const ProofreadingPanel = (() => {
         } else {
             checkedItems.delete(itemKey);
             itemRow.classList.remove('checked');
+        }
+
+        // タブの済状態を更新
+        updateTabDoneStatus();
+    }
+
+    /**
+     * タブの全項目チェック済み状態を更新
+     */
+    function updateTabDoneStatus() {
+        // 正誤タブ
+        updateCorrectnessTabDone();
+        // 提案タブ
+        updateProposalTabDone();
+        // コメントタブ
+        updateCommentsTabDone();
+    }
+
+    /**
+     * 正誤タブの済状態を更新
+     */
+    function updateCorrectnessTabDone() {
+        const tab = document.querySelector('.proofreading-tab[data-tab="correctness"]');
+        if (!tab || !correctnessContent) return;
+
+        const items = correctnessContent.querySelectorAll('.proofreading-item');
+        const totalCount = items.length;
+        const checkedCount = correctnessContent.querySelectorAll('.proofreading-item.checked').length;
+
+        // 項目が1つ以上あり、すべてチェック済みの場合
+        if (totalCount > 0 && totalCount === checkedCount) {
+            tab.classList.add('all-checked');
+        } else {
+            tab.classList.remove('all-checked');
+        }
+    }
+
+    /**
+     * 提案タブの済状態を更新
+     */
+    function updateProposalTabDone() {
+        const tab = document.querySelector('.proofreading-tab[data-tab="proposal"]');
+        if (!tab || !proposalContent) return;
+
+        const items = proposalContent.querySelectorAll('.proofreading-item');
+        const totalCount = items.length;
+        const checkedCount = proposalContent.querySelectorAll('.proofreading-item.checked').length;
+
+        // 項目が1つ以上あり、すべてチェック済みの場合
+        if (totalCount > 0 && totalCount === checkedCount) {
+            tab.classList.add('all-checked');
+        } else {
+            tab.classList.remove('all-checked');
+        }
+    }
+
+    /**
+     * コメントタブの済状態を更新
+     */
+    function updateCommentsTabDone() {
+        const tab = document.querySelector('.proofreading-tab[data-tab="comments"]');
+        if (!tab || !commentsContent) return;
+
+        const items = commentsContent.querySelectorAll('.proofreading-comment-item');
+        const totalCount = items.length;
+        const checkedCount = commentsContent.querySelectorAll('.proofreading-comment-item.checked').length;
+
+        // 項目が1つ以上あり、すべてチェック済みの場合
+        if (totalCount > 0 && totalCount === checkedCount) {
+            tab.classList.add('all-checked');
+        } else {
+            tab.classList.remove('all-checked');
         }
     }
 
@@ -1040,7 +1168,7 @@ const ProofreadingPanel = (() => {
         const doneStamp = {
             type: 'doneStamp',
             startPos: { x: canvasX, y: canvasY },
-            color: '#4caf50', // 緑色
+            color: '#ff0000', // 赤色
             size: stampSize,
             commentIndex: commentIndex // コメントとの関連付け
         };
@@ -1385,7 +1513,8 @@ const ProofreadingPanel = (() => {
 
                         for (const annot of annotations) {
                             // コメント（contents）を持つ注釈のみ対象
-                            if (annot.contents && annot.contents.trim()) {
+                            // Popup注釈は親注釈と同じ内容を持つため除外
+                            if (annot.contents && annot.contents.trim() && annot.subtype !== 'Popup') {
                                 // 表示用ノンブルを計算
                                 let displayNombre = pdfPageNum;
 

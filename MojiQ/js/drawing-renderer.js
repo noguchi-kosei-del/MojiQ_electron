@@ -3505,9 +3505,11 @@ window.MojiQDrawingRenderer = (function() {
      * @param {{x: number, y: number, width: number, height: number}} bounds - オブジェクトの境界
      */
     function renderDeleteButton(ctx, bounds) {
-        const btnX = bounds.x + bounds.width + DELETE_BUTTON_OFFSET;
-        const btnY = bounds.y + bounds.height + DELETE_BUTTON_OFFSET;
         const size = DELETE_BUTTON_SIZE;
+
+        // デフォルト位置（右下）
+        let btnX = bounds.x + bounds.width + DELETE_BUTTON_OFFSET;
+        let btnY = bounds.y + bounds.height + DELETE_BUTTON_OFFSET;
 
         ctx.save();
 
@@ -3576,13 +3578,21 @@ window.MojiQDrawingRenderer = (function() {
     /**
      * 削除ボタンの位置を取得
      * @param {{x: number, y: number, width: number, height: number}} bounds - オブジェクトの境界
+     * @param {number} [canvasWidth] - キャンバスの幅（省略時は自動取得）
+     * @param {number} [canvasHeight] - キャンバスの高さ（省略時は自動取得）
      * @returns {{x: number, y: number, size: number}} 削除ボタンの位置とサイズ
      */
-    function getDeleteButtonPosition(bounds) {
+    function getDeleteButtonPosition(bounds, canvasWidth, canvasHeight) {
+        const size = DELETE_BUTTON_SIZE;
+
+        // デフォルト位置（右下）
+        let btnX = bounds.x + bounds.width + DELETE_BUTTON_OFFSET;
+        let btnY = bounds.y + bounds.height + DELETE_BUTTON_OFFSET;
+
         return {
-            x: bounds.x + bounds.width + DELETE_BUTTON_OFFSET,
-            y: bounds.y + bounds.height + DELETE_BUTTON_OFFSET,
-            size: DELETE_BUTTON_SIZE
+            x: btnX,
+            y: btnY,
+            size: size
         };
     }
 

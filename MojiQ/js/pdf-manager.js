@@ -1421,6 +1421,9 @@ window.MojiQPdfManager = (function() {
             renderPage(1);
             enableHeaderButtons();
 
+            // ファイル読み込み完了イベントを発行
+            window.dispatchEvent(new CustomEvent('mojiq:file-loaded'));
+
             // 描画を追加して読み込みモードの場合、描画データを読み込む
             if (window._pendingDrawingImport) {
                 window._pendingDrawingImport = false;
@@ -1702,6 +1705,9 @@ window.MojiQPdfManager = (function() {
 
             renderPage(1);
             enableHeaderButtons();
+
+            // ファイル読み込み完了イベントを発行
+            window.dispatchEvent(new CustomEvent('mojiq:file-loaded'));
 
             // 描画を追加して読み込みモードの場合、描画データを読み込む
             if (window._pendingDrawingImport) {
@@ -3163,6 +3169,9 @@ window.MojiQPdfManager = (function() {
             renderPage(startPage);
             enableHeaderButtons();
 
+            // ファイル読み込み完了イベントを発行
+            window.dispatchEvent(new CustomEvent('mojiq:file-loaded'));
+
             // 描画を追加して読み込みモードの場合、描画データを読み込む
             if (window._pendingDrawingImport) {
                 window._pendingDrawingImport = false;
@@ -3314,6 +3323,9 @@ window.MojiQPdfManager = (function() {
 
             // ヘッダーボタンを有効化
             enableHeaderButtons();
+
+            // ファイル読み込み完了イベントを発行
+            window.dispatchEvent(new CustomEvent('mojiq:file-loaded'));
 
             // ナビゲーションを更新
             if (window.MojiQPageManager) {

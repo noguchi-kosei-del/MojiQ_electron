@@ -29,7 +29,45 @@ npm run start        # 開発用起動
 - **指示入れモード**: PDF/画像に校正指示を書き込む
 - **校正チェックモード**: 校正チェックリストを表示・管理
 
-## 最近の変更 (2026-03-12)
+## 最近の変更 (2026-03-13)
+
+### 新機能: Ctrl+方向キーでオブジェクト移動
+- オブジェクトを選択した状態でCtrl+方向キーで5px単位の移動が可能
+- 環境設定のショートカットからキー割り当てを変更可能
+- 関連ファイル: `MojiQ/js/drawing-select.js`, `MojiQ/js/shortcuts.js`, `MojiQ/js/settings.js`
+
+### 新機能: PDFコメントアイコンのオブジェクト化
+- PDFコメントをアイコン+テキストの`pdfComment`オブジェクトとして表示
+- アイコンをクリックするとテキストの表示/非表示を切り替え可能
+- アイコン上でカーソルがポインターに変化（クリック可能を示す）
+- 関連ファイル: `MojiQ/js/pdf-annotation-loader.js`, `MojiQ/js/drawing-renderer.js`, `MojiQ/js/drawing-select.js`
+
+### 改善: 校正チェックモードのカテゴリヘッダーチェックボックス
+- カテゴリヘッダーのチェックボックスをオンにすると、カテゴリ内の全項目にチェックが入る
+- 全項目チェック時はタブに「済」マークが表示される
+
+### 改善: 済スタンプの色統一
+- 済スタンプは赤色（#ff0000）固定で配置
+- オブジェクト選択後のカラーパレットでの色変更は引き続き可能
+- コメントタブの確認済みチェック時の済スタンプも赤色に統一
+
+### バグ修正: PDF再読み込み時のリセット
+- PDFを再読み込みした際に正誤・提案・コメントが正しくリセットされない問題を修正
+- `mojiq:file-loaded`カスタムイベントを追加し、ファイル読み込み完了時にリセット処理を実行
+
+### 関連ファイル
+- `MojiQ/js/drawing-select.js` - オブジェクト移動機能、pdfCommentクリック処理
+- `MojiQ/js/drawing-renderer.js` - pdfComment描画、hitTestPdfCommentIcon追加
+- `MojiQ/js/pdf-annotation-loader.js` - pdfCommentオブジェクト生成
+- `MojiQ/js/shortcuts.js` - オブジェクト移動ショートカット
+- `MojiQ/js/settings.js` - 移動ショートカット設定追加
+- `MojiQ/js/drawing.js` - 済スタンプ赤色固定
+- `MojiQ/js/ui/proofreading-panel.js` - カテゴリチェック同期、済スタンプ赤色、リセット処理
+- `MojiQ/js/pdf-manager.js` - mojiq:file-loadedイベント発行
+
+---
+
+## 過去の変更 (2026-03-12)
 
 ### バージョン更新
 - バージョンを2.0.7から2.0.8に更新

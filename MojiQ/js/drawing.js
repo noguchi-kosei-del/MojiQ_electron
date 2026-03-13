@@ -712,12 +712,11 @@ window.MojiQDrawing = (function() {
 
         // 済スタンプモードの処理（クリックで即座にスタンプを配置）
         if (state.currentMode === 'doneStamp') {
-            const style = getCurrentDrawingStyle();
             const stampSize = Constants ? Constants.STAMP_SIZES.DONE : 28;
             saveObjectToPage({
                 type: 'doneStamp',
                 startPos: { x: pos.x, y: pos.y },
-                color: style.color,
+                color: '#ff0000',  // 済スタンプは赤色固定
                 size: stampSize
             });
             if (saveHistoryCallback) saveHistoryCallback();

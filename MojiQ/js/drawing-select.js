@@ -2166,6 +2166,98 @@ window.MojiQDrawingSelect = (function() {
     }
 
     /**
+     * 選択中のオブジェクトを指定量だけ移動
+     * @param {number} dx - X方向の移動量
+     * @param {number} dy - Y方向の移動量
+     * @returns {boolean} 移動に成功した場合true
+     */
+    function moveSelectedByDelta(dx, dy) {
+        if (!DrawingObjects) return false;
+
+        const pageNum = DrawingObjects.getCurrentPage();
+        const selectedIndices = DrawingObjects.getSelectedIndices(pageNum);
+
+        if (selectedIndices.length === 0) return false;
+
+        const objects = DrawingObjects.getPageObjects(pageNum);
+
+        // 元の状態を保存（Undo用）
+        const originalStates = {};
+        for (const idx of selectedIndices) {
+            if (idx >= 0 && idx < objects.length) {
+                originalStates[idx] = MojiQClone.deep(objects[idx]);
+            }
+        }
+
+        // 移動を適用
+        for (const idx of selectedIndices) {
+            if (idx >= 0 && idx < objects.length) {
+                const obj = objects[idx];
+                const orig = originalStates[idx];
+
+                // 位置を更新
+                if (obj.startPos) {
+                    obj.startPos = { x: obj.startPos.x + dx, y: obj.startPos.y + dy };
+                }
+                if (obj.endPos) {
+                    obj.endPos = { x: obj.endPos.x + dx, y: obj.endPos.y + dy };
+                }
+                if (obj.points) {
+                    obj.points = obj.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+                }
+
+                // 引出線の処理
+                if (obj.leaderLine) {
+                    const leaderLineTypes = ['toruStamp', 'torutsumeStamp', 'torumamaStamp', 'zenkakuakiStamp', 'nibunakiStamp', 'shibunakiStamp', 'kaigyouStamp', 'fontLabel', 'text', 'labeledRect'];
+                    if (leaderLineTypes.includes(obj.type)) {
+                        // 起点は固定、終端を自動計算
+                        const DrawingModes = window.MojiQDrawingModes;
+                        const leaderStart = obj.leaderLine.start;
+                        let newEnd = { x: obj.leaderLine.end.x + dx, y: obj.leaderLine.end.y + dy };
+                        if (obj.type === 'labeledRect') {
+                            newEnd = getLabeledRectLeaderEndPos(obj, leaderStart);
+                        } else if (DrawingModes && DrawingModes.getStampLeaderEndPos) {
+                            newEnd = DrawingModes.getStampLeaderEndPos(obj, leaderStart);
+                        }
+                        obj.leaderLine = { start: leaderStart, end: newEnd };
+                    } else {
+                        // 引出線全体を移動
+                        obj.leaderLine = {
+                            start: { x: obj.leaderLine.start.x + dx, y: obj.leaderLine.start.y + dy },
+                            end: { x: obj.leaderLine.end.x + dx, y: obj.leaderLine.end.y + dy }
+                        };
+                    }
+                }
+
+                // アノテーション位置も移動
+                if (obj.annotation) {
+                    obj.annotation = recalculateAnnotationLeaderLine(obj, orig.annotation, dx, dy);
+                }
+
+                // fontLabelのテキスト位置も移動
+                if (obj.textX !== undefined && obj.textY !== undefined) {
+                    obj.textX = obj.textX + dx;
+                    obj.textY = obj.textY + dy;
+                }
+            }
+        }
+
+        // Undo状態を保存
+        for (const idx of selectedIndices) {
+            if (originalStates[idx] && idx >= 0 && idx < objects.length) {
+                DrawingObjects.saveUndoState(pageNum, 'update', {
+                    old: originalStates[idx],
+                    new: MojiQClone.deep(objects[idx])
+                });
+            }
+        }
+
+        // 再描画
+        if (redrawCallback) redrawCallback();
+        return true;
+    }
+
+    /**
      * 選択状態かどうか
      */
     function hasSelection() {
@@ -2265,6 +2357,7 @@ window.MojiQDrawingSelect = (function() {
         setSelectedColor: setSelectedColor,
         setSelectedLineWidth: setSelectedLineWidth,
         hasSelection: hasSelection,
+        moveSelectedByDelta: moveSelectedByDelta,
         isOperating: isOperating,
         isMarqueeSelecting: isMarqueeSelecting,
         getMarqueeRect: getMarqueeRect,
