@@ -781,6 +781,19 @@ body.dark-mode .save-pdf-dropdown .checkbox-item input[type="checkbox"]:checked 
     background-color: #66bb6a;
 }
 
+/* 圧縮保存チェックボックス（オレンジ色 - ダークモード） */
+body.dark-mode .save-pdf-dropdown .checkbox-item.compress-save .checkbox-icon {
+    border-color: #ff9800;
+}
+
+body.dark-mode .save-pdf-dropdown .checkbox-item.compress-save input[type="checkbox"]:checked + .checkbox-icon {
+    background-color: #ff9800;
+}
+
+body.dark-mode .save-pdf-dropdown .checkbox-item.compress-save:hover {
+    background-color: rgba(255, 152, 0, 0.15);
+}
+
 /* 読み込んで描画を追加（緑色 - ダークモード） */
 body.dark-mode .pdf-upload-dropdown .page-edit-dropdown-item.drawing-import {
     color: #66bb6a;

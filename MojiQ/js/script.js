@@ -1551,16 +1551,31 @@ window.addEventListener('load', () => {
         return checkbox ? checkbox.checked : false;
     };
 
+    // 圧縮保存チェックボックスの状態をグローバルに公開
+    window.isCompressSaveEnabled = () => {
+        const checkbox = document.getElementById('compressSaveCheck');
+        return checkbox ? checkbox.checked : false;
+    };
+
     if (savePdfBtn && savePdfDropdown) {
         const overwriteSaveBtn = document.getElementById('overwriteSaveBtn');
         const saveAsNewBtn = document.getElementById('saveAsNewBtn');
         const exportDrawingCheck = document.getElementById('exportDrawingCheck');
+        const compressSaveCheck = document.getElementById('compressSaveCheck');
 
         // 保存されたチェックボックスの状態を復元
         if (exportDrawingCheck) {
             const savedState = localStorage.getItem('mojiq_export_drawing_enabled');
             if (savedState === 'true') {
                 exportDrawingCheck.checked = true;
+            }
+        }
+
+        // 圧縮保存チェックボックスの状態を復元
+        if (compressSaveCheck) {
+            const savedState = localStorage.getItem('mojiq_compress_save_enabled');
+            if (savedState === 'true') {
+                compressSaveCheck.checked = true;
             }
         }
 
@@ -1621,6 +1636,16 @@ window.addEventListener('load', () => {
             });
             exportDrawingCheck.addEventListener('change', () => {
                 localStorage.setItem('mojiq_export_drawing_enabled', exportDrawingCheck.checked ? 'true' : 'false');
+            });
+        }
+
+        // 圧縮保存チェックボックスのイベントリスナー
+        if (compressSaveCheck) {
+            compressSaveCheck.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+            compressSaveCheck.addEventListener('change', () => {
+                localStorage.setItem('mojiq_compress_save_enabled', compressSaveCheck.checked ? 'true' : 'false');
             });
         }
 

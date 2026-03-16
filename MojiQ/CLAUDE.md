@@ -31,6 +31,14 @@ npm run start        # 開発用起動
 
 ## 最近の変更 (2026-03-16)
 
+### 新機能: PDF圧縮保存
+- PDF保存ドロップダウンに「圧縮保存（25MB以下）」チェックボックスを追加
+- チェック時は各ページをJPEGでラスタライズして25MB以下に圧縮
+- 画質最優先のアルゴリズム: 高品質(0.95)・高解像度(2.5x)から開始し、必要に応じて段階的に調整
+- チェック状態はlocalStorageに保存
+- 25MB以下にできない場合は警告ダイアログを表示
+- 関連ファイル: `MojiQ/index.html`, `MojiQ/css/navigation.css`, `MojiQ/css/dark-mode.css`, `MojiQ/js/script.js`, `MojiQ/js/pdf-lib-saver.js`, `MojiQ/js/pdf-manager.js`
+
 ### バグ修正: 重大バグリスク調査・修正
 - 見開きモードの座標変換修正（splitFromSpreadPage）: 逆スケール（1/scale）を正しく適用
 - Promise.raceタイムアウト後のリソースリーク修正: 画像読み込みキャンセル処理を追加

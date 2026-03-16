@@ -616,6 +616,19 @@ input[type="range"]#pageSlider::-webkit-slider-thumb {
     margin-bottom: 2px;
 }
 
+/* 圧縮保存チェックボックス（オレンジ色） */
+.save-pdf-dropdown .checkbox-item.compress-save .checkbox-icon {
+    border-color: #e65100;
+}
+
+.save-pdf-dropdown .checkbox-item.compress-save input[type="checkbox"]:checked + .checkbox-icon {
+    background-color: #e65100;
+}
+
+.save-pdf-dropdown .checkbox-item.compress-save:hover {
+    background-color: #fff3e0;
+}
+
 /* 読み込んで描画を追加（緑色） */
 .pdf-upload-dropdown .page-edit-dropdown-item.drawing-import {
     color: #2e7d32;

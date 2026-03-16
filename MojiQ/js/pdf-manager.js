@@ -1868,7 +1868,8 @@ window.MojiQPdfManager = (function() {
                     if (showProgress) {
                         updateLoadingProgress(percent, 100, '%');
                     }
-                }
+                },
+                compressMode: window.isCompressSaveEnabled && window.isCompressSaveEnabled()
             };
 
             // 見開きモード時は見開き状態で保存
@@ -1884,6 +1885,11 @@ window.MojiQPdfManager = (function() {
 
             if (!result.success) {
                 throw new Error(result.error || 'PDF保存に失敗しました');
+            }
+
+            // 圧縮警告がある場合は表示
+            if (result.compressWarning) {
+                MojiQModal.showAlert(result.compressWarning, '圧縮結果');
             }
 
             const pdfBytes = result.data;
@@ -2055,7 +2061,8 @@ window.MojiQPdfManager = (function() {
                     if (showProgress) {
                         updateLoadingProgress(percent, 100, '%');
                     }
-                }
+                },
+                compressMode: window.isCompressSaveEnabled && window.isCompressSaveEnabled()
             };
 
             // 見開きモード時は見開き状態で保存
@@ -2071,6 +2078,11 @@ window.MojiQPdfManager = (function() {
 
             if (!result.success) {
                 throw new Error(result.error || 'PDF保存に失敗しました');
+            }
+
+            // 圧縮警告がある場合は表示
+            if (result.compressWarning) {
+                MojiQModal.showAlert(result.compressWarning, '圧縮結果');
             }
 
             const pdfBytes = result.data;

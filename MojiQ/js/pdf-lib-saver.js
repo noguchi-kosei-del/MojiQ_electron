@@ -58,6 +58,57 @@ window.MojiQPdfLibSaver = (function() {
     }
 
     /**
+     * CanvasをJPEG Blobに変換（圧縮用、タイムアウト・エラーハンドリング付き）
+     * @param {HTMLCanvasElement} canvas - 変換するCanvas
+     * @param {number} quality - JPEG品質 (0.0-1.0)
+     * @param {number} timeout - タイムアウト時間（ミリ秒、デフォルト30秒）
+     * @returns {Promise<{data: Uint8Array|null, timedOut: boolean}>} - JPEG画像データとタイムアウトフラグ
+     */
+    function canvasToJpegWithTimeout(canvas, quality = 0.75, timeout = 30000) {
+        return new Promise((resolve) => {
+            const timeoutId = setTimeout(() => {
+                console.warn('canvasToJpegWithTimeout: toBlob timeout');
+                resolve({ data: null, timedOut: true });
+            }, timeout);
+
+            try {
+                canvas.toBlob((blob) => {
+                    clearTimeout(timeoutId);
+                    if (!blob) {
+                        resolve({ data: null, timedOut: false });
+                        return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        resolve({ data: new Uint8Array(reader.result), timedOut: false });
+                    };
+                    reader.onerror = () => {
+                        console.warn('canvasToJpegWithTimeout: FileReader error');
+                        resolve({ data: null, timedOut: false });
+                    };
+                    reader.readAsArrayBuffer(blob);
+                }, 'image/jpeg', quality);
+            } catch (e) {
+                clearTimeout(timeoutId);
+                console.warn('canvasToJpegWithTimeout: toBlob exception', e);
+                resolve({ data: null, timedOut: false });
+            }
+        });
+    }
+
+    /**
+     * 圧縮保存用の設定（画質最優先）
+     */
+    const COMPRESS_SETTINGS = {
+        TARGET_SIZE_MB: 25,
+        INITIAL_QUALITY: 0.95,   // ほぼ最高品質から開始
+        MIN_QUALITY: 0.65,       // 最低品質（高めに維持）
+        QUALITY_STEP: 0.02,      // 非常に細かいステップで調整
+        INITIAL_SCALE: 2.5,      // 高解像度から開始
+        MIN_SCALE: 1.5           // 最低スケール（文字の鮮明さを維持）
+    };
+
+    /**
      * キャンバスの最大メモリサイズ（ピクセル数）
      * 約200MB相当 (RGBA 4バイト/ピクセル)
      */
@@ -387,7 +438,8 @@ window.MojiQPdfLibSaver = (function() {
      * @param {object} options.imagePageData - 画像ページデータ（MojiQPdfManagerから渡される）
      * @param {boolean} options.spreadMode - 見開きモードで保存するかどうか
      * @param {Array} options.spreadMapping - 見開きマッピング配列
-     * @returns {Promise<{success: boolean, data?: Uint8Array, error?: string}>}
+     * @param {boolean} options.compressMode - 圧縮保存モード（25MB以下に圧縮）
+     * @returns {Promise<{success: boolean, data?: Uint8Array, error?: string, compressed?: boolean, compressWarning?: string}>}
      */
     async function saveNonDestructive(state, fileName, options = {}) {
         if (!state.pdfDocs || state.pdfDocs.length === 0) {
@@ -400,6 +452,12 @@ window.MojiQPdfLibSaver = (function() {
         const imagePageData = options.imagePageData || (window.MojiQPdfManager && window.MojiQPdfManager.getImagePageData ? window.MojiQPdfManager.getImagePageData() : {});
         const spreadMode = options.spreadMode || false;
         const spreadMapping = options.spreadMapping || [];
+        const compressMode = options.compressMode || false;
+
+        // 圧縮モードの場合は圧縮保存関数を使用
+        if (compressMode) {
+            return await saveWithCompression(state, fileName, options);
+        }
 
         // 見開きモードの場合は別の保存ロジックを使用
         if (spreadMode && spreadMapping.length > 0) {
@@ -668,6 +726,293 @@ window.MojiQPdfLibSaver = (function() {
         } catch (error) {
             console.error('PDF保存エラー:', error);
             return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * 圧縮保存（25MB以下になるまで段階的に圧縮、画質維持優先）
+     * 各ページをCanvas経由でJPEGにラスタライズして圧縮する
+     * @param {object} state - アプリケーション状態
+     * @param {string} fileName - ファイル名
+     * @param {object} options - オプション
+     * @returns {Promise<{success: boolean, data?: Uint8Array, error?: string, compressed?: boolean, compressWarning?: string}>}
+     */
+    async function saveWithCompression(state, fileName, options = {}) {
+        const onProgress = options.onProgress || (() => {});
+        const targetSizeBytes = COMPRESS_SETTINGS.TARGET_SIZE_MB * 1024 * 1024;
+        const imagePageData = options.imagePageData || (window.MojiQPdfManager && window.MojiQPdfManager.getImagePageData ? window.MojiQPdfManager.getImagePageData() : {});
+
+        try {
+            onProgress(5);
+
+            // ステップ1: 高品質でまずサイズを確認
+            let pdfBytes = await createCompressedPdf(state, fileName, {
+                quality: COMPRESS_SETTINGS.INITIAL_QUALITY,
+                scale: COMPRESS_SETTINGS.INITIAL_SCALE,
+                imagePageData,
+                onProgress: (p) => onProgress(5 + p * 0.2)
+            });
+
+            if (!pdfBytes) {
+                return { success: false, error: '圧縮PDF生成に失敗しました' };
+            }
+
+            let currentSizeMB = pdfBytes.length / (1024 * 1024);
+            console.log(`初期サイズ: ${currentSizeMB.toFixed(2)}MB (quality=${COMPRESS_SETTINGS.INITIAL_QUALITY}, scale=${COMPRESS_SETTINGS.INITIAL_SCALE})`);
+
+            // すでにターゲット以下なら完了
+            if (pdfBytes.length <= targetSizeBytes) {
+                onProgress(100);
+                return { success: true, data: pdfBytes, compressed: true };
+            }
+
+            // ステップ2: 必要な圧縮率を計算して最適なパラメータを推定
+            const compressionRatio = targetSizeBytes / pdfBytes.length;
+
+            // 圧縮率から適切な品質を推定（JPEGの品質とサイズは概ね比例）
+            // ただし、スケールも考慮（スケール^2がサイズに影響）
+            let estimatedQuality = Math.max(
+                COMPRESS_SETTINGS.MIN_QUALITY,
+                Math.min(COMPRESS_SETTINGS.INITIAL_QUALITY, COMPRESS_SETTINGS.INITIAL_QUALITY * Math.sqrt(compressionRatio) * 1.1)
+            );
+            let scale = COMPRESS_SETTINGS.INITIAL_SCALE;
+
+            // 圧縮率が厳しい場合（50%以下）はスケールも下げる
+            if (compressionRatio < 0.5) {
+                scale = Math.max(COMPRESS_SETTINGS.MIN_SCALE, COMPRESS_SETTINGS.INITIAL_SCALE * Math.sqrt(compressionRatio) * 1.2);
+            }
+
+            console.log(`推定パラメータ: quality=${estimatedQuality.toFixed(2)}, scale=${scale.toFixed(2)} (圧縮率=${(compressionRatio * 100).toFixed(1)}%)`);
+
+            // ステップ3: 推定パラメータで生成
+            onProgress(30);
+            pdfBytes = await createCompressedPdf(state, fileName, {
+                quality: estimatedQuality,
+                scale,
+                imagePageData,
+                onProgress: (p) => onProgress(30 + p * 0.3)
+            });
+
+            if (!pdfBytes) {
+                return { success: false, error: '圧縮PDF生成に失敗しました' };
+            }
+
+            currentSizeMB = pdfBytes.length / (1024 * 1024);
+            console.log(`推定後サイズ: ${currentSizeMB.toFixed(2)}MB`);
+
+            // ターゲット以下なら完了
+            if (pdfBytes.length <= targetSizeBytes) {
+                onProgress(100);
+                return { success: true, data: pdfBytes, compressed: true };
+            }
+
+            // ステップ4: まだ大きい場合は段階的に品質を下げる
+            let quality = estimatedQuality;
+            let bestBytes = pdfBytes;
+            let attempts = 0;
+            const maxAttempts = 8;
+
+            while (attempts < maxAttempts && pdfBytes.length > targetSizeBytes) {
+                attempts++;
+
+                // 品質を下げる
+                quality -= COMPRESS_SETTINGS.QUALITY_STEP;
+
+                // 品質が最低に達したらスケールも下げる
+                if (quality < COMPRESS_SETTINGS.MIN_QUALITY) {
+                    quality = COMPRESS_SETTINGS.MIN_QUALITY + 0.1;
+                    scale = Math.max(COMPRESS_SETTINGS.MIN_SCALE, scale - 0.2);
+                    if (scale <= COMPRESS_SETTINGS.MIN_SCALE && quality <= COMPRESS_SETTINGS.MIN_QUALITY) {
+                        break;
+                    }
+                }
+
+                onProgress(60 + attempts * 4);
+
+                pdfBytes = await createCompressedPdf(state, fileName, {
+                    quality,
+                    scale,
+                    imagePageData,
+                    onProgress: () => {}
+                });
+
+                if (!pdfBytes) continue;
+
+                currentSizeMB = pdfBytes.length / (1024 * 1024);
+                console.log(`調整 ${attempts}: quality=${quality.toFixed(2)}, scale=${scale.toFixed(2)}, size=${currentSizeMB.toFixed(2)}MB`);
+
+                bestBytes = pdfBytes;
+
+                if (pdfBytes.length <= targetSizeBytes) {
+                    onProgress(100);
+                    return { success: true, data: pdfBytes, compressed: true };
+                }
+            }
+
+            // ターゲット未達でも最小サイズ版を返す
+            onProgress(100);
+            const finalSizeMB = bestBytes.length / (1024 * 1024);
+            return {
+                success: true,
+                data: bestBytes,
+                compressed: true,
+                compressWarning: `圧縮後のファイルサイズは ${finalSizeMB.toFixed(1)}MB です。25MB以下にできませんでした。`
+            };
+
+        } catch (error) {
+            console.error('圧縮保存エラー:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * 圧縮用PDFを生成（各ページをCanvas経由でJPEGにラスタライズ）
+     * @param {object} state - アプリケーション状態
+     * @param {string} fileName - ファイル名
+     * @param {object} options - オプション
+     * @returns {Promise<Uint8Array|null>}
+     */
+    async function createCompressedPdf(state, fileName, options = {}) {
+        const quality = options.quality || COMPRESS_SETTINGS.INITIAL_QUALITY;
+        const scale = options.scale || COMPRESS_SETTINGS.INITIAL_SCALE;
+        const imagePageData = options.imagePageData || {};
+        const onProgress = options.onProgress || (() => {});
+
+        try {
+            const pdfDoc = await PDFDocument.create();
+
+            for (let i = 0; i < state.totalPages; i++) {
+                const mapItem = state.pageMapping[i];
+                if (!mapItem) continue;
+
+                const pageNum = i + 1;
+                onProgress(Math.round((pageNum / state.totalPages) * 90));
+
+                // UIをブロックしないため次フレームまで待機
+                await new Promise(resolve => setTimeout(resolve, 0));
+
+                let pageWidth, pageHeight;
+                let canvas, ctx;
+
+                if (mapItem.docIndex === -2) {
+                    // 画像ページ
+                    const imgData = imagePageData[mapItem.imageIndex];
+                    if (!imgData || !imgData.data) continue;
+
+                    pageWidth = imgData.width;
+                    pageHeight = imgData.height;
+
+                    // 画像をCanvasに描画してJPEG化
+                    canvas = document.createElement('canvas');
+                    canvas.width = pageWidth * scale;
+                    canvas.height = pageHeight * scale;
+                    ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    // 画像データをImageに変換
+                    const img = new Image();
+                    await new Promise((resolve, reject) => {
+                        img.onload = resolve;
+                        img.onerror = reject;
+                        if (typeof imgData.data === 'string') {
+                            img.src = imgData.data;
+                        } else {
+                            const blob = new Blob([imgData.data], { type: imgData.type === 'png' ? 'image/png' : 'image/jpeg' });
+                            img.src = URL.createObjectURL(blob);
+                        }
+                    });
+
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                } else if (mapItem.docIndex === -1) {
+                    // 白紙ページ
+                    pageWidth = mapItem.width || 595;
+                    pageHeight = mapItem.height || 842;
+
+                    canvas = document.createElement('canvas');
+                    canvas.width = pageWidth * scale;
+                    canvas.height = pageHeight * scale;
+                    ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                } else {
+                    // PDFページ
+                    const targetDoc = state.pdfDocs[mapItem.docIndex];
+                    const pdfPage = await targetDoc.getPage(mapItem.pageNum);
+                    const viewport = pdfPage.getViewport({ scale: 1 });
+                    pageWidth = viewport.width;
+                    pageHeight = viewport.height;
+
+                    canvas = document.createElement('canvas');
+                    canvas.width = pageWidth * scale;
+                    canvas.height = pageHeight * scale;
+                    ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    const scaledViewport = pdfPage.getViewport({ scale: scale });
+                    await pdfPage.render({
+                        canvasContext: ctx,
+                        viewport: scaledViewport
+                    }).promise;
+                }
+
+                // 描画オブジェクトを重ねる
+                const displayWidth = mapItem.displayWidth || pageWidth;
+                const displayHeight = mapItem.displayHeight || pageHeight;
+
+                if (window.MojiQDrawingObjects && window.MojiQDrawingRenderer) {
+                    const pageObjects = window.MojiQDrawingObjects.getPageObjects(pageNum);
+                    if (pageObjects && pageObjects.length > 0) {
+                        const scaleX = (pageWidth * scale) / displayWidth;
+                        const scaleY = (pageHeight * scale) / displayHeight;
+
+                        ctx.save();
+                        ctx.scale(scaleX, scaleY);
+                        for (const obj of pageObjects) {
+                            window.MojiQDrawingRenderer.renderObject(ctx, obj);
+                        }
+                        ctx.restore();
+                    }
+                }
+
+                // CanvasをJPEGに変換
+                const jpegResult = await canvasToJpegWithTimeout(canvas, quality);
+                canvas.width = 0;
+                canvas.height = 0;
+
+                if (!jpegResult || !jpegResult.data) {
+                    console.error('JPEG変換に失敗しました（ページ:', pageNum, '）');
+                    continue;
+                }
+
+                // PDFにJPEG画像として追加
+                const page = pdfDoc.addPage([pageWidth, pageHeight]);
+                const jpgImage = await pdfDoc.embedJpg(jpegResult.data);
+                page.drawImage(jpgImage, {
+                    x: 0,
+                    y: 0,
+                    width: pageWidth,
+                    height: pageHeight,
+                });
+            }
+
+            // メタデータを設定
+            pdfDoc.setTitle(fileName);
+            pdfDoc.setCreator('MojiQ');
+            pdfDoc.setProducer('MojiQ PDF-Lib Saver (Compressed)');
+
+            onProgress(95);
+            const pdfBytes = await pdfDoc.save({ useObjectStreams: false });
+            onProgress(100);
+
+            return pdfBytes;
+
+        } catch (error) {
+            console.error('圧縮PDF生成エラー:', error);
+            return null;
         }
     }
 
