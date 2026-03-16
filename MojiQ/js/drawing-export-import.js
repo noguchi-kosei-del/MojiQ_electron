@@ -203,6 +203,12 @@ const DrawingExportImport = {
             const savedSize = savedPageSizes[pageNum];
 
             if (savedSize && (savedSize.width !== currentSize.width || savedSize.height !== currentSize.height)) {
+                // 0除算防止: savedSize.width/heightが0または負の場合はスケーリングをスキップ
+                if (!savedSize.width || savedSize.width <= 0 || !savedSize.height || savedSize.height <= 0) {
+                    console.warn('[MojiQ DrawingExportImport] 無効な保存サイズを検出:', savedSize);
+                    scaledData[pageNum] = objects;
+                    continue;
+                }
                 const scaleX = currentSize.width / savedSize.width;
                 const scaleY = currentSize.height / savedSize.height;
 

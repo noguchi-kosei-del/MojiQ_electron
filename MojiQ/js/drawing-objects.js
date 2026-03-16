@@ -1409,30 +1409,30 @@ window.MojiQDrawingObjects = (function() {
 
                 if (isLeftPage && leftPageNum !== null) {
                     // 左ページに追加
-                    // スケーリングを適用（見開き座標系→単ページ座標系）
+                    // スケーリングを適用（見開き座標系→単ページ座標系：逆スケール）
                     if (scaleInfo && (scaleInfo.leftScaleX !== 1 || scaleInfo.leftScaleY !== 1)) {
-                        this._scaleObject(clonedObj, scaleInfo.leftScaleX, scaleInfo.leftScaleY);
+                        this._scaleObject(clonedObj, 1 / scaleInfo.leftScaleX, 1 / scaleInfo.leftScaleY);
                     }
                     state.pageObjects[leftPageNum].objects.push(clonedObj);
                 } else if (!isLeftPage && rightPageNum !== null) {
-                    // 右ページに追加（X座標からrightOffsetを引いてからスケーリング）
+                    // 右ページに追加（X座標からrightOffsetを引いてから逆スケーリング）
                     this._offsetObjectX(clonedObj, -rightOffset);
-                    // スケーリングを適用（見開き座標系→単ページ座標系）
+                    // スケーリングを適用（見開き座標系→単ページ座標系：逆スケール）
                     if (scaleInfo && (scaleInfo.rightScaleX !== 1 || scaleInfo.rightScaleY !== 1)) {
-                        this._scaleObject(clonedObj, scaleInfo.rightScaleX, scaleInfo.rightScaleY);
+                        this._scaleObject(clonedObj, 1 / scaleInfo.rightScaleX, 1 / scaleInfo.rightScaleY);
                     }
                     state.pageObjects[rightPageNum].objects.push(clonedObj);
                 } else if (isLeftPage && leftPageNum === null && rightPageNum !== null) {
                     // フォールバック: 左ページがnullの場合は右ページに追加
                     this._offsetObjectX(clonedObj, -rightOffset);
                     if (scaleInfo && (scaleInfo.rightScaleX !== 1 || scaleInfo.rightScaleY !== 1)) {
-                        this._scaleObject(clonedObj, scaleInfo.rightScaleX, scaleInfo.rightScaleY);
+                        this._scaleObject(clonedObj, 1 / scaleInfo.rightScaleX, 1 / scaleInfo.rightScaleY);
                     }
                     state.pageObjects[rightPageNum].objects.push(clonedObj);
                 } else if (!isLeftPage && rightPageNum === null && leftPageNum !== null) {
                     // フォールバック: 右ページがnullの場合は左ページに追加
                     if (scaleInfo && (scaleInfo.leftScaleX !== 1 || scaleInfo.leftScaleY !== 1)) {
-                        this._scaleObject(clonedObj, scaleInfo.leftScaleX, scaleInfo.leftScaleY);
+                        this._scaleObject(clonedObj, 1 / scaleInfo.leftScaleX, 1 / scaleInfo.leftScaleY);
                     }
                     state.pageObjects[leftPageNum].objects.push(clonedObj);
                 }

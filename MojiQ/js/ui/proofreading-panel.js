@@ -10,6 +10,9 @@
 const ProofreadingPanel = (() => {
     'use strict';
 
+    // 初期化済みフラグ（イベントリスナー多重登録防止）
+    let isInitialized = false;
+
     // DOM要素キャッシュ
     let panel, panelToggle, colorSwatches, customColorSwatch, eyedropperBtn, colorPicker, rainbowPicker;
     let lineWidthInput, lineWidthSlider;
@@ -32,6 +35,11 @@ const ProofreadingPanel = (() => {
      * 初期化
      */
     function init() {
+        // 多重初期化を防止
+        if (isInitialized) {
+            return;
+        }
+        isInitialized = true;
         panel = document.getElementById('proofreadingPanel');
         if (!panel) return;
 
@@ -518,10 +526,9 @@ const ProofreadingPanel = (() => {
             return;
         }
 
-        // 新しいデータ読み込み時は確認済み状態のみリセット（コメントは維持）
+        // 新しいデータ読み込み時は正誤・提案の確認済み状態のみリセット
+        // コメントの確認済み状態は維持（PDFコメントは校正チェックJSONとは独立）
         checkedItems.clear();
-        // コメントの確認済み状態もリセット
-        resetCheckedComments();
 
         // 全アイテムを収集
         const allItems = [];
@@ -1648,7 +1655,7 @@ const ProofreadingPanel = (() => {
      */
     function getCommentTypeLabel(type) {
         const labels = {
-            'Text': 'テキスト',
+            'Text': 'コメント',
             'FreeText': 'フリーテキスト',
             'Highlight': 'ハイライト',
             'Underline': '下線',

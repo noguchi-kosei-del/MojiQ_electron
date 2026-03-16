@@ -220,6 +220,10 @@ window.MojiQDrawingSelect = (function() {
         // 既に選択中のオブジェクトがある場合（単一選択モードでの操作）
         if (!isMultiSelect && selectedIndex !== null && selectedIndex >= 0) {
             const selectedObj = DrawingObjects.getSelectedObject(pageNum);
+            // nullチェック: getSelectedObject が null を返す場合は処理をスキップ
+            if (!selectedObj) {
+                return false;
+            }
             const bounds = DrawingRenderer.getBounds(selectedObj);
 
             // ダブルクリックでテキストオブジェクトの場合は編集モードへ
@@ -238,8 +242,9 @@ window.MojiQDrawingSelect = (function() {
                 return true;
             }
 
-            // 削除ボタンのヒットテスト（最優先）
-            if (DrawingRenderer.hitTestDeleteButton && DrawingRenderer.hitTestDeleteButton(pos, selectedObj)) {
+            // 削除ボタンのヒットテスト（単一選択時のみ）
+            // 複数選択時は後続のmultiSelectDeleteButton処理で一括削除する
+            if (selectedIndices.length <= 1 && DrawingRenderer.hitTestDeleteButton && DrawingRenderer.hitTestDeleteButton(pos, selectedObj)) {
                 // オブジェクトを削除
                 DrawingObjects.removeObject(pageNum, selectedIndex);
                 if (redrawCallback) redrawCallback();

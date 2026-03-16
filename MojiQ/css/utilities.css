@@ -1,0 +1,403 @@
+/* ========================================= */
+/* utilities.css - 共通ユーティリティクラス */
+/* スクロールバー、ドロップダウン、ボタン等 */
+/* ========================================= */
+
+/* =========================== */
+/* スクロールバー共通スタイル */
+/* =========================== */
+
+.scrollbar-styled {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.scrollbar-styled::-webkit-scrollbar {
+    width: var(--scrollbar-width);
+    height: var(--scrollbar-width);
+}
+
+.scrollbar-styled::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+    border-radius: var(--radius-sm);
+}
+
+.scrollbar-styled::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: var(--radius-sm);
+}
+
+.scrollbar-styled::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+}
+
+.scrollbar-styled::-webkit-scrollbar-corner {
+    background: var(--scrollbar-track);
+}
+
+/* 太めのスクロールバー */
+.scrollbar-styled-lg {
+    scrollbar-width: auto;
+}
+
+.scrollbar-styled-lg::-webkit-scrollbar {
+    width: var(--scrollbar-width-lg);
+    height: var(--scrollbar-width-lg);
+}
+
+/* =========================== */
+/* ドロップダウン共通パターン */
+/* =========================== */
+
+.dropdown-base {
+    position: absolute;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    z-index: var(--z-dropdown);
+    background: var(--bg-dropdown);
+    border: 1px solid var(--border-color-light);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    transition:
+        opacity var(--transition-medium),
+        transform var(--transition-medium),
+        visibility 0s linear 0.2s;
+}
+
+.dropdown-base.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition:
+        opacity var(--transition-medium),
+        transform var(--transition-medium);
+}
+
+/* 横展開ドロップダウン（左方向） */
+.dropdown-horizontal-left {
+    right: 100%;
+    top: 0;
+    margin-right: 8px;
+    transform: translateX(20px);
+}
+
+.dropdown-horizontal-left.open {
+    transform: translateX(0);
+}
+
+/* 横展開ドロップダウン（右方向） */
+.dropdown-horizontal-right {
+    left: 100%;
+    top: 0;
+    margin-left: 8px;
+    transform: translateX(-20px);
+}
+
+.dropdown-horizontal-right.open {
+    transform: translateX(0);
+}
+
+/* 下方向ドロップダウン */
+.dropdown-vertical-down {
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    transform: translateY(-10px);
+}
+
+.dropdown-vertical-down.open {
+    transform: translateY(0);
+}
+
+/* =========================== */
+/* トグルボタン共通パターン */
+/* =========================== */
+
+.toggle-btn-base {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: bold;
+    background: var(--bg-button);
+    border: 2px solid;
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.toggle-btn-base:focus {
+    outline: none;
+}
+
+.toggle-btn-base .toggle-arrow {
+    font-size: 10px;
+    transition: transform var(--transition-medium);
+}
+
+.toggle-btn-base.open .toggle-arrow {
+    transform: rotate(180deg);
+}
+
+/* 校正赤テーマ */
+.toggle-btn-proofreading {
+    color: var(--color-proofreading-800);
+    border-color: var(--color-proofreading-200);
+}
+
+.toggle-btn-proofreading:hover {
+    background: var(--color-proofreading-50);
+    border-color: var(--color-proofreading-300);
+}
+
+.toggle-btn-proofreading.active,
+.toggle-btn-proofreading.open {
+    border-color: var(--color-proofreading-800);
+}
+
+/* 青テーマ */
+.toggle-btn-primary {
+    color: var(--color-primary-800);
+    border-color: var(--color-primary-200);
+}
+
+.toggle-btn-primary:hover {
+    background: var(--color-primary-50);
+    border-color: var(--color-primary-300);
+}
+
+.toggle-btn-primary.active,
+.toggle-btn-primary.open {
+    border-color: var(--color-primary-800);
+}
+
+/* グレーテーマ */
+.toggle-btn-gray {
+    color: var(--color-gray-550);
+    border-color: var(--color-gray-200);
+}
+
+.toggle-btn-gray:hover {
+    background: var(--color-gray-25);
+    border-color: var(--color-gray-350);
+}
+
+.toggle-btn-gray.active,
+.toggle-btn-gray.open {
+    background: var(--color-gray-25);
+    border-color: var(--color-gray-500);
+}
+
+/* =========================== */
+/* スタンプボタン共通パターン */
+/* =========================== */
+
+.stamp-btn-base {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 4px;
+    font-size: 11px;
+    font-weight: 400;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+    box-sizing: border-box;
+    background: var(--bg-button);
+    border: 2px solid;
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.stamp-btn-base:focus {
+    outline: none;
+}
+
+/* 校正赤テーマ */
+.stamp-btn-proofreading {
+    color: var(--color-proofreading-800);
+    border-color: var(--color-proofreading-200);
+    background: #ffffff;
+}
+
+.stamp-btn-proofreading:hover {
+    background: var(--color-proofreading-50);
+    border-color: var(--color-proofreading-300);
+}
+
+.stamp-btn-proofreading.active {
+    border-color: var(--color-proofreading-800);
+    box-shadow: 0 0 0 2px rgba(198, 40, 40, 0.3);
+}
+
+/* 青テーマ */
+.stamp-btn-primary {
+    color: var(--color-primary-800);
+    border-color: var(--color-primary-200);
+    background: #ffffff;
+}
+
+.stamp-btn-primary:hover {
+    background: var(--color-primary-50);
+    border-color: var(--color-primary-300);
+}
+
+.stamp-btn-primary.active {
+    border-color: var(--color-primary-800);
+    box-shadow: 0 0 0 2px rgba(21, 101, 192, 0.3);
+}
+
+/* =========================== */
+/* 状態ユーティリティ */
+/* =========================== */
+
+.state-disabled {
+    opacity: var(--opacity-disabled) !important;
+    pointer-events: none !important;
+    cursor: not-allowed !important;
+}
+
+.state-locked {
+    opacity: 0.3 !important;
+    pointer-events: none !important;
+    cursor: not-allowed !important;
+    filter: grayscale(100%) !important;
+}
+
+.state-hidden {
+    display: none !important;
+}
+
+.state-invisible {
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* =========================== */
+/* フレックスユーティリティ */
+/* =========================== */
+
+.flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.flex-between {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.flex-column {
+    display: flex;
+    flex-direction: column;
+}
+
+.flex-1 {
+    flex: 1;
+}
+
+.flex-shrink-0 {
+    flex-shrink: 0;
+}
+
+/* =========================== */
+/* テキストユーティリティ */
+/* =========================== */
+
+.text-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-left {
+    text-align: left;
+}
+
+.text-right {
+    text-align: right;
+}
+
+/* =========================== */
+/* アイコンボタン共通 */
+/* =========================== */
+
+.icon-btn-base {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.icon-btn-base:hover {
+    background: var(--bg-button-hover);
+}
+
+.icon-btn-base:active {
+    background: var(--bg-button-active);
+}
+
+.icon-btn-base:focus {
+    outline: none;
+}
+
+.icon-btn-base:disabled {
+    opacity: var(--opacity-disabled);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* =========================== */
+/* セパレーター */
+/* =========================== */
+
+.separator-horizontal {
+    height: 1px;
+    background: var(--border-color);
+    margin: 8px 0;
+}
+
+.separator-vertical {
+    width: 1px;
+    background: var(--border-color);
+    margin: 0 8px;
+    align-self: stretch;
+}
+
+/* 両端が繋がらないセパレーター */
+.separator-inset {
+    position: relative;
+    height: 1px;
+    margin: 8px 12px;
+}
+
+.separator-inset::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(
+        to right,
+        transparent,
+        var(--border-color) 10%,
+        var(--border-color) 90%,
+        transparent
+    );
+}

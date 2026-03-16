@@ -481,17 +481,6 @@ window.MojiQModeController = (function() {
         if (mode === 'text') textBtn.classList.add('active');
         if (mode === 'image') imgInsertBtn.classList.add('active');
         if (mode === 'eraser') eraserBtn.classList.add('active');
-        if (mode === 'doneStamp') doneStampBtn.classList.add('active');
-        if (mode === 'rubyStamp') rubyStampBtn.classList.add('active');
-        if (mode === 'toruStamp' && toruStampBtn) toruStampBtn.classList.add('active');
-        if (mode === 'torutsumeStamp' && torutsumeStampBtn) torutsumeStampBtn.classList.add('active');
-        if (mode === 'torumamaStamp' && torumamaStampBtn) torumamaStampBtn.classList.add('active');
-        if (mode === 'zenkakuakiStamp' && zenkakuakiStampBtn) zenkakuakiStampBtn.classList.add('active');
-        if (mode === 'nibunakiStamp' && nibunakiStampBtn) nibunakiStampBtn.classList.add('active');
-        if (mode === 'shibunakiStamp' && shibunakiStampBtn) shibunakiStampBtn.classList.add('active');
-        if (mode === 'kaigyouStamp' && kaigyouStampBtn) kaigyouStampBtn.classList.add('active');
-        if (mode === 'tojiruStamp' && tojiruStampBtn) tojiruStampBtn.classList.add('active');
-        if (mode === 'hirakuStamp' && hirakuStampBtn) hirakuStampBtn.classList.add('active');
 
         // スポイトモードのアクティブ状態を更新
         if (window.MojiQCanvasContext) {
@@ -517,6 +506,20 @@ window.MojiQModeController = (function() {
 
         state.interactionState = 0;
         deactivateStamps();
+
+        // スタンプボタンのactive状態は deactivateStamps() の後に設定
+        // （deactivateStamps が全 .stamp-btn から active を削除するため）
+        if (mode === 'doneStamp' && doneStampBtn) doneStampBtn.classList.add('active');
+        if (mode === 'rubyStamp' && rubyStampBtn) rubyStampBtn.classList.add('active');
+        if (mode === 'toruStamp' && toruStampBtn) toruStampBtn.classList.add('active');
+        if (mode === 'torutsumeStamp' && torutsumeStampBtn) torutsumeStampBtn.classList.add('active');
+        if (mode === 'torumamaStamp' && torumamaStampBtn) torumamaStampBtn.classList.add('active');
+        if (mode === 'zenkakuakiStamp' && zenkakuakiStampBtn) zenkakuakiStampBtn.classList.add('active');
+        if (mode === 'nibunakiStamp' && nibunakiStampBtn) nibunakiStampBtn.classList.add('active');
+        if (mode === 'shibunakiStamp' && shibunakiStampBtn) shibunakiStampBtn.classList.add('active');
+        if (mode === 'kaigyouStamp' && kaigyouStampBtn) kaigyouStampBtn.classList.add('active');
+        if (mode === 'tojiruStamp' && tojiruStampBtn) tojiruStampBtn.classList.add('active');
+        if (mode === 'hirakuStamp' && hirakuStampBtn) hirakuStampBtn.classList.add('active');
 
         MojiQCanvasContext.initContext();
 

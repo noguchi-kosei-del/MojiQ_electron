@@ -109,12 +109,19 @@ window.MojiQPageManager = (function() {
         const currentOperationId = ++undoRedoOperationId;
 
         let timeoutId = null;
+        let img = null;
+        let isTimedOut = false;
         try {
             // タイムアウト付きで画像読み込み（5秒でタイムアウト）
             await Promise.race([
                 new Promise((resolve, reject) => {
-                    const img = new Image();
+                    img = new Image();
                     img.onload = () => {
+                        // タイムアウト済みの場合は処理をスキップ
+                        if (isTimedOut) {
+                            resolve();
+                            return;
+                        }
                         // タイムアウトタイマーをクリア
                         if (timeoutId) clearTimeout(timeoutId);
                         // 新しい操作が開始されていた場合は描画をスキップ
@@ -131,6 +138,10 @@ window.MojiQPageManager = (function() {
                         resolve();
                     };
                     img.onerror = (err) => {
+                        if (isTimedOut) {
+                            resolve();
+                            return;
+                        }
                         if (timeoutId) clearTimeout(timeoutId);
                         console.warn('Undo image load failed:', err);
                         reject(new Error('Undo画像の読み込みに失敗しました'));
@@ -138,7 +149,16 @@ window.MojiQPageManager = (function() {
                     img.src = prevData;
                 }),
                 new Promise((_, reject) => {
-                    timeoutId = setTimeout(() => reject(new Error('Undo処理がタイムアウトしました')), 5000);
+                    timeoutId = setTimeout(() => {
+                        isTimedOut = true;
+                        // 画像読み込みをキャンセル
+                        if (img) {
+                            img.onload = null;
+                            img.onerror = null;
+                            img.src = '';
+                        }
+                        reject(new Error('Undo処理がタイムアウトしました'));
+                    }, 5000);
                 })
             ]).catch((err) => {
                 console.error('Undo処理中にエラーが発生:', err);
@@ -189,12 +209,19 @@ window.MojiQPageManager = (function() {
         const currentOperationId = ++undoRedoOperationId;
 
         let timeoutId = null;
+        let img = null;
+        let isTimedOut = false;
         try {
             // タイムアウト付きで画像読み込み（5秒でタイムアウト）
             await Promise.race([
                 new Promise((resolve, reject) => {
-                    const img = new Image();
+                    img = new Image();
                     img.onload = () => {
+                        // タイムアウト済みの場合は処理をスキップ
+                        if (isTimedOut) {
+                            resolve();
+                            return;
+                        }
                         // タイムアウトタイマーをクリア
                         if (timeoutId) clearTimeout(timeoutId);
                         // 新しい操作が開始されていた場合は描画をスキップ
@@ -211,6 +238,10 @@ window.MojiQPageManager = (function() {
                         resolve();
                     };
                     img.onerror = (err) => {
+                        if (isTimedOut) {
+                            resolve();
+                            return;
+                        }
                         if (timeoutId) clearTimeout(timeoutId);
                         console.warn('Redo image load failed:', err);
                         reject(new Error('Redo画像の読み込みに失敗しました'));
@@ -218,7 +249,16 @@ window.MojiQPageManager = (function() {
                     img.src = popped;
                 }),
                 new Promise((_, reject) => {
-                    timeoutId = setTimeout(() => reject(new Error('Redo処理がタイムアウトしました')), 5000);
+                    timeoutId = setTimeout(() => {
+                        isTimedOut = true;
+                        // 画像読み込みをキャンセル
+                        if (img) {
+                            img.onload = null;
+                            img.onerror = null;
+                            img.src = '';
+                        }
+                        reject(new Error('Redo処理がタイムアウトしました'));
+                    }, 5000);
                 })
             ]).catch((err) => {
                 console.error('Redo処理中にエラーが発生:', err);

@@ -1,0 +1,212 @@
+/* ========================================= */
+/* variables.css - CSS変数定義 */
+/* 色、サイズ、トランジションの一元管理 */
+/* ========================================= */
+
+:root {
+    /* =========================== */
+    /* カラーパレット */
+    /* =========================== */
+
+    /* プライマリカラー（青系） */
+    --color-primary-900: #0d47a1;
+    --color-primary-800: #1565c0;
+    --color-primary-700: #1976d2;
+    --color-primary-600: #1e88e5;
+    --color-primary-500: #2196f3;
+    --color-primary-400: #42a5f5;
+    --color-primary-300: #64b5f6;
+    --color-primary-200: #90caf9;
+    --color-primary-100: #bbdefb;
+    --color-primary-50: #e3f2fd;
+
+    /* 校正赤（アクセントカラー） */
+    --color-proofreading-900: #b71c1c;
+    --color-proofreading-800: #c62828;
+    --color-proofreading-700: #d32f2f;
+    --color-proofreading-600: #e53935;
+    --color-proofreading-500: #f44336;
+    --color-proofreading-400: #ef5350;
+    --color-proofreading-300: #e57373;
+    --color-proofreading-200: #ef9a9a;
+    --color-proofreading-100: #ffcdd2;
+    --color-proofreading-50: #ffebee;
+
+    /* 成功・完了（緑系） */
+    --color-success-800: #2e7d32;
+    --color-success-700: #388e3c;
+    --color-success-600: #43a047;
+    --color-success-500: #4caf50;
+    --color-success-400: #66bb6a;
+    --color-success-300: #81c784;
+    --color-success-200: #a5d6a7;
+    --color-success-100: #c8e6c9;
+    --color-success-50: #e8f5e9;
+
+    /* 警告（黄系） */
+    --color-warning-800: #f57f17;
+    --color-warning-700: #f9a825;
+    --color-warning-600: #fbc02d;
+    --color-warning-500: #ffeb3b;
+    --color-warning-400: #ffee58;
+    --color-warning-300: #fff176;
+    --color-warning-200: #fff59d;
+    --color-warning-100: #fff9c4;
+    --color-warning-50: #fffde7;
+
+    /* オレンジ */
+    --color-orange-800: #e65100;
+    --color-orange-700: #ef6c00;
+    --color-orange-600: #f57c00;
+    --color-orange-500: #ff9800;
+    --color-orange-400: #ffa726;
+    --color-orange-300: #ffb74d;
+
+    /* グレースケール */
+    --color-gray-950: #0a0a0a;
+    --color-gray-900: #1a1a1a;
+    --color-gray-850: #222222;
+    --color-gray-800: #252525;
+    --color-gray-750: #2a2a2a;
+    --color-gray-700: #333333;
+    --color-gray-650: #3a3a3a;
+    --color-gray-600: #444444;
+    --color-gray-550: #555555;
+    --color-gray-500: #666666;
+    --color-gray-450: #777777;
+    --color-gray-400: #888888;
+    --color-gray-350: #999999;
+    --color-gray-300: #aaaaaa;
+    --color-gray-250: #bbbbbb;
+    --color-gray-200: #cccccc;
+    --color-gray-150: #dddddd;
+    --color-gray-100: #e0e0e0;
+    --color-gray-75: #e8e8e8;
+    --color-gray-50: #f0f0f0;
+    --color-gray-25: #f5f5f5;
+    --color-gray-10: #f8f8f8;
+    --color-gray-0: #fafafa;
+
+    /* =========================== */
+    /* Border Radius */
+    /* =========================== */
+    --radius-xs: 2px;
+    --radius-sm: 3px;
+    --radius-md: 4px;
+    --radius-lg: 6px;
+    --radius-xl: 8px;
+    --radius-2xl: 12px;
+    --radius-3xl: 16px;
+    --radius-full: 9999px;
+
+    /* =========================== */
+    /* トランジション */
+    /* =========================== */
+    --transition-fast: 0.1s ease;
+    --transition-normal: 0.15s ease;
+    --transition-medium: 0.2s ease;
+    --transition-slow: 0.3s ease;
+    --transition-slower: 0.5s ease;
+
+    /* =========================== */
+    /* シャドウ */
+    /* =========================== */
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.1);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 6px 24px rgba(0, 0, 0, 0.2);
+    --shadow-xl: 0 10px 40px rgba(0, 0, 0, 0.25);
+
+    /* =========================== */
+    /* スクロールバー */
+    /* =========================== */
+    --scrollbar-width: 6px;
+    --scrollbar-width-lg: 8px;
+    --scrollbar-track: var(--color-gray-100);
+    --scrollbar-thumb: var(--color-gray-300);
+    --scrollbar-thumb-hover: var(--color-gray-400);
+
+    /* =========================== */
+    /* セマンティックカラー（ライトモード） */
+    /* =========================== */
+
+    /* 背景色 */
+    --bg-body: var(--color-gray-50);
+    --bg-sidebar: #ffffff;
+    --bg-header: var(--color-gray-50);
+    --bg-modal: #ffffff;
+    --bg-dropdown: #ffffff;
+    --bg-input: #ffffff;
+    --bg-button: var(--color-gray-10);
+    --bg-button-hover: var(--color-gray-75);
+    --bg-button-active: var(--color-gray-100);
+    --bg-active: var(--color-primary-50);
+    --bg-canvas: var(--color-gray-200);
+
+    /* ボーダー色 */
+    --border-color: var(--color-gray-200);
+    --border-color-light: var(--color-gray-150);
+    --border-color-dark: var(--color-gray-400);
+    --border-color-focus: var(--color-primary-500);
+
+    /* テキスト色 */
+    --text-primary: var(--color-gray-700);
+    --text-secondary: var(--color-gray-550);
+    --text-muted: var(--color-gray-400);
+    --text-disabled: var(--color-gray-350);
+    --text-inverse: #ffffff;
+
+    /* =========================== */
+    /* 状態 */
+    /* =========================== */
+    --opacity-disabled: 0.4;
+    --opacity-muted: 0.5;
+    --opacity-hover: 0.8;
+
+    /* =========================== */
+    /* z-index レイヤー */
+    /* =========================== */
+    --z-dropdown: 100;
+    --z-modal-backdrop: 900;
+    --z-modal: 1000;
+    --z-tooltip: 1100;
+    --z-toast: 1200;
+}
+
+/* ========================================= */
+/* ダークモード - 変数オーバーライド */
+/* ========================================= */
+body.dark-mode {
+    /* 背景色 */
+    --bg-body: var(--color-gray-900);
+    --bg-sidebar: var(--color-gray-800);
+    --bg-header: #1e1e1e;
+    --bg-modal: var(--color-gray-750);
+    --bg-dropdown: var(--color-gray-750);
+    --bg-input: var(--color-gray-700);
+    --bg-button: var(--color-gray-700);
+    --bg-button-hover: var(--color-gray-650);
+    --bg-button-active: var(--color-gray-600);
+    --bg-active: #1a3a5c;
+    --bg-canvas: var(--color-gray-800);
+
+    /* ボーダー色 */
+    --border-color: var(--color-gray-600);
+    --border-color-light: var(--color-gray-650);
+    --border-color-dark: var(--color-gray-550);
+
+    /* テキスト色 */
+    --text-primary: var(--color-gray-150);
+    --text-secondary: var(--color-gray-300);
+    --text-muted: var(--color-gray-400);
+    --text-disabled: var(--color-gray-500);
+
+    /* スクロールバー */
+    --scrollbar-track: var(--color-gray-700);
+    --scrollbar-thumb: var(--color-gray-500);
+    --scrollbar-thumb-hover: var(--color-gray-400);
+
+    /* シャドウ */
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 6px 24px rgba(0, 0, 0, 0.5);
+}

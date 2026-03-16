@@ -47,6 +47,11 @@ window._MojiQPdfCache = (function() {
      */
     PageRenderLRUCache.prototype.set = function(key, value) {
         if (this._map.has(key)) {
+            // 既存エントリのImageBitmapを解放してから削除
+            var existing = this._map.get(key);
+            if (existing && existing.bitmap && typeof existing.bitmap.close === 'function') {
+                existing.bitmap.close();
+            }
             this._map.delete(key);
         }
         this._map.set(key, value);

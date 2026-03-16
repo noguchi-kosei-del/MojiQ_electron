@@ -5,18 +5,18 @@
 /* --- ヘッダー & タブ --- */
 .app-mode-switcher {
     height: 40px;
-    background: #f0f0f0;
+    background: var(--bg-header);
     display: flex;
     align-items: center;
     padding: 0 0 0 15px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    box-shadow: var(--shadow-sm);
     z-index: 9999;
     flex-shrink: 0;
     position: relative;
 }
 
 .app-mode-switcher .logo {
-    color: #333;
+    color: var(--text-primary);
     font-weight: bold;
     margin-right: 8px;
     font-size: 16px;
@@ -31,14 +31,14 @@
     height: 18px;
     width: 18px;
     display: block;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
 }
 
 /* ヘッダー区切り線 */
 .header-divider {
     width: 1px;
     height: 20px;
-    background-color: #ccc;
+    background-color: var(--border-color);
     margin: 0 8px;
 }
 
@@ -71,10 +71,10 @@
 .custom-menu-bar .menu-label {
     padding: 4px 10px;
     font-size: 13px;
-    color: #333;
+    color: var(--text-primary);
     cursor: pointer;
-    border-radius: 4px;
-    transition: background-color 0.15s;
+    border-radius: var(--radius-md);
+    transition: background-color var(--transition-normal);
 }
 
 .custom-menu-bar .menu-label:hover,
@@ -87,14 +87,14 @@
     top: 100%;
     left: 0;
     min-width: 200px;
-    background: #fff;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background: var(--bg-dropdown);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
     opacity: 0;
     visibility: hidden;
     transform: translateY(-5px);
-    transition: opacity 0.15s, transform 0.15s, visibility 0s linear 0.15s;
+    transition: opacity var(--transition-normal), transform var(--transition-normal), visibility 0s linear 0.15s;
     z-index: 10000;
 }
 
@@ -102,27 +102,27 @@
     opacity: 1;
     visibility: visible;
     transform: translateY(0);
-    transition: opacity 0.15s, transform 0.15s;
+    transition: opacity var(--transition-normal), transform var(--transition-normal);
 }
 
 .custom-menu-bar .menu-dropdown-item {
     padding: 8px 12px;
     font-size: 13px;
-    color: #333;
+    color: var(--text-primary);
     cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    transition: background-color 0.1s;
+    transition: background-color var(--transition-fast);
 }
 
 .custom-menu-bar .menu-dropdown-item:hover {
-    background-color: #e8e8e8;
+    background-color: var(--bg-button-hover);
 }
 
 /* disabled状態のメニュー項目 */
 .custom-menu-bar .menu-dropdown-item.disabled {
-    color: #999;
+    color: var(--text-muted);
     pointer-events: none;
     cursor: not-allowed;
 }
@@ -132,26 +132,26 @@
 }
 
 .custom-menu-bar .menu-dropdown-item.disabled .shortcut {
-    color: #bbb;
+    color: var(--color-gray-250);
 }
 
 .custom-menu-bar .menu-dropdown-item:first-child {
-    border-radius: 4px 4px 0 0;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
 .custom-menu-bar .menu-dropdown-item:last-child {
-    border-radius: 0 0 4px 4px;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
 
 .custom-menu-bar .menu-dropdown-item .shortcut {
     font-size: 11px;
-    color: #888;
+    color: var(--color-gray-400);
     margin-left: 20px;
 }
 
 .custom-menu-bar .menu-dropdown-divider {
     height: 1px;
-    background: #ddd;
+    background: var(--border-color-light);
     margin: 4px 0;
 }
 
@@ -178,22 +178,22 @@
 .window-control-btn {
     width: 28px;
     height: 20px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-color);
     border-top: none;
     border-right: none;
     background: transparent !important;
-    color: #333;
+    color: var(--text-primary);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background-color 0.1s;
+    transition: background-color var(--transition-fast);
     outline: none;
 }
 
 .window-control-btn.close-btn {
     width: 36px;
-    border-right: 1px solid #ccc;
+    border-right: 1px solid var(--border-color);
 }
 
 .window-control-btn:hover,
@@ -230,7 +230,7 @@ body.electron-app .app-mode-switcher {
 
 /* PDFファイル名表示 */
 .pdf-filename {
-    color: #666;
+    color: var(--color-gray-500);
     font-size: 16px;
     white-space: nowrap;
     overflow: hidden;
@@ -240,11 +240,11 @@ body.electron-app .app-mode-switcher {
     left: 50%;
     transform: translateX(-50%);
     padding: 4px 12px;
-    border-radius: 6px;
+    border-radius: var(--radius-lg);
 }
 
 .pdf-filename:not(:empty) {
-    background-color: #e0e0e0;
+    background-color: var(--color-gray-100);
 }
 
 /* モードタブ */
@@ -259,13 +259,13 @@ body.electron-app .app-mode-switcher {
     background: #37474f;
     color: #b0bec5;
     border: none;
-    border-radius: 8px 8px 0 0;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     padding: 0 16px;
     font-size: 12px;
     cursor: pointer;
     height: 32px;
     margin-bottom: 0;
-    transition: all 0.2s;
+    transition: all var(--transition-medium);
     font-weight: bold;
     display: flex;
     align-items: center;
@@ -275,11 +275,11 @@ body.electron-app .app-mode-switcher {
 
 .mode-tab:hover {
     background: #455a64;
-    color: #fff;
+    color: var(--text-inverse);
 }
 
 .mode-tab.active {
-    background: #f0f0f0;
+    background: var(--bg-header);
     color: #263238;
     height: 36px;
 }
@@ -334,11 +334,11 @@ label.header-icon-btn {
     padding: 0;
     margin: 0;
     border: none;
-    border-radius: 5px;
+    border-radius: var(--radius-md);
     background: transparent !important;
     cursor: pointer;
     box-sizing: border-box;
-    transition: background 0.2s;
+    transition: background var(--transition-medium);
     outline: none;
     flex-shrink: 0;
 }
@@ -363,24 +363,24 @@ label.header-icon-btn:focus-visible {
 label.header-icon-btn svg {
     width: 19px;
     height: 19px;
-    stroke: #333;
-    transition: stroke 0.2s;
+    stroke: var(--text-primary);
+    transition: stroke var(--transition-medium);
 }
 
 .header-icon-btn:hover svg,
 label.header-icon-btn:hover svg {
-    stroke: #1976d2;
+    stroke: var(--color-primary-700);
 }
 
 .header-icon-btn:hover svg circle,
 .header-icon-btn:hover svg path,
 label.header-icon-btn:hover svg circle,
 label.header-icon-btn:hover svg path {
-    stroke: #1976d2;
+    stroke: var(--color-primary-700);
 }
 
 #workspaceFlipBtn:hover {
-    color: #1976d2;
+    color: var(--color-primary-700);
 }
 
 /* ページ編集ドロップダウン専用スタイル */
@@ -397,10 +397,10 @@ label.header-icon-btn:hover svg path {
 .binding-option .binding-check {
     position: absolute;
     right: 12px;
-    color: #1976d2;
+    color: var(--color-primary-700);
     font-size: 14px;
     opacity: 0;
-    transition: opacity 0.15s;
+    transition: opacity var(--transition-normal);
 }
 
 .binding-option.selected .binding-check {
@@ -417,7 +417,7 @@ label.header-icon-btn.pdf-required.locked {
 
 .header-icon-btn.pdf-required.locked svg,
 label.header-icon-btn.pdf-required.locked svg {
-    stroke: #999;
+    stroke: var(--text-muted);
 }
 
 /* メニュー展開時のグレーロック状態 */
@@ -434,7 +434,7 @@ label.header-icon-btn.menu-lockable.menu-locked,
 .header-icon-btn.menu-lockable.menu-locked svg,
 button.header-icon-btn.menu-lockable.menu-locked svg,
 label.header-icon-btn.menu-lockable.menu-locked svg {
-    stroke: #999;
+    stroke: var(--text-muted);
 }
 
 /* disabled状態のボタン（元に戻す/やり直し/全消去など） */
@@ -447,7 +447,7 @@ button.header-icon-btn:disabled {
 
 .header-icon-btn:disabled svg,
 button.header-icon-btn:disabled svg {
-    stroke: #999;
+    stroke: var(--text-muted);
 }
 
 /* --- ヘッダーズームコントロール --- */
@@ -468,10 +468,10 @@ button.header-icon-btn:disabled svg {
     padding: 0;
     margin: 0;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--radius-md);
     background: transparent;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background var(--transition-normal);
 }
 
 .header-zoom-btn:hover {
@@ -485,17 +485,17 @@ button.header-icon-btn:disabled svg {
 .header-zoom-btn svg {
     width: 18px;
     height: 18px;
-    stroke: #555;
-    transition: stroke 0.15s;
+    stroke: var(--text-secondary);
+    transition: stroke var(--transition-normal);
 }
 
 .header-zoom-btn:hover svg {
-    stroke: #333;
+    stroke: var(--text-primary);
 }
 
 .header-zoom-label {
     font-size: 13px;
-    color: #333;
+    color: var(--text-primary);
     min-width: 42px;
     text-align: center;
     user-select: none;
@@ -509,7 +509,7 @@ button.header-icon-btn:disabled svg {
 }
 
 .header-zoom-btn:disabled svg {
-    stroke: #999;
+    stroke: var(--text-muted);
 }
 
 .header-zoom-control.pdf-required[disabled] {
@@ -518,7 +518,7 @@ button.header-icon-btn:disabled svg {
 }
 
 .header-zoom-control.pdf-required[disabled] .header-zoom-label {
-    color: #999;
+    color: var(--text-muted);
 }
 
 /* メニュー展開時のロック状態 */
@@ -532,11 +532,11 @@ button.header-icon-btn:disabled svg {
 }
 
 .header-zoom-control.menu-lockable.menu-locked .header-zoom-label {
-    color: #999;
+    color: var(--text-muted);
 }
 
 .header-zoom-btn.menu-lockable.menu-locked svg {
-    stroke: #999;
+    stroke: var(--text-muted);
 }
 
 

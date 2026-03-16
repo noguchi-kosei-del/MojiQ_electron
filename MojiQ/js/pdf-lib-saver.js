@@ -217,12 +217,38 @@ window.MojiQPdfLibSaver = (function() {
             // spreadObjectsには左右両方のオブジェクトが含まれている
             // X座標がleftPageWidth以下なら左ページ、それ以上なら右ページ
             leftObjects = spreadObjects.filter(obj => {
-                const objX = obj.x || (obj.points && obj.points[0] ? obj.points[0].x : 0);
-                return objX < leftPageWidth;
+                // オブジェクトの中心X座標を計算（より正確な左右判定）
+                let objX = null;
+                if (obj.startPos && obj.endPos) {
+                    // 矩形系オブジェクト
+                    objX = (obj.startPos.x + obj.endPos.x) / 2;
+                } else if (obj.bounds) {
+                    // テキスト系オブジェクト
+                    objX = obj.bounds.x + (obj.bounds.width || 0) / 2;
+                } else if (obj.x !== undefined) {
+                    objX = obj.x;
+                } else if (obj.points && obj.points.length > 0) {
+                    // ペン・ポリライン系オブジェクト（点の平均X座標）
+                    const sumX = obj.points.reduce((sum, p) => sum + (p.x || 0), 0);
+                    objX = sumX / obj.points.length;
+                }
+                // objXが取得できない場合は左ページとして扱う（フォールバック）
+                return objX === null || objX < leftPageWidth;
             });
             rightObjects = spreadObjects.filter(obj => {
-                const objX = obj.x || (obj.points && obj.points[0] ? obj.points[0].x : 0);
-                return objX >= leftPageWidth;
+                let objX = null;
+                if (obj.startPos && obj.endPos) {
+                    objX = (obj.startPos.x + obj.endPos.x) / 2;
+                } else if (obj.bounds) {
+                    objX = obj.bounds.x + (obj.bounds.width || 0) / 2;
+                } else if (obj.x !== undefined) {
+                    objX = obj.x;
+                } else if (obj.points && obj.points.length > 0) {
+                    const sumX = obj.points.reduce((sum, p) => sum + (p.x || 0), 0);
+                    objX = sumX / obj.points.length;
+                }
+                // objXが有効で、leftPageWidth以上なら右ページ
+                return objX !== null && objX >= leftPageWidth;
             });
         } else {
             // フォールバック: 元のページ番号から直接取得

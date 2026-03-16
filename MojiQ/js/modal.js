@@ -288,23 +288,22 @@ window.MojiQModal = (function() {
     function closeTextModal() {
         textModal.style.display = 'none';
 
-        // アノテーション編集モードの場合はキャンセル
-        if (editingAnnotationObject) {
-            editingAnnotationObject = null;
-            editingAnnotationIndex = null;
-            editingAnnotationId = null;
-            editingAnnotationPageNum = null;
-            // キャンセル時も再描画（選択状態をリフレッシュ）
-            if (window.MojiQDrawing) {
-                MojiQDrawing.redrawCanvas();
-            }
-        }
-        // テキスト編集モードの場合はキャンセル
-        else if (editingTextObject) {
-            editingTextObject = null;
-            editingTextIndex = null;
-            editingTextId = null;
-            editingPageNum = null;
+        // 編集状態をすべてクリア（競合防止のため両方をクリア）
+        const needsRedraw = editingAnnotationObject || editingTextObject;
+
+        // アノテーション編集状態をクリア
+        editingAnnotationObject = null;
+        editingAnnotationIndex = null;
+        editingAnnotationId = null;
+        editingAnnotationPageNum = null;
+
+        // テキスト編集状態をクリア
+        editingTextObject = null;
+        editingTextIndex = null;
+        editingTextId = null;
+        editingPageNum = null;
+
+        if (needsRedraw) {
             // キャンセル時も再描画（選択状態をリフレッシュ）
             if (window.MojiQDrawing) {
                 MojiQDrawing.redrawCanvas();

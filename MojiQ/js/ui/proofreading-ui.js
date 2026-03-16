@@ -6,6 +6,9 @@
 window.MojiQProofreadingUI = (function() {
     'use strict';
 
+    // 初期化済みフラグ（イベントリスナー多重登録防止）
+    let isInitialized = false;
+
     /**
      * パネルを閉じるべきかどうかを判定（設定に基づく）
      * @returns {boolean} true: 閉じる, false: 展開を維持
@@ -15,6 +18,11 @@ window.MojiQProofreadingUI = (function() {
     }
 
     function init() {
+        // 多重初期化を防止
+        if (isInitialized) {
+            return;
+        }
+        isInitialized = true;
         const proofreadingInstructionToggleBtn = document.getElementById('proofreadingInstructionToggleBtn');
         const proofreadingInstructionDropdown = document.querySelector('.proofreading-instruction-dropdown');
         const proofreadingInstructionArea = document.getElementById('proofreading-instruction-area');

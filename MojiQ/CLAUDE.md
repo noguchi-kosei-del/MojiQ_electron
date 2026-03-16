@@ -29,7 +29,44 @@ npm run start        # 開発用起動
 - **指示入れモード**: PDF/画像に校正指示を書き込む
 - **校正チェックモード**: 校正チェックリストを表示・管理
 
-## 最近の変更 (2026-03-13)
+## 最近の変更 (2026-03-16)
+
+### バグ修正: 重大バグリスク調査・修正
+- 見開きモードの座標変換修正（splitFromSpreadPage）: 逆スケール（1/scale）を正しく適用
+- Promise.raceタイムアウト後のリソースリーク修正: 画像読み込みキャンセル処理を追加
+- イベントリスナー多重登録防止: proofreading-ui.js, proofreading-panel.jsに初期化フラグ追加
+- モード切替時のスタンプボタン状態修正: deactivateStamps()後にactive状態を設定
+- ImageBitmapキャッシュ更新時のメモリリーク修正: 既存エントリのclose()を確実に呼び出し
+- モーダル編集状態の競合修正: テキスト・アノテーション両方の状態をクリア
+- localStorage保存の例外処理追加: QuotaExceededError等のエラーをキャッチ
+- 描画JSONインポート時のゼロ除算防止: 無効なサイズデータをスキップ
+
+### バグ修正: 複数オブジェクト選択削除
+- 複数オブジェクトを選択して削除ボタンを押しても1つしか削除されない問題を修正
+- 単一オブジェクト削除判定に`selectedIndices.length <= 1`条件を追加
+
+### UI改善: コメントタブラベル変更
+- 校正チェックモードのコメントタブの項目タグ「テキスト」→「コメント」に変更
+
+### 改善: 校正チェックJSON読み込み時の確認済み状態維持
+- コメントの確認済み状態を維持したままJSONを読み込めるよう変更
+- 正誤・提案の確認済み状態のみリセット
+
+### 関連ファイル
+- `MojiQ/js/drawing-objects.js` - 座標変換修正
+- `MojiQ/js/page-manager.js` - Promise.raceリソースリーク修正
+- `MojiQ/js/ui/proofreading-ui.js` - 初期化フラグ追加
+- `MojiQ/js/ui/proofreading-panel.js` - 初期化フラグ、ラベル変更、JSON読み込み修正
+- `MojiQ/js/mode-controller.js` - スタンプボタン状態修正
+- `MojiQ/js/pdf/pdf-cache.js` - ImageBitmapリーク修正
+- `MojiQ/js/modal.js` - 編集状態競合修正
+- `MojiQ/js/settings.js` - localStorage例外処理
+- `MojiQ/js/drawing-export-import.js` - ゼロ除算防止
+- `MojiQ/js/drawing-select.js` - 複数オブジェクト削除修正
+
+---
+
+## 過去の変更 (2026-03-13)
 
 ### 新機能: Ctrl+方向キーでオブジェクト移動
 - オブジェクトを選択した状態でCtrl+方向キーで5px単位の移動が可能

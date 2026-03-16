@@ -110,11 +110,19 @@ window.MojiQSettings = (function() {
      * 設定保存
      */
     function save() {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+        } catch (e) {
+            // localStorage容量超過やプライベートモードでの保存失敗
+            console.error('[MojiQSettings] 設定の保存に失敗しました:', e);
+            // イベントは発火しない（保存が失敗したため）
+            return false;
+        }
         // イベント発火（他モジュールへの通知）
         window.dispatchEvent(new CustomEvent('mojiq:settings-changed', {
             detail: { settings: settings }
         }));
+        return true;
     }
 
     /**
