@@ -425,7 +425,9 @@ label.header-icon-btn.pdf-required.locked svg {
 button.header-icon-btn.menu-lockable.menu-locked,
 label.header-icon-btn.menu-lockable.menu-locked,
 .logo.menu-lockable.menu-locked,
-.custom-menu-bar.menu-lockable.menu-locked {
+.custom-menu-bar.menu-lockable.menu-locked,
+.hamburger-btn.menu-lockable.menu-locked,
+.mode-toggle-container.menu-lockable.menu-locked {
     opacity: 0.3;
     pointer-events: none;
     cursor: not-allowed;

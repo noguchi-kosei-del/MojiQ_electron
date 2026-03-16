@@ -31,13 +31,23 @@ npm run start        # 開発用起動
 
 ## 最近の変更 (2026-03-16)
 
+### 新機能: PDF/JPEG読み込み中・保存中のメニューグレーアウト
+- 読み込み中・保存中は上部メニューをグレーアウトして誤操作を防止
+- 対象要素: ハンバーガーメニュー、ロゴ、モード切替、作品仕様/校正チェックボタン、カスタムメニューバー、ズームコントロール、各種アクションボタン
+- `lockMenu()`関数を追加し、`.menu-lockable`要素に`.menu-locked`クラスを付与
+- 関連ファイル: `MojiQ/js/pdf-manager.js`, `MojiQ/index.html`, `MojiQ/css/header.css`
+
 ### 新機能: PDF圧縮保存
-- PDF保存ドロップダウンに「圧縮保存（25MB以下）」チェックボックスを追加
+- PDF保存ドロップダウンに「圧縮保存」チェックボックスを追加
 - チェック時は各ページをJPEGでラスタライズして25MB以下に圧縮
 - 画質最優先のアルゴリズム: 高品質(0.95)・高解像度(2.5x)から開始し、必要に応じて段階的に調整
 - チェック状態はlocalStorageに保存
 - 25MB以下にできない場合は警告ダイアログを表示
 - 関連ファイル: `MojiQ/index.html`, `MojiQ/css/navigation.css`, `MojiQ/css/dark-mode.css`, `MojiQ/js/script.js`, `MojiQ/js/pdf-lib-saver.js`, `MojiQ/js/pdf-manager.js`
+
+### UI改善: 保存ドロップダウンの区切り線
+- 区切り線の両端に空白（12px）を追加
+- 関連ファイル: `MojiQ/css/navigation.css`
 
 ### バグ修正: 重大バグリスク調査・修正
 - 見開きモードの座標変換修正（splitFromSpreadPage）: 逆スケール（1/scale）を正しく適用

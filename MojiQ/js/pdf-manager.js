@@ -1821,6 +1821,9 @@ window.MojiQPdfManager = (function() {
         // 処理中フラグを立てる（ファイルオープン防止）
         isProcessing = true;
 
+        // メニューをロック（誤操作防止）
+        lockMenu(true);
+
         // 保存中の表示（titleを変更）
         const originalTitle = savePdfBtn ? savePdfBtn.title : '';
         if (savePdfBtn) {
@@ -1976,6 +1979,8 @@ window.MojiQPdfManager = (function() {
                 hideProgressOverlay();
             }
             isProcessing = false;
+            // メニューをアンロック（showProgressがfalseの場合、またはshowLoadingOverlay後の安全策）
+            lockMenu(false);
             releaseSaveLock(); // QA対策 #42, #52, #54
             if (savePdfBtn) {
                 savePdfBtn.title = originalTitle;
@@ -2013,6 +2018,9 @@ window.MojiQPdfManager = (function() {
 
         // 処理中フラグを立てる（ファイルオープン防止）
         isProcessing = true;
+
+        // メニューをロック（誤操作防止）
+        lockMenu(true);
 
         // 保存中の表示（titleを変更）
         const originalTitle = savePdfBtn ? savePdfBtn.title : '';
@@ -2144,6 +2152,8 @@ window.MojiQPdfManager = (function() {
                 hideProgressOverlay();
             }
             isProcessing = false;
+            // メニューをアンロック（showProgressがfalseの場合、またはshowLoadingOverlay後の安全策）
+            lockMenu(false);
             releaseSaveLock(); // QA対策 #42, #52, #54
             if (savePdfBtn) {
                 savePdfBtn.title = originalTitle;
@@ -2163,6 +2173,9 @@ window.MojiQPdfManager = (function() {
 
         // 処理中フラグを立てる（ファイルオープン防止）
         isProcessing = true;
+
+        // メニューをロック（誤操作防止）
+        lockMenu(true);
 
         // 保存中の表示
         const originalTitle = savePdfBtn ? savePdfBtn.title : '';
@@ -2270,6 +2283,8 @@ window.MojiQPdfManager = (function() {
                 hideProgressOverlay();
             }
             isProcessing = false;
+            // メニューをアンロック
+            lockMenu(false);
             if (savePdfBtn) {
                 savePdfBtn.title = originalTitle;
                 savePdfBtn.disabled = false;
@@ -3427,6 +3442,9 @@ window.MojiQPdfManager = (function() {
         const settings = await showTransparentPdfModal();
         if (settings.cancelled) return;
 
+        // メニューをロック（誤操作防止）
+        lockMenu(true);
+
         // 保存中の表示
         const saveTransparentBtn = document.getElementById('saveTransparentPdfBtn');
         const originalTitle = saveTransparentBtn ? saveTransparentBtn.title : '';
@@ -3514,6 +3532,8 @@ window.MojiQPdfManager = (function() {
             console.error('透過PDF保存エラー:', e);
             MojiQModal.showAlert('保存エラー: ' + e.message, 'エラー');
         } finally {
+            // メニューをアンロック
+            lockMenu(false);
             if (saveTransparentBtn) {
                 saveTransparentBtn.title = originalTitle;
                 saveTransparentBtn.disabled = false;
@@ -3530,6 +3550,9 @@ window.MojiQPdfManager = (function() {
 
         // 処理中フラグを立てる（ファイルオープン防止）
         isProcessing = true;
+
+        // メニューをロック（誤操作防止）
+        lockMenu(true);
 
         // 保存中の表示
         const originalTitle = savePdfBtn ? savePdfBtn.title : '';
@@ -3632,6 +3655,8 @@ window.MojiQPdfManager = (function() {
                 hideProgressOverlay();
             }
             isProcessing = false;
+            // メニューをアンロック
+            lockMenu(false);
             if (savePdfBtn) {
                 savePdfBtn.title = originalTitle;
                 savePdfBtn.disabled = false;
@@ -5109,6 +5134,21 @@ window.MojiQPdfManager = (function() {
     }
 
     /**
+     * メニューをロック/アンロック（読み込み中・保存中の誤操作防止）
+     * @param {boolean} lock - true=ロック, false=アンロック
+     */
+    function lockMenu(lock) {
+        const lockableElements = document.querySelectorAll('.menu-lockable');
+        lockableElements.forEach(el => {
+            if (lock) {
+                el.classList.add('menu-locked');
+            } else {
+                el.classList.remove('menu-locked');
+            }
+        });
+    }
+
+    /**
      * プログレスオーバーレイを表示/非表示（汎用）
      * @param {boolean} show - 表示/非表示
      * @param {string} [title] - タイトルテキスト（オプション）
@@ -5122,8 +5162,12 @@ window.MojiQPdfManager = (function() {
                     titleElement.textContent = title;
                 }
                 overlay.classList.add('active');
+                // メニューをロック
+                lockMenu(true);
             } else {
                 overlay.classList.remove('active');
+                // メニューをアンロック
+                lockMenu(false);
             }
         }
     }

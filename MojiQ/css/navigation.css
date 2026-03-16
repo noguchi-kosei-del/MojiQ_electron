@@ -507,7 +507,7 @@ input[type="range"]#pageSlider::-webkit-slider-thumb {
 .page-edit-dropdown-divider {
     height: 1px;
     background-color: #e0e0e0;
-    margin: 4px 0;
+    margin: 4px 12px;
 }
 
 .page-edit-dropdown-overlay {
