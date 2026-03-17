@@ -13,16 +13,23 @@ window._MojiQPdfCompress = (function() {
      * @param {object} callbacks - コールバック関数群
      * @param {function} callbacks.nextFrame - UIブロック回避用
      * @param {function} callbacks.updateProgress - 進捗更新 (current, total)
+     * @param {function} [callbacks.isCancelled] - キャンセル判定関数（オプション）
      * @returns {Promise<Uint8Array>} - 圧縮されたPDFデータ
-     * @throws {Error} PDF圧縮に失敗した場合
+     * @throws {Error} PDF圧縮に失敗した場合、またはキャンセルされた場合
      */
     async function compressPdfViaCanvas(typedarray, callbacks) {
         var nextFrame = callbacks.nextFrame;
         var updateProgress = callbacks.updateProgress;
+        var isCancelled = callbacks.isCancelled || function() { return false; };
         var pdfDoc = null;
         var newPdf = null;
 
         try {
+            // キャンセルチェック
+            if (isCancelled()) {
+                throw new Error('CANCELLED');
+            }
+
             var loadOptions = {
                 data: typedarray,
                 cMapUrl: window.MojiQPdfJsConfig?.cMapUrl || 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/cmaps/',
@@ -36,6 +43,11 @@ window._MojiQPdfCompress = (function() {
             var jsPDFConstructor = window.jspdf.jsPDF;
 
             for (var i = 1; i <= numPages; i++) {
+                // 各ページ処理前にキャンセルチェック
+                if (isCancelled()) {
+                    throw new Error('CANCELLED');
+                }
+
                 await nextFrame();
                 updateProgress(i, numPages);
 
@@ -107,6 +119,23 @@ window._MojiQPdfCompress = (function() {
         }
     }
 
+    // キャンセル状態を管理するグローバルフラグ
+    var _compressionCancelled = false;
+
+    /**
+     * 圧縮処理をキャンセル
+     */
+    function cancelCompression() {
+        _compressionCancelled = true;
+    }
+
+    /**
+     * キャンセル状態をリセット
+     */
+    function resetCancellation() {
+        _compressionCancelled = false;
+    }
+
     /**
      * ファイルサイズが閾値を超えているかチェックし、必要に応じて最適化または圧縮
      * @param {File} file - PDFファイル
@@ -117,9 +146,13 @@ window._MojiQPdfCompress = (function() {
      * @param {function} options.updateProgress - 進捗更新 (current, total)
      * @param {function} options.updateProgressText - 進捗テキスト更新 (message)
      * @param {function} options.hideProgress - 進捗非表示
+     * @param {function} [options.showCancelButton] - キャンセルボタン表示（オプション）
+     * @param {function} [options.hideCancelButton] - キャンセルボタン非表示（オプション）
      * @returns {Promise<{data: Uint8Array|null, originalData: Uint8Array|null, wasCompressed: boolean, wasOptimized: boolean, cancelled: boolean}>}
      */
     async function checkAndCompressPdf(file, options) {
+        // キャンセル状態をリセット
+        resetCancellation();
         // 圧縮処理中はメニューをロック（ハンバーガー、読み込みボタンを無効化）
         if (typeof window.lockMenuForCompression === 'function') {
             window.lockMenuForCompression();
@@ -165,19 +198,41 @@ window._MojiQPdfCompress = (function() {
 
                     options.showProgress('PDFを圧縮しています...');
 
+                    // キャンセルボタンを表示（オプション）
+                    if (typeof options.showCancelButton === 'function') {
+                        options.showCancelButton(cancelCompression);
+                    }
+
                     try {
                         await options.nextFrame();
 
                         var compressedData = await compressPdfViaCanvas(typedarray, {
                             nextFrame: options.nextFrame,
-                            updateProgress: options.updateProgress
+                            updateProgress: options.updateProgress,
+                            isCancelled: function() { return _compressionCancelled; }
                         });
+
+                        // キャンセルボタンを非表示
+                        if (typeof options.hideCancelButton === 'function') {
+                            options.hideCancelButton();
+                        }
                         options.hideProgress();
                         unlockMenu();
                         resolve({ data: compressedData, originalData: typedarray, wasCompressed: true, wasOptimized: false, cancelled: false });
                     } catch (err) {
+                        // キャンセルボタンを非表示
+                        if (typeof options.hideCancelButton === 'function') {
+                            options.hideCancelButton();
+                        }
                         options.hideProgress();
                         unlockMenu();
+
+                        // キャンセルされた場合
+                        if (err.message === 'CANCELLED') {
+                            resolve({ data: null, originalData: null, wasCompressed: false, wasOptimized: false, cancelled: true });
+                            return;
+                        }
+
                         MojiQModal.showAlert('圧縮処理に失敗しました。元のPDFで読み込みます。', 'エラー');
                         resolve({ data: typedarray, originalData: typedarray, wasCompressed: false, wasOptimized: false, cancelled: false });
                     }
@@ -225,6 +280,7 @@ window._MojiQPdfCompress = (function() {
 
     return {
         compressPdfViaCanvas: compressPdfViaCanvas,
-        checkAndCompressPdf: checkAndCompressPdf
+        checkAndCompressPdf: checkAndCompressPdf,
+        cancelCompression: cancelCompression
     };
 })();

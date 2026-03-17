@@ -304,6 +304,14 @@ function initWindowControlsAndMenuBar() {
         });
     }
 
+    // サイドバーの作品仕様読み込みボタン → 元のボタンのクリックをトリガー
+    const presetLoadBtn = document.getElementById('presetLoadBtn');
+    if (presetLoadBtn && originalGdriveBtn) {
+        presetLoadBtn.addEventListener('click', () => {
+            originalGdriveBtn.click();
+        });
+    }
+
     // 初期状態（指示入れモード）でボタンの状態を設定
     updateHeaderButtonModeState(false);
 
@@ -1222,12 +1230,54 @@ window.addEventListener('load', () => {
     }, ctx, appState);
 
     // JSON Folder Browser (Electron環境のみ)
+    // 作品仕様JSONのバリデーション関数
+    function isValidPresetJson(data) {
+        if (!data || typeof data !== 'object') {
+            return false;
+        }
+
+        // presetDataでラップされている形式にも対応
+        const presetData = data.presetData || data;
+
+        // presets または fontSizeStats のいずれかが含まれている必要がある
+        const hasPresets = presetData.presets && typeof presetData.presets === 'object';
+        const hasFontSizeStats = presetData.fontSizeStats &&
+                                 (typeof presetData.fontSizeStats === 'object' || Array.isArray(presetData.fontSizeStats));
+        const hasFonts = Array.isArray(presetData.fonts);
+        const isArrayFormat = Array.isArray(presetData);
+
+        return hasPresets || hasFontSizeStats || hasFonts || isArrayFormat;
+    }
+
     if (window.electronAPI && window.electronAPI.isElectron) {
         MojiQJsonFolderBrowser.init({
             onJsonFileSelect: (data, fileName) => {
                 // 読み込み結果のフラグ
                 let loadedPreset = false;
                 let loadedChecks = false;
+
+                // 現在のモードを確認
+                const isProofreadingMode = window.MojiQStore && MojiQStore.get('proofreadingMode.enabled');
+
+                // 校正チェックJSON形式のチェック
+                const isProofreadingJson = window.ProofreadingPanel && ProofreadingPanel.isValidProofreadingJson(data);
+                // 作品仕様JSON形式のチェック
+                const isPresetJson = isValidPresetJson(data);
+
+                // モードに応じたバリデーション
+                if (isProofreadingMode) {
+                    // 校正チェックモード: 校正チェックJSONのみ許可
+                    if (!isProofreadingJson) {
+                        MojiQModal.showAlert('この形式のJSONは読み込めません。校正チェックデータのJSONを読み込んでください。', 'エラー');
+                        return;
+                    }
+                } else {
+                    // 指示入れモード: 作品仕様JSONのみ許可
+                    if (!isPresetJson) {
+                        MojiQModal.showAlert('この形式のJSONは読み込めません。作品仕様のJSONを読み込んでください。', 'エラー');
+                        return;
+                    }
+                }
 
                 // MojiQStampsの既存のプリセット読み込みロジックを再利用
                 // presetDataでラップされている形式にも対応
@@ -1272,7 +1322,7 @@ window.addEventListener('load', () => {
                 }
 
                 // 校正チェックデータの読み込み（checks が含まれている場合）
-                if (data.checks && window.MojiQStore) {
+                if (data.checks && window.MojiQStore && isProofreadingJson) {
                     // タイトル生成
                     const fileNameWithoutExt = fileName.replace('.json', '');
                     const workName = data.work || '';
@@ -1310,10 +1360,8 @@ window.addEventListener('load', () => {
                         message = '校正情報を読み込みました';
                     } else if (loadedPreset) {
                         message = '作品仕様を読み込みました';
-                    } else {
-                        message = 'JSONファイルを読み込みました';
                     }
-                    MojiQModal.showAlert(message, '読み込み完了');
+                    MojiQModal.showAlert(message, '読み込み完了', { titleColor: '#2e7d32' });
                 }
             }
         });

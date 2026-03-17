@@ -292,6 +292,16 @@ const CalibrationPanel = (() => {
       if (window.electronAPI && window.electronAPI.readCalibrationFile) {
         const result = await window.electronAPI.readCalibrationFile(filePath);
         if (result.success) {
+          // 校正チェックJSON形式のバリデーション
+          if (window.ProofreadingPanel && !ProofreadingPanel.isValidProofreadingJson(result.data)) {
+            if (window.MojiQModal) {
+              MojiQModal.showAlert('この形式のJSONは読み込めません。校正チェックデータのJSONを読み込んでください。', 'エラー');
+            } else {
+              alert('この形式のJSONは読み込めません。校正チェックデータのJSONを読み込んでください。');
+            }
+            return;
+          }
+
           // タイトル生成
           const fileName = filePath.replace(/\\/g, '/').split('/').pop().replace('.json', '');
           const workName = result.data.work || '';
@@ -323,7 +333,7 @@ const CalibrationPanel = (() => {
 
       // 読み込み完了ダイアログを表示
       if (jsonData && window.MojiQModal) {
-        MojiQModal.showAlert('校正情報を読み込みました', '読み込み完了');
+        MojiQModal.showAlert('校正情報を読み込みました', '読み込み完了', { titleColor: '#2e7d32' });
       }
     } catch (error) {
       alert('ファイルの読み込みに失敗しました: ' + error.message);

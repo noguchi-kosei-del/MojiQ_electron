@@ -658,9 +658,10 @@ window.MojiQModal = (function() {
      * ブラウザのalert()後のフォーカス問題を回避
      * @param {string} message - 表示するメッセージ
      * @param {string} title - タイトル（省略可）
+     * @param {Object} options - オプション（titleColor: タイトルの色）
      * @returns {Promise<void>}
      */
-    function showAlert(message, title = 'お知らせ') {
+    function showAlert(message, title = 'お知らせ', options = {}) {
         return new Promise((resolve) => {
             if (!promptModal) {
                 alert(message);
@@ -670,6 +671,7 @@ window.MojiQModal = (function() {
 
             promptResolve = () => resolve();
             promptModalTitle.textContent = title;
+            promptModalTitle.style.color = options.titleColor || '';
             promptModalLabel.textContent = message;
             promptModalInput.style.display = 'none';
             promptModalCancelBtn.style.display = 'none';  // キャンセルボタンを非表示

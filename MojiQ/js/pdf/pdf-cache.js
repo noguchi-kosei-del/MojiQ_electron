@@ -56,13 +56,21 @@ window._MojiQPdfCache = (function() {
         }
         this._map.set(key, value);
         // 容量超過時にLRU（先頭）を削除
-        while (this._map.size > this._maxSize) {
+        // 安全策: 最大イテレーション回数を設定して無限ループを防止
+        var maxIterations = this._map.size + 10;
+        var iterations = 0;
+        while (this._map.size > this._maxSize && iterations < maxIterations) {
+            iterations++;
             var oldestKey = this._map.keys().next().value;
+            if (oldestKey === undefined) break;  // キーが取得できない場合は終了
             var oldest = this._map.get(oldestKey);
             if (oldest && oldest.bitmap && typeof oldest.bitmap.close === 'function') {
                 oldest.bitmap.close();
             }
             this._map.delete(oldestKey);
+        }
+        if (iterations >= maxIterations) {
+            console.warn('[MojiQ] LRUキャッシュ: ループ上限に達しました');
         }
     };
 

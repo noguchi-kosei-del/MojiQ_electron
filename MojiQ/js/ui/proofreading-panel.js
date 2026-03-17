@@ -85,6 +85,18 @@ const ProofreadingPanel = (() => {
      * イベントリスナーの設定
      */
     function setupEventListeners() {
+        // 校正チェック読み込みボタン
+        const proofreadingLoadBtn = document.getElementById('proofreadingLoadBtn');
+        if (proofreadingLoadBtn) {
+            proofreadingLoadBtn.addEventListener('click', () => {
+                // 既存の校正チェック読み込みボタン（calibrationToggleBtn）のクリックをトリガー
+                const calibrationToggleBtn = document.getElementById('calibrationToggleBtn');
+                if (calibrationToggleBtn) {
+                    calibrationToggleBtn.click();
+                }
+            });
+        }
+
         // 折りたたみトグルボタン
         if (panelToggle) {
             panelToggle.addEventListener('click', () => {
@@ -515,6 +527,36 @@ const ProofreadingPanel = (() => {
         const max = parseFloat(mainLineWidth.max) || 20;
         const percentage = ((value - min) / (max - min)) * 100;
         mainLineWidth.style.background = `linear-gradient(to right, #ff8c00 ${percentage}%, #333 ${percentage}%)`;
+    }
+
+    /**
+     * 校正チェックJSONの形式をバリデート
+     * @param {Object} data - 読み込んだJSONデータ
+     * @returns {boolean} - 有効な校正チェック形式の場合はtrue
+     */
+    function isValidProofreadingJson(data) {
+        if (!data || typeof data !== 'object') {
+            return false;
+        }
+
+        // checksオブジェクトが必須
+        if (!data.checks || typeof data.checks !== 'object') {
+            return false;
+        }
+
+        // variation または simple のいずれかが存在し、items配列を持つ必要がある
+        const hasVariation = data.checks.variation &&
+                             typeof data.checks.variation === 'object' &&
+                             Array.isArray(data.checks.variation.items);
+        const hasSimple = data.checks.simple &&
+                          typeof data.checks.simple === 'object' &&
+                          Array.isArray(data.checks.simple.items);
+
+        if (!hasVariation && !hasSimple) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -1023,13 +1065,17 @@ const ProofreadingPanel = (() => {
         if (checkbox.checked) {
             checkedComments.add(commentIndex);
             commentItem.classList.add('checked');
-            // 済スタンプを追加
-            addDoneStampForComment(commentIndex);
+            // 済スタンプを非同期で追加（UIをブロックしない）
+            requestAnimationFrame(() => {
+                addDoneStampForComment(commentIndex);
+            });
         } else {
             checkedComments.delete(commentIndex);
             commentItem.classList.remove('checked');
-            // 済スタンプを削除
-            removeDoneStampForComment(commentIndex);
+            // 済スタンプを非同期で削除（UIをブロックしない）
+            requestAnimationFrame(() => {
+                removeDoneStampForComment(commentIndex);
+            });
         }
 
         // タブの済状態を更新
@@ -1837,6 +1883,7 @@ const ProofreadingPanel = (() => {
         jumpToCommentPage,
         copyContent,
         renderCheckData,
+        isValidProofreadingJson,
         onEyedropperColorPicked,
         toggleCollapse,
         togglePageBar,

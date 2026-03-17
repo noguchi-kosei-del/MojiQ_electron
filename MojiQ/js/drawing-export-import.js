@@ -5,6 +5,12 @@
  * v1.1: 座標をインtrinsicサイズ（PDFのscale=1サイズ、画像の元サイズ）ベースで保存
  *       ウィンドウサイズに依存しない座標系で保存し、読み込み時に現在の表示サイズにスケーリング
  */
+
+// UIブロック回避用のnextFrame関数
+function _drawingExportNextFrame() {
+    return new Promise(resolve => requestAnimationFrame(resolve));
+}
+
 const DrawingExportImport = {
     VERSION: '1.1',
     FILE_EXTENSION: '.mojiq.json',
@@ -268,7 +274,10 @@ const DrawingExportImport = {
             data: exportDataContent
         };
 
+        // UIブロック回避: JSON処理前にフレームを待機
+        await _drawingExportNextFrame();
         const jsonString = JSON.stringify(exportData, null, 2);
+        await _drawingExportNextFrame();
         const blob = new Blob([jsonString], { type: 'application/json' });
 
         // デフォルトのファイル名を生成（読み込んだファイル名_描画.json）
@@ -389,7 +398,10 @@ const DrawingExportImport = {
         let importData;
 
         try {
+            // UIブロック回避: JSON処理前にフレームを待機
+            await _drawingExportNextFrame();
             importData = JSON.parse(jsonString);
+            await _drawingExportNextFrame();
         } catch (e) {
             throw new Error('JSONファイルの解析に失敗しました。ファイル形式を確認してください。');
         }
@@ -544,7 +556,10 @@ const DrawingExportImport = {
             data: exportDataContent
         };
 
+        // UIブロック回避: JSON処理前にフレームを待機
+        await _drawingExportNextFrame();
         const jsonString = JSON.stringify(exportData, null, 2);
+        await _drawingExportNextFrame();
 
         // ファイルパスから描画データのパスを生成（拡張子を_描画.jsonに置換）
         const drawingFilePath = filePath.replace(/\.(pdf|jpg|jpeg|png)$/i, '_描画.json');

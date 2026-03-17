@@ -29,7 +29,36 @@ npm run start        # 開発用起動
 - **指示入れモード**: PDF/画像に校正指示を書き込む
 - **校正チェックモード**: 校正チェックリストを表示・管理
 
-## 最近の変更 (2026-03-16)
+## 最近の変更 (2026-03-17)
+
+### 新機能: JSON読み込みのバリデーション
+- 校正チェックJSON形式のバリデーション機能を追加
+- 作品仕様JSON形式のバリデーション機能を追加
+- モードに応じた読み込み制限: 指示入れモードでは作品仕様JSONのみ、校正チェックモードでは校正チェックJSONのみ読み込み可能
+- 不正な形式のJSONを読み込もうとした場合、アラートを表示
+- アラートは選択ダイアログの上に表示（z-index: 1100）
+- 関連ファイル: `MojiQ/js/ui/proofreading-panel.js`, `MojiQ/js/ui/calibration-panel.js`, `MojiQ/js/script.js`, `MojiQ/css/components.css`
+
+### UI改善: 読み込み完了ダイアログ
+- 読み込み完了時のダイアログタイトル「読み込み完了」を緑色（#2e7d32）で表示
+- `showAlert`関数にtitleColorオプションを追加
+- 関連ファイル: `MojiQ/js/modal.js`, `MojiQ/js/script.js`, `MojiQ/js/ui/calibration-panel.js`
+
+### UI改善: サイドバーにJSON読み込みボタンを配置
+- 校正チェックモード: 検索欄の上に「校正チェックを読み込み」ボタンを追加
+- 指示入れモード: フォント指定の下に「作品仕様を読み込み」ボタンを追加
+- ボタンはサイドバー幅いっぱいに表示、既存のヘッダーボタンと同じアイコン・スタイル
+- ダークモード対応
+- 関連ファイル: `MojiQ/index.html`, `MojiQ/css/proofreading-mode.css`, `MojiQ/css/stamps.css`, `MojiQ/css/dark-mode.css`, `MojiQ/js/ui/proofreading-panel.js`, `MojiQ/js/script.js`
+
+### UI変更: ヘッダーボタンの削除
+- モード切替トグルの右隣にあった「作品仕様を読み込み」「校正チェックを読み込み」ボタンを削除
+- 機能はサイドバーのボタンに移行
+- 関連ファイル: `MojiQ/index.html`, `MojiQ/css/header.css`
+
+---
+
+## 過去の変更 (2026-03-16)
 
 ### 新機能: PDF/JPEG読み込み中・保存中のメニューグレーアウト
 - 読み込み中・保存中は上部メニューをグレーアウトして誤操作を防止

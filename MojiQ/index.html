@@ -55,16 +55,6 @@
 
         <div class="header-divider"></div>
 
-        <!-- 作品仕様読み込み / 校正チェックボタン（モード切替の右隣） -->
-        <button id="headerGdriveJsonBtn" class="header-icon-btn header-spec-btn pdf-required menu-lockable" title="作品仕様を読み込み" disabled>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a1 1 0 011-1h5l2 2h7a1 1 0 011 1v8a1 1 0 01-1 1H5a1 1 0 01-1-1V7z"/></svg>
-        </button>
-        <button id="headerCalibrationBtn" class="header-icon-btn header-calibration-btn pdf-required menu-lockable" title="校正チェックを読み込み" disabled>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><polyline points="3,6 4,7 6,5"/><polyline points="3,12 4,13 6,11"/><polyline points="3,18 4,19 6,17"/></svg>
-        </button>
-
-        <div class="header-divider"></div>
-
         <!-- カスタムメニューバー -->
         <div class="custom-menu-bar menu-lockable" id="customMenuBar">
             <div class="menu-item" data-menu="file">
@@ -860,6 +850,15 @@
 <div id="locked-tools-area">
     <input type="checkbox" id="useLeaderLine" checked style="display:none;">
     <div id="stampContainer"></div>
+    <!-- 作品仕様読み込みボタン -->
+    <div class="preset-load-section">
+        <button id="presetLoadBtn" class="preset-load-btn" title="作品仕様を読み込み">
+            <svg width="16" height="16" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 5a1 1 0 011-1h4l2 2h6a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1V5z"/>
+            </svg>
+            作品仕様を読み込み
+        </button>
+    </div>
     <div class="add-font-row">
         <button id="gdriveJsonBrowserBtn"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5a1 1 0 011-1h4l2 2h6a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1V5z"/></svg> 作品仕様を読み込み</button>
         <button id="calibrationToggleBtn" class="calibration-toggle-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><polyline points="3,6 4,7 6,5"/><polyline points="3,12 4,13 6,11"/><polyline points="3,18 4,19 6,17"/></svg> 校正チェック</button>
@@ -913,6 +912,20 @@
 
         <!-- チェックセクションラッパー -->
         <div class="proofreading-checks-wrapper">
+            <!-- 校正チェック読み込みボタン -->
+            <div class="proofreading-load-section">
+                <button id="proofreadingLoadBtn" class="proofreading-load-btn" title="校正チェックを読み込み">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="10" y1="6" x2="21" y2="6"/>
+                        <line x1="10" y1="12" x2="21" y2="12"/>
+                        <line x1="10" y1="18" x2="21" y2="18"/>
+                        <polyline points="3,6 4,7 6,5"/>
+                        <polyline points="3,12 4,13 6,11"/>
+                        <polyline points="3,18 4,19 6,17"/>
+                    </svg>
+                    校正チェックを読み込み
+                </button>
+            </div>
             <!-- 検索ボックス -->
             <div class="proofreading-search-section">
                 <div class="proofreading-search-box">

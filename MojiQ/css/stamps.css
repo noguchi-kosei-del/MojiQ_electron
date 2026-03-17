@@ -569,3 +569,52 @@
     vertical-align: middle;
     flex-shrink: 0;
 }
+
+
+/* =====================================================
+   作品仕様読み込みボタン
+   ===================================================== */
+
+.preset-load-section {
+    padding: 8px 0;
+    flex-shrink: 0;
+}
+
+.preset-load-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 8px 12px;
+    background: transparent;
+    color: #2e7d32;
+    border: 1.5px solid #2e7d32;
+    border-radius: 5px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.preset-load-btn:hover {
+    background-color: rgba(46, 125, 50, 0.1);
+}
+
+.preset-load-btn:active {
+    background-color: rgba(46, 125, 50, 0.2);
+}
+
+.preset-load-btn svg {
+    flex-shrink: 0;
+}
+
+.preset-load-btn svg,
+.preset-load-btn svg path {
+    stroke: #2e7d32;
+}
+
+.preset-load-btn:hover svg,
+.preset-load-btn:hover svg path {
+    stroke: #2e7d32;
+}

@@ -24,8 +24,26 @@ window.MojiQDrawingObjects = (function() {
         isUndoRedoProcessing: false,
 
         // オブジェクトIDカウンター
-        idCounter: 0
+        idCounter: 0,
+
+        // ページごとのバージョン（キャッシュ無効化用）
+        pageVersions: {}  // pageVersions[pageNum] = version
     };
+
+    /**
+     * ページバージョンをインクリメント（描画キャッシュ無効化）
+     */
+    function incrementPageVersion(pageNum) {
+        if (!state.pageVersions[pageNum]) {
+            state.pageVersions[pageNum] = 0;
+        }
+        state.pageVersions[pageNum]++;
+
+        // 描画キャッシュを無効化
+        if (window.MojiQDrawingRenderer && window.MojiQDrawingRenderer.invalidateDrawingCache) {
+            window.MojiQDrawingRenderer.invalidateDrawingCache(pageNum);
+        }
+    }
 
     // --- IDインデックス（O(1)検索用） ---
     // Map<string, number>: "pageNum-objectId" -> index
@@ -173,6 +191,9 @@ window.MojiQDrawingObjects = (function() {
             // Undo用に保存
             this.saveUndoState(pageNum, 'add', obj);
 
+            // 描画キャッシュを無効化
+            incrementPageVersion(pageNum);
+
             // ページキャッシュを無効化（描画オブジェクトが変更されたため）
             if (window.MojiQPdfManager && MojiQPdfManager.invalidatePageCache) {
                 MojiQPdfManager.invalidatePageCache(pageNum);
@@ -199,6 +220,9 @@ window.MojiQDrawingObjects = (function() {
 
                 // Undo用に保存
                 this.saveUndoState(pageNum, 'update', { old: oldObj, new: objects[index] });
+
+                // 描画キャッシュを無効化
+                incrementPageVersion(pageNum);
 
                 // ページキャッシュを無効化（描画オブジェクトが変更されたため）
                 if (window.MojiQPdfManager && MojiQPdfManager.invalidatePageCache) {
@@ -271,6 +295,9 @@ window.MojiQDrawingObjects = (function() {
 
                 // Undo用に保存
                 this.saveUndoState(pageNum, 'remove', { object: removed, index: index });
+
+                // 描画キャッシュを無効化
+                incrementPageVersion(pageNum);
 
                 // ページキャッシュを無効化（描画オブジェクトが変更されたため）
                 if (window.MojiQPdfManager && MojiQPdfManager.invalidatePageCache) {
@@ -536,6 +563,9 @@ window.MojiQDrawingObjects = (function() {
             if (oldObjects.length > 0) {
                 this.saveUndoState(pageNum, 'clear', { objects: oldObjects });
             }
+
+            // 描画キャッシュを無効化
+            incrementPageVersion(pageNum);
         },
 
         /**
@@ -994,15 +1024,24 @@ window.MojiQDrawingObjects = (function() {
         },
 
         /**
-         * ページのオブジェクトを復元
+         * ページのオブジェクトを復元（画像読み込みは並列化、同時5つまで）
          */
         deserializePageObjects: async function(pageNum, objects) {
             initPageData(pageNum);
-            const restored = [];
 
-            for (const obj of objects) {
-                const restoredObj = await this.deserializeObject(obj);
-                restored.push(restoredObj);
+            // 並列度制限付きでオブジェクトを復元
+            const CONCURRENCY_LIMIT = 5;
+            const restored = new Array(objects.length);
+
+            // バッチ処理で並列化
+            for (let i = 0; i < objects.length; i += CONCURRENCY_LIMIT) {
+                const batch = objects.slice(i, i + CONCURRENCY_LIMIT);
+                const batchPromises = batch.map((obj, idx) =>
+                    this.deserializeObject(obj).then(restoredObj => {
+                        restored[i + idx] = restoredObj;
+                    })
+                );
+                await Promise.all(batchPromises);
             }
 
             state.pageObjects[pageNum].objects = restored;
@@ -1021,18 +1060,39 @@ window.MojiQDrawingObjects = (function() {
 
                 if (clonedObj.type === 'image' && clonedObj.imageDataUrl) {
                     const img = new Image();
+                    let isResolved = false;
+
+                    // タイムアウト処理（5秒）- デッドロック防止
+                    const timeoutId = setTimeout(() => {
+                        if (!isResolved) {
+                            isResolved = true;
+                            console.warn('画像の復元がタイムアウト:', clonedObj.id);
+                            clonedObj._imageLoadFailed = true;
+                            clonedObj._imageLoadTimeout = true;
+                            resolve(clonedObj);
+                        }
+                    }, 5000);
+
                     img.onload = () => {
-                        clonedObj.imageData = img;
-                        delete clonedObj.imageDataUrl;
-                        resolve(clonedObj);
+                        if (!isResolved) {
+                            isResolved = true;
+                            clearTimeout(timeoutId);
+                            clonedObj.imageData = img;
+                            delete clonedObj.imageDataUrl;
+                            resolve(clonedObj);
+                        }
                     };
                     img.onerror = (err) => {
-                        // BUG-003修正: エラーをログに記録し、画像なしでオブジェクトを返す
-                        console.warn('画像の復元に失敗:', clonedObj.id, err);
-                        // 画像データが破損している場合はimageDataUrlを保持したまま返す
-                        // これにより、後で再試行や別の処理が可能
-                        clonedObj._imageLoadFailed = true;
-                        resolve(clonedObj);  // アプリケーションの継続のためresolveを維持
+                        if (!isResolved) {
+                            isResolved = true;
+                            clearTimeout(timeoutId);
+                            // BUG-003修正: エラーをログに記録し、画像なしでオブジェクトを返す
+                            console.warn('画像の復元に失敗:', clonedObj.id, err);
+                            // 画像データが破損している場合はimageDataUrlを保持したまま返す
+                            // これにより、後で再試行や別の処理が可能
+                            clonedObj._imageLoadFailed = true;
+                            resolve(clonedObj);  // アプリケーションの継続のためresolveを維持
+                        }
                     };
                     img.src = clonedObj.imageDataUrl;
                 } else {
@@ -1637,6 +1697,15 @@ window.MojiQDrawingObjects = (function() {
          */
         setProjectMetadata: function(metadata) {
             // 現在は追加のメタデータ処理なし
+        },
+
+        /**
+         * ページのバージョンを取得（キャッシュ無効化判定用）
+         * @param {number} pageNum - ページ番号
+         * @returns {number} バージョン番号
+         */
+        getPageVersion: function(pageNum) {
+            return state.pageVersions[pageNum] || 0;
         }
     };
 })();

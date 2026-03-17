@@ -589,6 +589,52 @@ body.dark-mode .proofreading-stamp-btn.active {
     color: #ef9a9a;
 }
 
+/* 校正チェック読み込みボタン */
+body.dark-mode .proofreading-load-btn {
+    background: #2a2a2a !important;
+    border-color: #90caf9 !important;
+    color: #90caf9 !important;
+}
+
+body.dark-mode .proofreading-load-btn svg,
+body.dark-mode .proofreading-load-btn svg path,
+body.dark-mode .proofreading-load-btn svg line,
+body.dark-mode .proofreading-load-btn svg polyline {
+    stroke: #90caf9 !important;
+}
+
+body.dark-mode .proofreading-load-btn:hover {
+    background: #333 !important;
+}
+
+body.dark-mode .proofreading-load-btn:hover svg,
+body.dark-mode .proofreading-load-btn:hover svg path,
+body.dark-mode .proofreading-load-btn:hover svg line,
+body.dark-mode .proofreading-load-btn:hover svg polyline {
+    stroke: #90caf9 !important;
+}
+
+/* 作品仕様読み込みボタン */
+body.dark-mode .preset-load-btn {
+    background: #2a2a2a !important;
+    border-color: #81c784 !important;
+    color: #81c784 !important;
+}
+
+body.dark-mode .preset-load-btn svg,
+body.dark-mode .preset-load-btn svg path {
+    stroke: #81c784 !important;
+}
+
+body.dark-mode .preset-load-btn:hover {
+    background: #333 !important;
+}
+
+body.dark-mode .preset-load-btn:hover svg,
+body.dark-mode .preset-load-btn:hover svg path {
+    stroke: #81c784 !important;
+}
+
 /* スタンプトグル */
 body.dark-mode .stamp-toggle-btn {
     background: #333;

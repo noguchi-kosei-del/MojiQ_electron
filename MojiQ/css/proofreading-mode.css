@@ -307,6 +307,58 @@ body.proofreading-mode.pdf-loaded .sidebar.right.collapsed .proofreading-panel-h
 }
 
 /* =====================================================
+   校正チェック読み込みボタン
+   ===================================================== */
+
+.proofreading-load-section {
+    padding: 8px 12px;
+    flex-shrink: 0;
+}
+
+.proofreading-load-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 8px 12px;
+    background: transparent;
+    color: #1565c0;
+    border: 1.5px solid #1565c0;
+    border-radius: 5px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.proofreading-load-btn:hover {
+    background-color: rgba(21, 101, 192, 0.1);
+}
+
+.proofreading-load-btn:active {
+    background-color: rgba(21, 101, 192, 0.2);
+}
+
+.proofreading-load-btn svg {
+    flex-shrink: 0;
+}
+
+.proofreading-load-btn svg,
+.proofreading-load-btn svg path,
+.proofreading-load-btn svg line,
+.proofreading-load-btn svg polyline {
+    stroke: #1565c0;
+}
+
+.proofreading-load-btn:hover svg,
+.proofreading-load-btn:hover svg path,
+.proofreading-load-btn:hover svg line,
+.proofreading-load-btn:hover svg polyline {
+    stroke: #1565c0;
+}
+
+/* =====================================================
    検索ボックス
    ===================================================== */
 

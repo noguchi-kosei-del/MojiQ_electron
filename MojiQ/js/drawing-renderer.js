@@ -37,6 +37,46 @@ window.MojiQDrawingRenderer = (function() {
         lastRenderTime: 0
     };
 
+    // --- ページごとの描画キャッシュ ---
+    // キー: pageNum, 値: { canvas, version, width, height }
+    const _pageDrawingCache = new Map();
+    const MAX_CACHED_PAGES = 10;  // キャッシュする最大ページ数
+
+    /**
+     * 描画キャッシュを取得
+     */
+    function getDrawingCache(pageNum, width, height, version) {
+        const cached = _pageDrawingCache.get(pageNum);
+        if (cached && cached.version === version && cached.width === width && cached.height === height) {
+            return cached.canvas;
+        }
+        return null;
+    }
+
+    /**
+     * 描画キャッシュを保存
+     */
+    function setDrawingCache(pageNum, canvas, width, height, version) {
+        // キャッシュサイズ制限
+        if (_pageDrawingCache.size >= MAX_CACHED_PAGES) {
+            // 最も古いエントリを削除
+            const oldestKey = _pageDrawingCache.keys().next().value;
+            _pageDrawingCache.delete(oldestKey);
+        }
+        _pageDrawingCache.set(pageNum, { canvas, version, width, height });
+    }
+
+    /**
+     * 指定ページの描画キャッシュを無効化
+     */
+    function invalidateDrawingCache(pageNum) {
+        if (pageNum !== undefined) {
+            _pageDrawingCache.delete(pageNum);
+        } else {
+            _pageDrawingCache.clear();
+        }
+    }
+
     // --- ビューポートカリング関連関数 ---
 
     /**
@@ -3800,37 +3840,62 @@ window.MojiQDrawingRenderer = (function() {
         const objects = DrawingObjects.getPageObjects(pageNum);
         const selectedIndices = DrawingObjects.getSelectedIndices ? DrawingObjects.getSelectedIndices(pageNum) : [];
         const selectedIndex = DrawingObjects.getSelectedIndex(pageNum);
-
-        // ビューポートを取得
-        const viewport = cullingConfig.enabled ? getVisibleViewport() : null;
+        const hasSelection = selectedIndices.length > 0 || selectedIndex !== null;
 
         // 統計情報をリセット
         cullingStats.totalObjects = objects.length;
         cullingStats.renderedObjects = 0;
         cullingStats.culledObjects = 0;
 
-        // 消しゴムストロークをlinkedObjectIdsでグループ化
-        const erasersByObjectId = {};
-        objects.forEach((obj, index) => {
-            if (obj.type === 'eraser' && obj.linkedObjectIds) {
-                obj.linkedObjectIds.forEach(linkedId => {
-                    if (!erasersByObjectId[linkedId]) {
-                        erasersByObjectId[linkedId] = [];
-                    }
-                    erasersByObjectId[linkedId].push(obj);
-                });
+        // オブジェクトがない場合は早期リターン
+        if (objects.length === 0) {
+            cullingStats.lastRenderTime = performance.now() - startTime;
+            return;
+        }
+
+        // キャッシュキー用のバージョン（オブジェクト数とIDのハッシュ）
+        const version = DrawingObjects.getPageVersion ? DrawingObjects.getPageVersion(pageNum) : objects.length;
+        const canvasWidth = ctx.canvas.width;
+        const canvasHeight = ctx.canvas.height;
+
+        // 選択がなく、キャッシュが有効な場合はキャッシュから描画
+        if (!hasSelection && xOffset === 0) {
+            const cachedCanvas = getDrawingCache(pageNum, canvasWidth, canvasHeight, version);
+            if (cachedCanvas) {
+                ctx.drawImage(cachedCanvas, 0, 0);
+                cullingStats.renderedObjects = objects.length;
+                cullingStats.lastRenderTime = performance.now() - startTime;
+                return;
             }
-        });
+        }
+
+        // ビューポートを取得
+        const viewport = cullingConfig.enabled ? getVisibleViewport() : null;
+
+        // 消しゴムストロークをlinkedObjectIdsでグループ化（Mapで高速化）
+        const erasersByObjectId = new Map();
+        for (let i = 0; i < objects.length; i++) {
+            const obj = objects[i];
+            if (obj.type === 'eraser' && obj.linkedObjectIds) {
+                for (let j = 0; j < obj.linkedObjectIds.length; j++) {
+                    const linkedId = obj.linkedObjectIds[j];
+                    if (!erasersByObjectId.has(linkedId)) {
+                        erasersByObjectId.set(linkedId, []);
+                    }
+                    erasersByObjectId.get(linkedId).push(obj);
+                }
+            }
+        }
 
         // zIndexでソート（消しゴム以外のオブジェクトのみ）
-        const sortedObjects = objects
-            .map((obj, index) => ({
-                obj: obj,
-                originalObj: obj,
-                index
-            }))
-            .filter(({ obj }) => obj.type !== 'eraser')
-            .sort((a, b) => (a.obj.zIndex || 0) - (b.obj.zIndex || 0));
+        const sortedObjects = [];
+        for (let i = 0; i < objects.length; i++) {
+            const obj = objects[i];
+            if (obj.type !== 'eraser') {
+                sortedObjects.push({ obj, originalObj: obj, index: i });
+            }
+        }
+        sortedObjects.sort((a, b) => (a.obj.zIndex || 0) - (b.obj.zIndex || 0));
 
         // 見開きモード時はオフセットを適用
         if (xOffset !== 0) {
@@ -3838,13 +3903,27 @@ window.MojiQDrawingRenderer = (function() {
             ctx.translate(xOffset, 0);
         }
 
+        // 選択がなくキャッシュ可能な場合は、オフスクリーンキャンバスに描画
+        let cacheCtx = null;
+        let cacheCanvas = null;
+        if (!hasSelection && xOffset === 0 && objects.length > 10) {
+            cacheCanvas = document.createElement('canvas');
+            cacheCanvas.width = canvasWidth;
+            cacheCanvas.height = canvasHeight;
+            cacheCtx = cacheCanvas.getContext('2d');
+        }
+
+        const targetCtx = cacheCtx || ctx;
+
         // 描画（ビューポートカリング適用）
-        sortedObjects.forEach(({ obj, originalObj, index }) => {
+        for (let i = 0; i < sortedObjects.length; i++) {
+            const { obj, originalObj, index } = sortedObjects[i];
+
             // PDF注釈テキストの表示/非表示チェック（オリジナルオブジェクトでチェック）
             const checkObj = originalObj || obj;
             if (window.MojiQTextLayerManager && !MojiQTextLayerManager.shouldRenderObject(checkObj)) {
                 cullingStats.culledObjects++;
-                return;
+                continue;
             }
 
             // 複数選択対応：selectedIndicesに含まれているかチェック
@@ -3855,18 +3934,18 @@ window.MojiQDrawingRenderer = (function() {
             if (isSelected || visible) {
                 // このオブジェクトに関連する消しゴムストロークを取得（オリジナルIDで検索）
                 const objId = checkObj.id;
-                const linkedErasers = objId ? (erasersByObjectId[objId] || []) : [];
+                const linkedErasers = objId ? (erasersByObjectId.get(objId) || []) : [];
 
                 if (linkedErasers.length > 0) {
                     // 消しゴムストロークがある場合は、オフスクリーンキャンバスで合成
-                    renderObjectWithErasers(ctx, obj, linkedErasers, isSelected, selectedIndices);
+                    renderObjectWithErasers(targetCtx, obj, linkedErasers, isSelected, selectedIndices);
                 } else {
                     // 消しゴムストロークがない場合は通常描画
                     const showHandles = selectedIndices.length <= 1 && isSelected;
-                    renderObject(ctx, obj, showHandles);
+                    renderObject(targetCtx, obj, showHandles);
                     // 複数選択時も選択枠を描画
                     if (isSelected && selectedIndices.length > 1) {
-                        renderMultiSelectionOutline(ctx, obj);
+                        renderMultiSelectionOutline(targetCtx, obj);
                     }
                 }
                 cullingStats.renderedObjects++;
@@ -3876,15 +3955,21 @@ window.MojiQDrawingRenderer = (function() {
                 // デバッグモード: カリングされたオブジェクトを赤枠で表示
                 if (cullingConfig.debugMode) {
                     const bounds = getBounds(obj);
-                    ctx.save();
-                    ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
-                    ctx.lineWidth = 1;
-                    ctx.setLineDash([2, 2]);
-                    ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
-                    ctx.restore();
+                    targetCtx.save();
+                    targetCtx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+                    targetCtx.lineWidth = 1;
+                    targetCtx.setLineDash([2, 2]);
+                    targetCtx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+                    targetCtx.restore();
                 }
             }
-        });
+        }
+
+        // キャッシュに保存して描画
+        if (cacheCanvas && cacheCtx) {
+            setDrawingCache(pageNum, cacheCanvas, canvasWidth, canvasHeight, version);
+            ctx.drawImage(cacheCanvas, 0, 0);
+        }
 
         // 複数選択時は全体のバウンディングボックスの右下に削除ボタンを描画
         if (selectedIndices.length > 1) {
@@ -4409,6 +4494,9 @@ window.MojiQDrawingRenderer = (function() {
 
         // エクスポートモード（PDF保存時にマーカーのmultiply無効化）
         setExportMode: setExportMode,
-        isExportMode: isExportMode
+        isExportMode: isExportMode,
+
+        // 描画キャッシュ関連
+        invalidateDrawingCache: invalidateDrawingCache
     };
 })();

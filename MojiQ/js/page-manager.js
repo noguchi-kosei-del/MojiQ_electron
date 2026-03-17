@@ -18,6 +18,9 @@ window.MojiQPageManager = (function() {
     let undoRedoOperationId = 0;
     let isUndoRedoInProgress = false;  // Undo/Redo処理中フラグ
 
+    // イベントリスナー参照を保存（クリーンアップ用）
+    const _eventListeners = [];
+
     /**
      * 初期化
      * @param {object} elements - DOM要素
@@ -110,57 +113,60 @@ window.MojiQPageManager = (function() {
 
         let timeoutId = null;
         let img = null;
-        let isTimedOut = false;
+        let isResolved = false;  // 一度だけresolve/rejectするためのフラグ
         try {
             // タイムアウト付きで画像読み込み（5秒でタイムアウト）
-            await Promise.race([
-                new Promise((resolve, reject) => {
-                    img = new Image();
-                    img.onload = () => {
-                        // タイムアウト済みの場合は処理をスキップ
-                        if (isTimedOut) {
-                            resolve();
-                            return;
-                        }
-                        // タイムアウトタイマーをクリア
-                        if (timeoutId) clearTimeout(timeoutId);
-                        // 新しい操作が開始されていた場合は描画をスキップ
-                        if (currentOperationId !== undoRedoOperationId) {
-                            resolve();
-                            return;
-                        }
-                        try {
-                            ctx.clearRect(0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
-                            ctx.drawImage(img, 0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
-                        } catch (e) {
-                            console.error('Undo描画エラー:', e);
-                        }
+            await new Promise((resolve, reject) => {
+                img = new Image();
+
+                const cleanup = () => {
+                    if (timeoutId) {
+                        clearTimeout(timeoutId);
+                        timeoutId = null;
+                    }
+                    if (img) {
+                        img.onload = null;
+                        img.onerror = null;
+                    }
+                };
+
+                img.onload = () => {
+                    if (isResolved) return;
+                    isResolved = true;
+                    cleanup();
+                    // 新しい操作が開始されていた場合は描画をスキップ
+                    if (currentOperationId !== undoRedoOperationId) {
                         resolve();
-                    };
-                    img.onerror = (err) => {
-                        if (isTimedOut) {
-                            resolve();
-                            return;
-                        }
-                        if (timeoutId) clearTimeout(timeoutId);
-                        console.warn('Undo image load failed:', err);
-                        reject(new Error('Undo画像の読み込みに失敗しました'));
-                    };
-                    img.src = prevData;
-                }),
-                new Promise((_, reject) => {
-                    timeoutId = setTimeout(() => {
-                        isTimedOut = true;
-                        // 画像読み込みをキャンセル
-                        if (img) {
-                            img.onload = null;
-                            img.onerror = null;
-                            img.src = '';
-                        }
-                        reject(new Error('Undo処理がタイムアウトしました'));
-                    }, 5000);
-                })
-            ]).catch((err) => {
+                        return;
+                    }
+                    try {
+                        ctx.clearRect(0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
+                        ctx.drawImage(img, 0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
+                    } catch (e) {
+                        console.error('Undo描画エラー:', e);
+                    }
+                    resolve();
+                };
+                img.onerror = (err) => {
+                    if (isResolved) return;
+                    isResolved = true;
+                    cleanup();
+                    console.warn('Undo image load failed:', err);
+                    reject(new Error('Undo画像の読み込みに失敗しました'));
+                };
+
+                // タイムアウト処理
+                timeoutId = setTimeout(() => {
+                    if (isResolved) return;
+                    isResolved = true;
+                    cleanup();
+                    // 画像読み込みを中止
+                    if (img) img.src = '';
+                    reject(new Error('Undo処理がタイムアウトしました'));
+                }, 5000);
+
+                img.src = prevData;
+            }).catch((err) => {
                 console.error('Undo処理中にエラーが発生:', err);
             });
         } finally {
@@ -210,57 +216,60 @@ window.MojiQPageManager = (function() {
 
         let timeoutId = null;
         let img = null;
-        let isTimedOut = false;
+        let isResolved = false;  // 一度だけresolve/rejectするためのフラグ
         try {
             // タイムアウト付きで画像読み込み（5秒でタイムアウト）
-            await Promise.race([
-                new Promise((resolve, reject) => {
-                    img = new Image();
-                    img.onload = () => {
-                        // タイムアウト済みの場合は処理をスキップ
-                        if (isTimedOut) {
-                            resolve();
-                            return;
-                        }
-                        // タイムアウトタイマーをクリア
-                        if (timeoutId) clearTimeout(timeoutId);
-                        // 新しい操作が開始されていた場合は描画をスキップ
-                        if (currentOperationId !== undoRedoOperationId) {
-                            resolve();
-                            return;
-                        }
-                        try {
-                            ctx.clearRect(0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
-                            ctx.drawImage(img, 0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
-                        } catch (e) {
-                            console.error('Redo描画エラー:', e);
-                        }
+            await new Promise((resolve, reject) => {
+                img = new Image();
+
+                const cleanup = () => {
+                    if (timeoutId) {
+                        clearTimeout(timeoutId);
+                        timeoutId = null;
+                    }
+                    if (img) {
+                        img.onload = null;
+                        img.onerror = null;
+                    }
+                };
+
+                img.onload = () => {
+                    if (isResolved) return;
+                    isResolved = true;
+                    cleanup();
+                    // 新しい操作が開始されていた場合は描画をスキップ
+                    if (currentOperationId !== undoRedoOperationId) {
                         resolve();
-                    };
-                    img.onerror = (err) => {
-                        if (isTimedOut) {
-                            resolve();
-                            return;
-                        }
-                        if (timeoutId) clearTimeout(timeoutId);
-                        console.warn('Redo image load failed:', err);
-                        reject(new Error('Redo画像の読み込みに失敗しました'));
-                    };
-                    img.src = popped;
-                }),
-                new Promise((_, reject) => {
-                    timeoutId = setTimeout(() => {
-                        isTimedOut = true;
-                        // 画像読み込みをキャンセル
-                        if (img) {
-                            img.onload = null;
-                            img.onerror = null;
-                            img.src = '';
-                        }
-                        reject(new Error('Redo処理がタイムアウトしました'));
-                    }, 5000);
-                })
-            ]).catch((err) => {
+                        return;
+                    }
+                    try {
+                        ctx.clearRect(0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
+                        ctx.drawImage(img, 0, 0, state.baseCSSExtent.width, state.baseCSSExtent.height);
+                    } catch (e) {
+                        console.error('Redo描画エラー:', e);
+                    }
+                    resolve();
+                };
+                img.onerror = (err) => {
+                    if (isResolved) return;
+                    isResolved = true;
+                    cleanup();
+                    console.warn('Redo image load failed:', err);
+                    reject(new Error('Redo画像の読み込みに失敗しました'));
+                };
+
+                // タイムアウト処理
+                timeoutId = setTimeout(() => {
+                    if (isResolved) return;
+                    isResolved = true;
+                    cleanup();
+                    // 画像読み込みを中止
+                    if (img) img.src = '';
+                    reject(new Error('Redo処理がタイムアウトしました'));
+                }, 5000);
+
+                img.src = popped;
+            }).catch((err) => {
                 console.error('Redo処理中にエラーが発生:', err);
             });
         } finally {
@@ -573,11 +582,19 @@ window.MojiQPageManager = (function() {
     }
 
     /**
+     * イベントリスナーを登録し、参照を保存（クリーンアップ用）
+     */
+    function addWindowListener(eventName, handler) {
+        window.addEventListener(eventName, handler);
+        _eventListeners.push({ target: window, eventName, handler });
+    }
+
+    /**
      * ショートカットイベントのセットアップ
      */
     function setupShortcutListeners() {
         // 線幅変更 (Ctrl + [ / ]) - ペン・マーカー・消しゴム共通ロジック
-        window.addEventListener('mojiq:linewidth', (e) => {
+        addWindowListener('mojiq:linewidth', (e) => {
             const lineWidthRange = document.getElementById('lineWidth');
 
             // 現在の値を取得（1pxずつ変更）
@@ -618,7 +635,7 @@ window.MojiQPageManager = (function() {
         });
 
         // アンドゥ / リドゥ (Ctrl+Z / Ctrl+Shift+Z)
-        window.addEventListener('mojiq:history', (e) => {
+        addWindowListener('mojiq:history', (e) => {
             if (e.detail.action === 'undo') {
                 performUndo();
             } else if (e.detail.action === 'redo') {
@@ -627,7 +644,7 @@ window.MojiQPageManager = (function() {
         });
 
         // カット (Ctrl+X)
-        window.addEventListener('mojiq:cut', (e) => {
+        addWindowListener('mojiq:cut', (e) => {
             const DrawingSelect = window.MojiQDrawingSelect;
             if (DrawingSelect && DrawingSelect.hasSelection()) {
                 DrawingSelect.cutSelected();
@@ -635,7 +652,7 @@ window.MojiQPageManager = (function() {
         });
 
         // ペースト (Ctrl+V)
-        window.addEventListener('mojiq:paste', (e) => {
+        addWindowListener('mojiq:paste', (e) => {
             const DrawingSelect = window.MojiQDrawingSelect;
             if (DrawingSelect && DrawingSelect.hasClipboard()) {
                 DrawingSelect.pasteFromClipboard();
@@ -643,7 +660,7 @@ window.MojiQPageManager = (function() {
         });
 
         // 全消去 (Ctrl + Delete) - 統合モードでは常に動作
-        window.addEventListener('mojiq:clear', (e) => {
+        addWindowListener('mojiq:clear', (e) => {
             // confirmed: trueの場合は既に処理済みなのでスキップ
             if (e.detail && e.detail.confirmed) return;
             clearBtn.click();
@@ -654,7 +671,7 @@ window.MojiQPageManager = (function() {
         let slidingSpreadIndex = null;
 
         // ページナビゲーション
-        window.addEventListener('mojiq:page-navigate', async (e) => {
+        addWindowListener('mojiq:page-navigate', async (e) => {
             const action = e.detail.action;
 
             if (state.totalPages === 0) return;
@@ -734,7 +751,7 @@ window.MojiQPageManager = (function() {
         });
 
         // ページジャンプ (Ctrl+J)
-        window.addEventListener('mojiq:page-jump', async () => {
+        addWindowListener('mojiq:page-jump', async () => {
             if (state.totalPages === 0) return;
             if (window.MojiQViewerMode && MojiQViewerMode.isActive()) return;
 
@@ -876,7 +893,7 @@ window.MojiQPageManager = (function() {
         });
 
         // ページスライド（長押し中はスライダーのみ動かす）
-        window.addEventListener('mojiq:page-slide', (e) => {
+        addWindowListener('mojiq:page-slide', (e) => {
             const action = e.detail.action;
             const PdfManager = window.MojiQPdfManager;
 
@@ -945,7 +962,7 @@ window.MojiQPageManager = (function() {
         });
 
         // ページ確定（長押し終了時）
-        window.addEventListener('mojiq:page-confirm', () => {
+        addWindowListener('mojiq:page-confirm', () => {
             const PdfManager = window.MojiQPdfManager;
 
             // 見開きモードの場合
@@ -965,6 +982,16 @@ window.MojiQPageManager = (function() {
         });
     }
 
+    /**
+     * イベントリスナーのクリーンアップ
+     */
+    function cleanup() {
+        _eventListeners.forEach(({ target, eventName, handler }) => {
+            target.removeEventListener(eventName, handler);
+        });
+        _eventListeners.length = 0;
+    }
+
     return {
         init,
         saveCurrentCanvasToHistory,
@@ -974,6 +1001,7 @@ window.MojiQPageManager = (function() {
         insertBlankPage,
         deleteCurrentPage,
         clearDrawing,
-        getPageKey
+        getPageKey,
+        cleanup
     };
 })();
