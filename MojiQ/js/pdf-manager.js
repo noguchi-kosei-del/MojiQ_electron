@@ -548,6 +548,10 @@ window.MojiQPdfManager = (function() {
                     displayWidth: displayWidth,
                     displayHeight: displayHeight
                 });
+                // pageMappingにもdisplayWidthとdisplayHeightを設定
+                // 保存時にこれらの値が必要なため、プリフェッチ時点で設定しておく
+                mapItem.displayWidth = displayWidth;
+                mapItem.displayHeight = displayHeight;
             }
         } catch (e) {
             if (e.message !== 'aborted') {
@@ -2171,6 +2175,12 @@ window.MojiQPdfManager = (function() {
         if (state.pdfDocs.length === 0) return;
         if (isProcessing) return;
 
+        // BUG修正: 保存ロックを取得（他の保存処理との競合防止）
+        if (!acquireSaveLock()) {
+            MojiQModal.showAlert('保存処理を実行中です。完了後に再度お試しください。', '処理中');
+            return;
+        }
+
         // 処理中フラグを立てる（ファイルオープン防止）
         isProcessing = true;
 
@@ -2283,6 +2293,8 @@ window.MojiQPdfManager = (function() {
                 hideProgressOverlay();
             }
             isProcessing = false;
+            // BUG修正: 保存ロックを解放
+            releaseSaveLock();
             // メニューをアンロック
             lockMenu(false);
             if (savePdfBtn) {
@@ -2354,8 +2366,17 @@ window.MojiQPdfManager = (function() {
 
     /**
      * イベントリスナーのセットアップ
+     * BUG修正: 多重登録防止フラグを追加
      */
+    let eventListenersInitialized = false;
     function setupEventListeners() {
+        // 多重登録防止
+        if (eventListenersInitialized) {
+            console.warn('setupEventListeners: イベントリスナーは既に初期化済みです');
+            return;
+        }
+        eventListenersInitialized = true;
+
         // 回転ボタン
         // PDF/画像アップロード
         if (pdfUpload) {
@@ -2797,8 +2818,54 @@ window.MojiQPdfManager = (function() {
             }
             // choice === null (キャンセル) の場合は何もしない
         } else {
-            // 複数ファイルの場合は従来の処理
-            loadFilesFromInput(files);
+            // 複数ファイルの場合
+            // 配置可能なファイル（画像/PDF）を抽出
+            const placeableFiles = [];
+            let hasOtherFile = false;
+
+            for (const file of files) {
+                const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+                const isImage = file.type.startsWith('image/');
+
+                if (isPdf || isImage) {
+                    placeableFiles.push(file);
+                } else {
+                    hasOtherFile = true;
+                }
+            }
+
+            // 配置可能なファイルがある場合は確認ダイアログを表示
+            if (placeableFiles.length > 0) {
+                const choice = await MojiQModal.showChoice(
+                    `${placeableFiles.length}件のファイルが選択されました。\nどのように処理しますか？`,
+                    [
+                        { label: '画像として配置', value: 'place' },
+                        { label: '原稿として読み込み', value: 'reload' }
+                    ],
+                    'ファイルの処理方法'
+                );
+
+                if (choice === 'place') {
+                    // 画像として配置
+                    try {
+                        const result = await MojiQModeController.loadMultipleImageFiles(placeableFiles);
+                        // 配置結果を表示（スキップがあった場合のみ）
+                        if (result.skipped > 0) {
+                            console.log(`画像配置: ${result.success}件成功, ${result.skipped}件スキップ`);
+                        }
+                    } catch (error) {
+                        console.error('複数ファイル配置エラー:', error);
+                        MojiQModal.showAlert('ファイルの配置中にエラーが発生しました', 'エラー');
+                    }
+                } else if (choice === 'reload') {
+                    // 原稿として読み込み（従来の処理）
+                    loadFilesFromInput(files);
+                }
+                // choice === null (キャンセル) の場合は何もしない
+            } else if (hasOtherFile) {
+                // 配置可能なファイルがなく、他のファイルがある場合は従来の処理
+                loadFilesFromInput(files);
+            }
         }
     }
 
@@ -3437,10 +3504,21 @@ window.MojiQPdfManager = (function() {
      */
     async function saveTransparentPdf() {
         if (state.pdfDocs.length === 0) return;
+        // BUG修正: 処理中チェックを追加
+        if (isProcessing) return;
 
         // 設定モーダルを表示
         const settings = await showTransparentPdfModal();
         if (settings.cancelled) return;
+
+        // BUG修正: 保存ロックを取得
+        if (!acquireSaveLock()) {
+            MojiQModal.showAlert('保存処理を実行中です。完了後に再度お試しください。', '処理中');
+            return;
+        }
+
+        // BUG修正: 処理中フラグを立てる
+        isProcessing = true;
 
         // メニューをロック（誤操作防止）
         lockMenu(true);
@@ -3532,6 +3610,10 @@ window.MojiQPdfManager = (function() {
             console.error('透過PDF保存エラー:', e);
             MojiQModal.showAlert('保存エラー: ' + e.message, 'エラー');
         } finally {
+            // BUG修正: 処理中フラグをクリア
+            isProcessing = false;
+            // BUG修正: 保存ロックを解放
+            releaseSaveLock();
             // メニューをアンロック
             lockMenu(false);
             if (saveTransparentBtn) {
@@ -3547,6 +3629,14 @@ window.MojiQPdfManager = (function() {
      */
     async function saveTransparentPdfDirect() {
         if (state.pdfDocs.length === 0) return;
+        // BUG修正: 処理中チェックを追加
+        if (isProcessing) return;
+
+        // BUG修正: 保存ロックを取得
+        if (!acquireSaveLock()) {
+            MojiQModal.showAlert('保存処理を実行中です。完了後に再度お試しください。', '処理中');
+            return;
+        }
 
         // 処理中フラグを立てる（ファイルオープン防止）
         isProcessing = true;
@@ -3655,6 +3745,8 @@ window.MojiQPdfManager = (function() {
                 hideProgressOverlay();
             }
             isProcessing = false;
+            // BUG修正: 保存ロックを解放
+            releaseSaveLock();
             // メニューをアンロック
             lockMenu(false);
             if (savePdfBtn) {
@@ -5186,7 +5278,10 @@ window.MojiQPdfManager = (function() {
             progressFill.style.width = percent + '%';
         }
         if (progressText) {
-            progressText.textContent = `${current} / ${total} ${unit}`;
+            // パーセント表示の場合は四捨五入して整数で表示
+            const displayCurrent = unit === '%' ? Math.round(current) : current;
+            const displayTotal = unit === '%' ? Math.round(total) : total;
+            progressText.textContent = `${displayCurrent} / ${displayTotal} ${unit}`;
         }
     }
 
@@ -5851,6 +5946,10 @@ window.MojiQPdfManager = (function() {
         getCurrentPage: () => state?.currentPageNum || 1,
         // PDFドキュメント取得（注釈読み込み用）
         getPdfDocs: () => state?.pdfDocs || [],
-        getPageMapping: () => state?.pageMapping || []
+        getPageMapping: () => state?.pageMapping || [],
+        // プログレス表示（画像配置等で使用）
+        showProgress: showProgressOverlay,
+        hideProgress: hideProgressOverlay,
+        updateProgress: updateLoadingProgress
     };
 })();

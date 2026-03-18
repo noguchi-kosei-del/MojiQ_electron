@@ -27,32 +27,47 @@ window.MojiQPdfLibSaver = (function() {
      */
     function canvasToPngWithTimeout(canvas, timeout = 30000) {
         return new Promise((resolve) => {
+            // BUG修正: 二重resolve防止フラグ
+            let resolved = false;
+            const safeResolve = (value) => {
+                if (!resolved) {
+                    resolved = true;
+                    resolve(value);
+                }
+            };
+
             const timeoutId = setTimeout(() => {
                 console.warn('canvasToPngWithTimeout: toBlob timeout');
-                resolve({ data: null, timedOut: true });
+                safeResolve({ data: null, timedOut: true });
             }, timeout);
 
             try {
                 canvas.toBlob((blob) => {
                     clearTimeout(timeoutId);
                     if (!blob) {
-                        resolve({ data: null, timedOut: false });
+                        safeResolve({ data: null, timedOut: false });
                         return;
                     }
                     const reader = new FileReader();
                     reader.onload = () => {
-                        resolve({ data: new Uint8Array(reader.result), timedOut: false });
+                        safeResolve({ data: new Uint8Array(reader.result), timedOut: false });
                     };
                     reader.onerror = () => {
                         console.warn('canvasToPngWithTimeout: FileReader error');
-                        resolve({ data: null, timedOut: false });
+                        safeResolve({ data: null, timedOut: false });
                     };
-                    reader.readAsArrayBuffer(blob);
+                    // BUG修正: readAsArrayBufferの例外をキャッチ
+                    try {
+                        reader.readAsArrayBuffer(blob);
+                    } catch (readerError) {
+                        console.warn('canvasToPngWithTimeout: readAsArrayBuffer exception', readerError);
+                        safeResolve({ data: null, timedOut: false });
+                    }
                 }, 'image/png');
             } catch (e) {
                 clearTimeout(timeoutId);
                 console.warn('canvasToPngWithTimeout: toBlob exception', e);
-                resolve({ data: null, timedOut: false });
+                safeResolve({ data: null, timedOut: false });
             }
         });
     }
@@ -66,32 +81,47 @@ window.MojiQPdfLibSaver = (function() {
      */
     function canvasToJpegWithTimeout(canvas, quality = 0.75, timeout = 30000) {
         return new Promise((resolve) => {
+            // BUG修正: 二重resolve防止フラグ
+            let resolved = false;
+            const safeResolve = (value) => {
+                if (!resolved) {
+                    resolved = true;
+                    resolve(value);
+                }
+            };
+
             const timeoutId = setTimeout(() => {
                 console.warn('canvasToJpegWithTimeout: toBlob timeout');
-                resolve({ data: null, timedOut: true });
+                safeResolve({ data: null, timedOut: true });
             }, timeout);
 
             try {
                 canvas.toBlob((blob) => {
                     clearTimeout(timeoutId);
                     if (!blob) {
-                        resolve({ data: null, timedOut: false });
+                        safeResolve({ data: null, timedOut: false });
                         return;
                     }
                     const reader = new FileReader();
                     reader.onload = () => {
-                        resolve({ data: new Uint8Array(reader.result), timedOut: false });
+                        safeResolve({ data: new Uint8Array(reader.result), timedOut: false });
                     };
                     reader.onerror = () => {
                         console.warn('canvasToJpegWithTimeout: FileReader error');
-                        resolve({ data: null, timedOut: false });
+                        safeResolve({ data: null, timedOut: false });
                     };
-                    reader.readAsArrayBuffer(blob);
+                    // BUG修正: readAsArrayBufferの例外をキャッチ
+                    try {
+                        reader.readAsArrayBuffer(blob);
+                    } catch (readerError) {
+                        console.warn('canvasToJpegWithTimeout: readAsArrayBuffer exception', readerError);
+                        safeResolve({ data: null, timedOut: false });
+                    }
                 }, 'image/jpeg', quality);
             } catch (e) {
                 clearTimeout(timeoutId);
                 console.warn('canvasToJpegWithTimeout: toBlob exception', e);
-                resolve({ data: null, timedOut: false });
+                safeResolve({ data: null, timedOut: false });
             }
         });
     }
@@ -266,7 +296,11 @@ window.MojiQPdfLibSaver = (function() {
         if (spreadObjects && spreadObjects.length > 0) {
             // 見開きキーにオブジェクトがある場合、左右に分割して描画
             // spreadObjectsには左右両方のオブジェクトが含まれている
-            // X座標がleftPageWidth以下なら左ページ、それ以上なら右ページ
+            // 左右判定には見開きCSS座標系の半分の値を使用
+            // spreadCssWidth/Heightが指定されていればそれを使用、なければdisplayPageWidth*2を使用
+            const actualSpreadCssWidth = spreadCssWidth || (displayPageWidth * 2);
+            const cssHalfWidth = actualSpreadCssWidth / 2;
+
             leftObjects = spreadObjects.filter(obj => {
                 // オブジェクトの中心X座標を計算（より正確な左右判定）
                 let objX = null;
@@ -284,7 +318,8 @@ window.MojiQPdfLibSaver = (function() {
                     objX = sumX / obj.points.length;
                 }
                 // objXが取得できない場合は左ページとして扱う（フォールバック）
-                return objX === null || objX < leftPageWidth;
+                // CSS座標系の半分より小さければ左ページ
+                return objX === null || objX < cssHalfWidth;
             });
             rightObjects = spreadObjects.filter(obj => {
                 let objX = null;
@@ -298,8 +333,8 @@ window.MojiQPdfLibSaver = (function() {
                     const sumX = obj.points.reduce((sum, p) => sum + (p.x || 0), 0);
                     objX = sumX / obj.points.length;
                 }
-                // objXが有効で、leftPageWidth以上なら右ページ
-                return objX !== null && objX >= leftPageWidth;
+                // objXが有効で、CSS座標系の半分以上なら右ページ
+                return objX !== null && objX >= cssHalfWidth;
             });
         } else {
             // フォールバック: 元のページ番号から直接取得
@@ -741,6 +776,11 @@ window.MojiQPdfLibSaver = (function() {
         const onProgress = options.onProgress || (() => {});
         const targetSizeBytes = COMPRESS_SETTINGS.TARGET_SIZE_MB * 1024 * 1024;
         const imagePageData = options.imagePageData || (window.MojiQPdfManager && window.MojiQPdfManager.getImagePageData ? window.MojiQPdfManager.getImagePageData() : {});
+        // 見開きモード関連のオプション
+        const spreadMode = options.spreadMode || false;
+        const spreadMapping = options.spreadMapping || [];
+        const spreadCssPageWidth = options.spreadCssPageWidth || null;
+        const spreadCssPageHeight = options.spreadCssPageHeight || null;
 
         try {
             onProgress(5);
@@ -750,6 +790,10 @@ window.MojiQPdfLibSaver = (function() {
                 quality: COMPRESS_SETTINGS.INITIAL_QUALITY,
                 scale: COMPRESS_SETTINGS.INITIAL_SCALE,
                 imagePageData,
+                spreadMode,
+                spreadMapping,
+                spreadCssPageWidth,
+                spreadCssPageHeight,
                 onProgress: (p) => onProgress(5 + p * 0.2)
             });
 
@@ -790,6 +834,10 @@ window.MojiQPdfLibSaver = (function() {
                 quality: estimatedQuality,
                 scale,
                 imagePageData,
+                spreadMode,
+                spreadMapping,
+                spreadCssPageWidth,
+                spreadCssPageHeight,
                 onProgress: (p) => onProgress(30 + p * 0.3)
             });
 
@@ -807,12 +855,20 @@ window.MojiQPdfLibSaver = (function() {
             }
 
             // ステップ4: まだ大きい場合は段階的に品質を下げる
+            // BUG修正: 全体タイムアウトを追加（UIフリーズ防止）
             let quality = estimatedQuality;
             let bestBytes = pdfBytes;
             let attempts = 0;
             const maxAttempts = 8;
+            const overallStartTime = Date.now();
+            const OVERALL_TIMEOUT_MS = 180000; // 3分
 
             while (attempts < maxAttempts && pdfBytes.length > targetSizeBytes) {
+                // 全体タイムアウトチェック
+                if (Date.now() - overallStartTime > OVERALL_TIMEOUT_MS) {
+                    console.warn('圧縮処理が全体タイムアウト（3分）に達しました');
+                    break;
+                }
                 attempts++;
 
                 // 品質を下げる
@@ -833,6 +889,10 @@ window.MojiQPdfLibSaver = (function() {
                     quality,
                     scale,
                     imagePageData,
+                    spreadMode,
+                    spreadMapping,
+                    spreadCssPageWidth,
+                    spreadCssPageHeight,
                     onProgress: () => {}
                 });
 
@@ -877,6 +937,11 @@ window.MojiQPdfLibSaver = (function() {
         const scale = options.scale || COMPRESS_SETTINGS.INITIAL_SCALE;
         const imagePageData = options.imagePageData || {};
         const onProgress = options.onProgress || (() => {});
+        // 見開きモード関連のオプション
+        const spreadMode = options.spreadMode || false;
+        const spreadMapping = options.spreadMapping || [];
+        const spreadCssPageWidth = options.spreadCssPageWidth || null;
+        const spreadCssPageHeight = options.spreadCssPageHeight || null;
 
         try {
             const pdfDoc = await PDFDocument.create();
@@ -911,15 +976,30 @@ window.MojiQPdfLibSaver = (function() {
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
                     // 画像データをImageに変換
+                    // BUG修正: Blob URL のメモリリークを防止
                     const img = new Image();
+                    let blobUrl = null;
                     await new Promise((resolve, reject) => {
-                        img.onload = resolve;
-                        img.onerror = reject;
+                        img.onload = () => {
+                            // Blob URL を解放
+                            if (blobUrl) {
+                                URL.revokeObjectURL(blobUrl);
+                            }
+                            resolve();
+                        };
+                        img.onerror = (e) => {
+                            // エラー時も Blob URL を解放
+                            if (blobUrl) {
+                                URL.revokeObjectURL(blobUrl);
+                            }
+                            reject(e);
+                        };
                         if (typeof imgData.data === 'string') {
                             img.src = imgData.data;
                         } else {
                             const blob = new Blob([imgData.data], { type: imgData.type === 'png' ? 'image/png' : 'image/jpeg' });
-                            img.src = URL.createObjectURL(blob);
+                            blobUrl = URL.createObjectURL(blob);
+                            img.src = blobUrl;
                         }
                     });
 
@@ -964,17 +1044,111 @@ window.MojiQPdfLibSaver = (function() {
                 const displayHeight = mapItem.displayHeight || pageHeight;
 
                 if (window.MojiQDrawingObjects && window.MojiQDrawingRenderer) {
-                    const pageObjects = window.MojiQDrawingObjects.getPageObjects(pageNum);
-                    if (pageObjects && pageObjects.length > 0) {
-                        const scaleX = (pageWidth * scale) / displayWidth;
-                        const scaleY = (pageHeight * scale) / displayHeight;
-
-                        ctx.save();
-                        ctx.scale(scaleX, scaleY);
-                        for (const obj of pageObjects) {
-                            window.MojiQDrawingRenderer.renderObject(ctx, obj);
+                    // 見開きモードの場合は見開きキーからオブジェクトを取得して座標変換
+                    if (spreadMode && spreadMapping.length > 0 && spreadCssPageWidth && spreadCssPageHeight) {
+                        // このページがどの見開きに属するか検索
+                        let spreadIndex = -1;
+                        let isLeftPage = false;
+                        let isRightPage = false;
+                        for (let si = 0; si < spreadMapping.length; si++) {
+                            const spread = spreadMapping[si];
+                            if (spread.leftPage === pageNum) {
+                                spreadIndex = si;
+                                isLeftPage = true;
+                                break;
+                            }
+                            if (spread.rightPage === pageNum) {
+                                spreadIndex = si;
+                                isRightPage = true;
+                                break;
+                            }
                         }
-                        ctx.restore();
+
+                        if (spreadIndex >= 0) {
+                            const spreadKey = window.MojiQDrawingObjects.getSpreadPageKey(spreadIndex);
+                            const spreadObjects = window.MojiQDrawingObjects.getPageObjects(spreadKey);
+                            if (spreadObjects && spreadObjects.length > 0) {
+                                // 見開き座標系 → 単ページ座標系のスケール
+                                const scaleFromSpreadX = displayWidth / spreadCssPageWidth;
+                                const scaleFromSpreadY = displayHeight / spreadCssPageHeight;
+                                // 単ページ座標系 → キャンバス座標系のスケール
+                                const scaleToCanvasX = (pageWidth * scale) / displayWidth;
+                                const scaleToCanvasY = (pageHeight * scale) / displayHeight;
+
+                                ctx.save();
+                                for (const obj of spreadObjects) {
+                                    // オブジェクトのバウンディングボックスを計算してこのページに属するか判定
+                                    let objMinX = Infinity, objMaxX = -Infinity;
+                                    if (obj.points) {
+                                        for (const p of obj.points) {
+                                            if (p.x < objMinX) objMinX = p.x;
+                                            if (p.x > objMaxX) objMaxX = p.x;
+                                        }
+                                    } else if (obj.x !== undefined && obj.width !== undefined) {
+                                        objMinX = obj.x;
+                                        objMaxX = obj.x + obj.width;
+                                    } else if (obj.x !== undefined) {
+                                        objMinX = obj.x;
+                                        objMaxX = obj.x;
+                                    }
+
+                                    // このページに属するか判定
+                                    const pageStartX = isLeftPage ? 0 : spreadCssPageWidth;
+                                    const pageEndX = isLeftPage ? spreadCssPageWidth : spreadCssPageWidth * 2;
+                                    // オブジェクトがこのページ範囲内にあるか（一部でも含まれていれば描画）
+                                    if (objMaxX < pageStartX || objMinX >= pageEndX) {
+                                        continue; // このページには属さない
+                                    }
+
+                                    // ディープコピーして座標変換
+                                    const transformedObj = JSON.parse(JSON.stringify(obj));
+                                    const offsetX = isRightPage ? spreadCssPageWidth : 0;
+
+                                    // X座標をオフセット
+                                    if (transformedObj.points) {
+                                        for (const p of transformedObj.points) {
+                                            p.x = (p.x - offsetX) * scaleFromSpreadX * scaleToCanvasX;
+                                            p.y = p.y * scaleFromSpreadY * scaleToCanvasY;
+                                        }
+                                    }
+                                    if (transformedObj.x !== undefined) {
+                                        transformedObj.x = (transformedObj.x - offsetX) * scaleFromSpreadX * scaleToCanvasX;
+                                    }
+                                    if (transformedObj.y !== undefined) {
+                                        transformedObj.y = transformedObj.y * scaleFromSpreadY * scaleToCanvasY;
+                                    }
+                                    if (transformedObj.width !== undefined) {
+                                        transformedObj.width = transformedObj.width * scaleFromSpreadX * scaleToCanvasX;
+                                    }
+                                    if (transformedObj.height !== undefined) {
+                                        transformedObj.height = transformedObj.height * scaleFromSpreadY * scaleToCanvasY;
+                                    }
+                                    if (transformedObj.lineWidth !== undefined) {
+                                        transformedObj.lineWidth = transformedObj.lineWidth * scaleFromSpreadX * scaleToCanvasX;
+                                    }
+                                    if (transformedObj.fontSize !== undefined) {
+                                        transformedObj.fontSize = transformedObj.fontSize * scaleFromSpreadY * scaleToCanvasY;
+                                    }
+
+                                    window.MojiQDrawingRenderer.renderObject(ctx, transformedObj);
+                                }
+                                ctx.restore();
+                            }
+                        }
+                    } else {
+                        // 通常モード（単ページ）
+                        const pageObjects = window.MojiQDrawingObjects.getPageObjects(pageNum);
+                        if (pageObjects && pageObjects.length > 0) {
+                            const scaleX = (pageWidth * scale) / displayWidth;
+                            const scaleY = (pageHeight * scale) / displayHeight;
+
+                            ctx.save();
+                            ctx.scale(scaleX, scaleY);
+                            for (const obj of pageObjects) {
+                                window.MojiQDrawingRenderer.renderObject(ctx, obj);
+                            }
+                            ctx.restore();
+                        }
                     }
                 }
 

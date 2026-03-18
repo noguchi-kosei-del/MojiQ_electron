@@ -165,6 +165,14 @@ const DrawingExportImport = {
         // 現在のキャンバスサイズをフォールバック用に取得
         const fallbackSize = this._getCurrentCanvasSize();
 
+        // 確認済みコメントの情報を取得（PDF注釈由来オブジェクトを除外するため）
+        let checkedSignatures = [];
+        if (window.ProofreadingPanel && window.ProofreadingPanel.getCheckedCommentSignatures) {
+            checkedSignatures = window.ProofreadingPanel.getCheckedCommentSignatures();
+        }
+
+        const filteredData = {};
+
         for (const pageNum in data) {
             // 各ページのサイズを取得（ページごとに異なる場合に対応）
             let pageSize = null;
@@ -180,9 +188,57 @@ const DrawingExportImport = {
                 width: pageSize.width,
                 height: pageSize.height
             };
+
+            // 確認済みコメント（済スタンプ付き）に対応するPDF注釈由来オブジェクトを除外
+            if (checkedSignatures.length > 0) {
+                filteredData[pageNum] = data[pageNum].filter(obj =>
+                    !this._isCheckedPdfAnnotation(obj, checkedSignatures, parseInt(pageNum))
+                );
+            } else {
+                filteredData[pageNum] = data[pageNum];
+            }
         }
 
-        return { data, pageSizes };
+        return { data: filteredData, pageSizes };
+    },
+
+    /**
+     * オブジェクトが確認済みPDF注釈または関連する済スタンプかどうかを判定
+     * @param {Object} obj - 描画オブジェクト
+     * @param {Array} checkedSignatures - 確認済みコメントの識別情報
+     * @param {number} pageNum - ページ番号
+     * @returns {boolean} 除外対象の場合true
+     */
+    _isCheckedPdfAnnotation(obj, checkedSignatures, pageNum) {
+        // コメントタブから配置された済スタンプ（commentIndexを持つ）は除外
+        // 済スタンプツールで手動配置したものはcommentIndexを持たないので残る
+        if (obj.type === 'doneStamp' && obj.commentIndex !== undefined) {
+            return true;
+        }
+
+        // PDF注釈由来でなければfalse
+        if (obj.type !== 'text' || !obj._pdfAnnotationSource) {
+            return false;
+        }
+
+        for (const sig of checkedSignatures) {
+            if (sig.pdfPage !== pageNum) continue;
+
+            // テキスト内容が一致
+            if (obj.text === sig.contents) {
+                return true;
+            }
+
+            // テキストが編集されている場合は座標で判定
+            if (sig.canvasRect && obj.startPos) {
+                const dx = Math.abs(obj.startPos.x - sig.canvasRect.x);
+                const dy = Math.abs(obj.startPos.y - sig.canvasRect.y);
+                if (dx < 30 && dy < 30) {
+                    return true;
+                }
+            }
+        }
+        return false;
     },
 
     /**
@@ -264,7 +320,20 @@ const DrawingExportImport = {
         }
 
         // ページサイズ情報を準備（読み込み時のスケーリング用）
+        // 確認済みコメントとその済スタンプはここで除外される
         const { data: exportDataContent, pageSizes } = await this._prepareExportData(data);
+
+        // フィルタリング後にデータが空かチェック
+        // （すべてのコメントが確認済みで他の描画がない場合）
+        const hasObjects = Object.values(exportDataContent).some(pageData => pageData.length > 0);
+        if (!hasObjects) {
+            if (window.MojiQModal && window.MojiQModal.showAlert) {
+                await window.MojiQModal.showAlert('エクスポートする描画データがありません。', '描画データのエクスポート');
+            } else {
+                alert('エクスポートする描画データがありません。');
+            }
+            return;
+        }
 
         const exportData = {
             version: this.VERSION,
@@ -546,7 +615,15 @@ const DrawingExportImport = {
         }
 
         // ページサイズ情報を準備（読み込み時のスケーリング用）
+        // 確認済みコメントとその済スタンプはここで除外される
         const { data: exportDataContent, pageSizes } = await this._prepareExportData(data);
+
+        // フィルタリング後にデータが空かチェック
+        // （すべてのコメントが確認済みで他の描画がない場合は保存不要）
+        const hasObjects = Object.values(exportDataContent).some(pageData => pageData.length > 0);
+        if (!hasObjects) {
+            return false;
+        }
 
         const exportData = {
             version: this.VERSION,

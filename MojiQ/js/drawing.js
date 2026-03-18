@@ -1765,6 +1765,9 @@ window.MojiQDrawing = (function() {
                             redrawCanvas(false);
                         }
                     }
+                } else {
+                    // サイズが小さすぎて保存されない場合、プレビューをクリア
+                    redrawCanvas(false);
                 }
             }
 
@@ -1831,6 +1834,9 @@ window.MojiQDrawing = (function() {
                         color: style.color,
                         lineWidth: style.lineWidth
                     });
+                } else {
+                    // サイズが小さすぎて保存されない場合、プレビューをクリア
+                    redrawCanvas(false);
                 }
             }
 
@@ -1868,6 +1874,9 @@ window.MojiQDrawing = (function() {
                         color: style.color,
                         lineWidth: style.lineWidth
                     });
+                } else {
+                    // サイズが小さすぎて保存されない場合、プレビューをクリア
+                    redrawCanvas(false);
                 }
             }
 

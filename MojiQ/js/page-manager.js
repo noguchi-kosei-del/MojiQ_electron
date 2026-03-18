@@ -332,6 +332,8 @@ window.MojiQPageManager = (function() {
     async function insertBlankPage(offset) {
         if (state.totalPages === 0) return;
 
+        // BUG修正: 未処理例外を防ぐためのtry-catch追加
+        try {
         // 見開きモード時は現在表示中の見開きからページ番号を取得
         let effectivePageNum = state.currentPageNum;
         if (MojiQPdfManager.isSpreadViewMode()) {
@@ -413,6 +415,12 @@ window.MojiQPageManager = (function() {
 
         const positionText = offset === 0 ? '前' : '後';
         MojiQModal.showAlert(`白紙ページを現在のページの${positionText}に追加しました。`, '追加完了');
+        } catch (error) {
+            console.error('insertBlankPage: 白紙ページ挿入中にエラーが発生しました', error);
+            if (window.MojiQModal && MojiQModal.showAlert) {
+                MojiQModal.showAlert('白紙ページの挿入に失敗しました: ' + error.message, 'エラー');
+            }
+        }
     }
 
     /**

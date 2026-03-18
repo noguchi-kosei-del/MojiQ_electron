@@ -1188,29 +1188,47 @@ const ProofreadingPanel = (() => {
         if (window.MojiQDrawingObjects && window.MojiQDrawingObjects.getPageObjects) {
             const pageObjects = window.MojiQDrawingObjects.getPageObjects(pdfPage);
             if (pageObjects) {
-                // コメント内容と一致するテキストオブジェクトを検索
-                const textObj = pageObjects.find(obj =>
-                    obj.type === 'text' &&
-                    obj.text === contents &&
-                    obj._pdfAnnotationSource // PDF注釈から読み込まれたもの
-                );
-                if (textObj && textObj.startPos) {
-                    canvasX = textObj.startPos.x;
-                    canvasY = textObj.startPos.y;
+                // 1. まずテキスト内容が一致するPDF注釈由来のテキストオブジェクトを検索
+                for (const obj of pageObjects) {
+                    if (obj.type === 'text' && obj._pdfAnnotationSource && obj.text === contents && obj.startPos) {
+                        canvasX = obj.startPos.x;
+                        canvasY = obj.startPos.y;
+                        break;
+                    }
+                }
+
+                // 2. テキスト内容で見つからない場合（編集された場合）は座標で検索
+                if (canvasX === undefined) {
+                    // コメントの座標情報を取得
+                    let targetX = null;
+                    let targetY = null;
+                    if (comment.canvasRect) {
+                        targetX = comment.canvasRect.x;
+                        targetY = comment.canvasRect.y;
+                    }
+
+                    if (targetX !== null && targetY !== null) {
+                        let minDistance = Infinity;
+                        for (const obj of pageObjects) {
+                            if (obj.type !== 'text' || !obj._pdfAnnotationSource || !obj.startPos) {
+                                continue;
+                            }
+                            const dx = Math.abs(obj.startPos.x - targetX);
+                            const dy = Math.abs(obj.startPos.y - targetY);
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                canvasX = obj.startPos.x;
+                                canvasY = obj.startPos.y;
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        // テキストオブジェクトが見つからない場合はrectから計算（フォールバック）
-        if (canvasX === undefined && comment.rect) {
-            const rect = comment.rect;
-            const viewportHeight = comment.viewportHeight || 792;
-            canvasX = rect[0];
-            canvasY = viewportHeight - rect[3];
-        }
-
         if (canvasX === undefined) {
-            console.warn('コメントの座標を取得できませんでした:', comment);
+            console.warn('コメントに対応するテキストオブジェクトが見つかりませんでした:', comment);
             return;
         }
 
@@ -1301,6 +1319,26 @@ const ProofreadingPanel = (() => {
                 if (checkbox) checkbox.checked = false;
             });
         }
+    }
+
+    /**
+     * 確認済みコメントの識別情報を取得
+     * 描画エクスポート時にPDF注釈由来オブジェクトを除外するために使用
+     * @returns {Array<{pdfPage: number, contents: string, canvasRect: {x: number, y: number}}>}
+     */
+    function getCheckedCommentSignatures() {
+        const signatures = [];
+        for (const index of checkedComments) {
+            const comment = pdfCommentsData[index];
+            if (comment) {
+                signatures.push({
+                    pdfPage: comment.pdfPage,
+                    contents: comment.contents,
+                    canvasRect: comment.canvasRect
+                });
+            }
+        }
+        return signatures;
     }
 
     /**
@@ -1538,28 +1576,51 @@ const ProofreadingPanel = (() => {
         }
 
         // 横長原稿（見開き内容PDF）かどうかを判定
+        // 見開きモードでは白紙ページが追加されるため、pageMappingから最初の非白紙ページを探す
         let isLandscapeSpread = false;
-        if (window.MojiQPdfManager.getOriginalPageSize) {
-            const pageSize = window.MojiQPdfManager.getOriginalPageSize(1);
-            if (pageSize && pageSize.width > pageSize.height) {
-                isLandscapeSpread = true;
+        for (let idx = 0; idx < pageMapping.length; idx++) {
+            const mapItem = pageMapping[idx];
+            // 白紙ページでないPDFページを探す
+            if (mapItem && mapItem.docIndex >= 0 && !mapItem.isSpreadBlank) {
+                // displayWidth/Heightまたはwidth/heightを確認
+                const w = mapItem.originalWidth || mapItem.displayWidth || mapItem.width;
+                const h = mapItem.originalHeight || mapItem.displayHeight || mapItem.height;
+                if (w && h && w > h) {
+                    isLandscapeSpread = true;
+                }
+                break; // 最初の非白紙ページで判定完了
             }
+        }
+
+        // アプリの見開きモード（SpreadViewMode）かどうかを判定
+        let isSpreadViewMode = false;
+        if (window.MojiQPdfManager.isSpreadViewMode) {
+            isSpreadViewMode = window.MojiQPdfManager.isSpreadViewMode();
         }
 
         try {
             pdfCommentsData = [];
             resetCheckedComments(); // 確認済み状態をリセット
 
+            // BUG修正: UIブロック対策 - 一定間隔でUIに制御を返す
+            const CHUNK_SIZE = 10; // 10ページごとにUIに制御を返す
+            const yieldToUI = () => new Promise(resolve => setTimeout(resolve, 0));
+
             // 各ページを走査して注釈を取得
             for (let i = 0; i < pageMapping.length; i++) {
+                // UIブロック対策: 一定間隔でUIに制御を返す
+                if (i > 0 && i % CHUNK_SIZE === 0) {
+                    await yieldToUI();
+                }
                 const mapItem = pageMapping[i];
-                const pdfPageNum = i + 1; // PDFの物理ページ番号
+                const appPageNum = i + 1; // アプリ上のページ番号（ジャンプ用）
+                const actualPdfPageNum = mapItem.pageNum; // PDFドキュメント内の実際のページ番号
 
                 // PDFページの場合のみ注釈を取得（画像ページや白紙ページはスキップ）
                 if (mapItem.docIndex >= 0 && pdfDocs[mapItem.docIndex]) {
                     const pdf = pdfDocs[mapItem.docIndex];
                     try {
-                        const page = await pdf.getPage(mapItem.pageNum);
+                        const page = await pdf.getPage(actualPdfPageNum);
                         const annotations = await page.getAnnotations();
                         const viewport = page.getViewport({ scale: 1 });
                         const pageWidth = viewport.width;
@@ -1569,17 +1630,26 @@ const ProofreadingPanel = (() => {
                             // Popup注釈は親注釈と同じ内容を持つため除外
                             if (annot.contents && annot.contents.trim() && annot.subtype !== 'Popup') {
                                 // 表示用ノンブルを計算
-                                let displayNombre = pdfPageNum;
+                                let displayNombre = actualPdfPageNum;
 
-                                if (isLandscapeSpread && pdfPageNum >= 2) {
+                                if (isLandscapeSpread && actualPdfPageNum >= 2) {
                                     // 横長原稿の場合: 2ページ目以降は見開き計算
                                     // PDFページ2 → ノンブル2-3、PDFページ3 → ノンブル4-5...
-                                    const baseNombre = (pdfPageNum - 1) * 2;
+                                    const baseNombre = (actualPdfPageNum - 1) * 2;
 
                                     // 注釈の位置から左/右ページを判定（右綴じ: 右=偶数、左=奇数）
-                                    if (annot.rect && annot.rect[0] !== undefined) {
-                                        const annotX = annot.rect[0];
-                                        if (annotX < pageWidth / 2) {
+                                    // 注釈の中心X座標を使用（rectがある場合）
+                                    let annotCenterX = null;
+                                    if (annot.rect && annot.rect.length >= 4) {
+                                        // rect = [x1, y1, x2, y2] (左下, 右上)
+                                        annotCenterX = (annot.rect[0] + annot.rect[2]) / 2;
+                                    } else if (annot.rect && annot.rect[0] !== undefined) {
+                                        // 最低限x1がある場合はそれを使用
+                                        annotCenterX = annot.rect[0];
+                                    }
+
+                                    if (annotCenterX !== null) {
+                                        if (annotCenterX < pageWidth / 2) {
                                             // 左側 = 奇数ノンブル（大きい数）
                                             displayNombre = baseNombre + 1;
                                         } else {
@@ -1590,24 +1660,50 @@ const ProofreadingPanel = (() => {
                                         // 位置不明の場合は範囲表示
                                         displayNombre = baseNombre + '-' + (baseNombre + 1);
                                     }
+                                } else if (isSpreadViewMode && !isLandscapeSpread) {
+                                    // アプリの見開きモード（横長原稿ではない場合）
+                                    // 見開きモードでは白紙ページが追加されているため、アプリページ番号からノンブルを計算
+                                    // 見開きインデックス = floor((appPageNum - 1) / 2)
+                                    // 見開きインデックス0: ノンブル1（表紙）
+                                    // 見開きインデックスN（N>=1）: 右側=ノンブル2N、左側=ノンブル2N+1
+                                    const spreadIndex = Math.floor((appPageNum - 1) / 2);
+                                    if (spreadIndex === 0) {
+                                        displayNombre = 1;
+                                    } else {
+                                        // 奇数アプリページ → 右側（偶数ノンブル）
+                                        // 偶数アプリページ → 左側（奇数ノンブル）
+                                        if (appPageNum % 2 === 1) {
+                                            // 右側 = 偶数ノンブル
+                                            displayNombre = spreadIndex * 2;
+                                        } else {
+                                            // 左側 = 奇数ノンブル
+                                            displayNombre = spreadIndex * 2 + 1;
+                                        }
+                                    }
                                 }
 
                                 // PDF座標をキャンバス座標に変換
                                 // rectは[x1, y1, x2, y2]形式（左下, 右上）
                                 let canvasRect = null;
                                 if (annot.rect && annot.rect.length >= 4) {
-                                    // viewportのtransformを使って座標変換
-                                    // transform: [scaleX, 0, 0, -scaleY, 0, height]
+                                    // 表示サイズを取得（pdf-annotation-loaderと同じ座標系を使用）
+                                    const displaySize = window.MojiQPdfManager.getDisplayPageSize ?
+                                        window.MojiQPdfManager.getDisplayPageSize(appPageNum) : null;
+                                    const displayWidth = displaySize ? displaySize.width : viewport.width;
+                                    const displayHeight = displaySize ? displaySize.height : viewport.height;
+                                    const scaleX = displayWidth / viewport.width;
+                                    const scaleY = displayHeight / viewport.height;
+
                                     const [x1, y1, x2, y2] = annot.rect;
-                                    // 左上座標をキャンバス座標に変換
-                                    const canvasX = x1;
-                                    const canvasY = viewport.height - y2; // Y軸反転
+                                    // 左上座標をキャンバス座標に変換（スケール適用）
+                                    const canvasX = x1 * scaleX;
+                                    const canvasY = (viewport.height - y2) * scaleY; // Y軸反転
                                     canvasRect = { x: canvasX, y: canvasY };
                                 }
 
                                 pdfCommentsData.push({
                                     page: displayNombre,
-                                    pdfPage: pdfPageNum, // 実際のPDFページ（ジャンプ用）
+                                    pdfPage: appPageNum, // アプリ上のページ番号（ジャンプ用）
                                     type: annot.subtype,
                                     contents: annot.contents,
                                     color: annot.color,
@@ -1619,7 +1715,7 @@ const ProofreadingPanel = (() => {
                             }
                         }
                     } catch (pageError) {
-                        console.warn(`ページ${pdfPageNum}の注釈取得に失敗:`, pageError);
+                        console.warn(`ページ${actualPdfPageNum}の注釈取得に失敗:`, pageError);
                     }
                 }
             }
@@ -1879,6 +1975,7 @@ const ProofreadingPanel = (() => {
         toggleCommentChecked,
         toggleItemChecked,
         resetCheckedComments,
+        getCheckedCommentSignatures,
         jumpToPage,
         jumpToCommentPage,
         copyContent,

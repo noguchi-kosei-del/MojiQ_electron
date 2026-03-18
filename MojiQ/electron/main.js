@@ -411,7 +411,8 @@ function createMenuTemplate() {
             });
             if (!result.canceled && result.filePaths.length > 0) {
               const filePath = result.filePaths[0];
-              const data = fs.readFileSync(filePath);
+              // BUG修正: 同期ファイル操作を非同期に変更
+              const data = await fs.promises.readFile(filePath);
               const base64 = data.toString('base64');
               const fileName = path.basename(filePath);
               mainWindow.webContents.send('file-opened', { data: base64, name: fileName });
@@ -502,12 +503,13 @@ ipcMain.handle('show-save-dialog', async (event, options) => {
 });
 
 // ファイル読み込み
+// BUG修正: readFileSyncをfs.promises.readFileに変更（メインプロセスブロック防止）
 ipcMain.handle('read-file', async (event, filePath) => {
   try {
     if (!isPathSafe(filePath)) {
       return { success: false, error: '不正なファイルパスです' };
     }
-    const data = fs.readFileSync(filePath);
+    const data = await fs.promises.readFile(filePath);
     // JSONファイルの場合はテキストとして返す
     if (filePath.toLowerCase().endsWith('.json')) {
       return { success: true, data: data.toString('utf-8') };
@@ -521,6 +523,7 @@ ipcMain.handle('read-file', async (event, filePath) => {
 
 // ファイル保存（アトミック書き込み: 一時ファイルに書いてからリネーム）
 // QA対策 #10: 読み取り専用ファイル判定
+// BUG修正: 同期ファイル操作を非同期に変更（メインプロセスブロック防止）
 ipcMain.handle('save-file', async (event, filePath, base64Data) => {
   if (!isPathSafe(filePath)) {
     return { success: false, error: '不正なファイルパスです', errorCode: 'INVALID_PATH' };
@@ -528,11 +531,16 @@ ipcMain.handle('save-file', async (event, filePath, base64Data) => {
 
   // 書き込み権限チェック（QA対策 #10）
   try {
-    if (fs.existsSync(filePath)) {
-      fs.accessSync(filePath, fs.constants.W_OK);
+    try {
+      await fs.promises.access(filePath, fs.constants.F_OK);
+      // ファイルが存在する場合、書き込み権限をチェック
+      await fs.promises.access(filePath, fs.constants.W_OK);
+    } catch (e) {
+      // ファイルが存在しない場合は問題なし（新規作成）
+      if (e.code !== 'ENOENT') throw e;
     }
     const dirPath = path.dirname(filePath);
-    fs.accessSync(dirPath, fs.constants.W_OK);
+    await fs.promises.access(dirPath, fs.constants.W_OK);
   } catch (accessError) {
     if (accessError.code === 'EACCES' || accessError.code === 'EPERM') {
       return {
@@ -555,13 +563,16 @@ ipcMain.handle('save-file', async (event, filePath, base64Data) => {
   const tempFilePath = filePath + '.tmp.' + Date.now() + '-' + randomSuffix;
   try {
     const buffer = Buffer.from(base64Data, 'base64');
-    fs.writeFileSync(tempFilePath, buffer);
+    await fs.promises.writeFile(tempFilePath, buffer);
     // アトミックにリネーム（書き込み中のクラッシュでも元ファイルを破損しない）
-    fs.renameSync(tempFilePath, filePath);
+    await fs.promises.rename(tempFilePath, filePath);
     return { success: true };
   } catch (error) {
     // 一時ファイルが残っている場合は削除
-    try { if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath); } catch (e) { /* ignore */ }
+    try {
+      await fs.promises.access(tempFilePath, fs.constants.F_OK);
+      await fs.promises.unlink(tempFilePath);
+    } catch (e) { /* ignore */ }
 
     // エラーコードに基づく詳細メッセージ（QA対策 #10）
     let errorMessage = error.message;
@@ -588,6 +599,7 @@ ipcMain.handle('save-file', async (event, filePath, base64Data) => {
 });
 
 // ディスク容量チェック（QA対策 #50）
+// BUG修正: execSyncをexecに変更（メインプロセスブロック防止）
 ipcMain.handle('check-disk-space', async (event, filePath, requiredBytes) => {
   try {
     if (process.platform === 'win32') {
@@ -597,21 +609,30 @@ ipcMain.handle('check-disk-space', async (event, filePath, requiredBytes) => {
         console.warn('無効なドライブレター:', drive);
         return { success: true, isEnough: true };
       }
-      const { execSync } = require('child_process');
-      const result = execSync(
-        `wmic logicaldisk where "DeviceID='${drive}:'" get FreeSpace`,
-        { encoding: 'utf8', timeout: 5000 }
-      );
-      const lines = result.trim().split('\n');
-      if (lines.length >= 2) {
-        const freeSpace = parseInt(lines[1].trim(), 10);
-        // 必要容量の1.5倍のマージンを確保
-        const requiredWithMargin = requiredBytes * 1.5;
-        return {
-          success: true,
-          freeSpace: freeSpace,
-          isEnough: freeSpace > requiredWithMargin
-        };
+      const { exec } = require('child_process');
+      const { promisify } = require('util');
+      const execAsync = promisify(exec);
+
+      try {
+        const { stdout } = await execAsync(
+          `wmic logicaldisk where "DeviceID='${drive}:'" get FreeSpace`,
+          { encoding: 'utf8', timeout: 5000 }
+        );
+        const lines = stdout.trim().split('\n');
+        if (lines.length >= 2) {
+          const freeSpace = parseInt(lines[1].trim(), 10);
+          // 必要容量の1.5倍のマージンを確保
+          const requiredWithMargin = requiredBytes * 1.5;
+          return {
+            success: true,
+            freeSpace: freeSpace,
+            isEnough: freeSpace > requiredWithMargin
+          };
+        }
+      } catch (execError) {
+        // タイムアウトまたはコマンド失敗時はチェックをスキップ
+        console.warn('WMICコマンド実行失敗:', execError.message);
+        return { success: true, isEnough: true };
       }
     }
     // 非Windows環境またはコマンド失敗時はチェックをスキップ
@@ -624,6 +645,7 @@ ipcMain.handle('check-disk-space', async (event, filePath, requiredBytes) => {
 });
 
 // 印刷用PDFをシステムビューアで開く
+// BUG修正: 同期ファイル操作を非同期に変更
 ipcMain.handle('print-pdf', async (event, pdfBase64Data) => {
   try {
     const { shell } = require('electron');
@@ -631,17 +653,16 @@ ipcMain.handle('print-pdf', async (event, pdfBase64Data) => {
     const tempFilePath = path.join(tempDir, `mojiq-print-${Date.now()}.pdf`);
 
     const buffer = Buffer.from(pdfBase64Data, 'base64');
-    fs.writeFileSync(tempFilePath, buffer);
+    await fs.promises.writeFile(tempFilePath, buffer);
 
     // システムのデフォルトPDFビューアで開く
     await shell.openPath(tempFilePath);
 
-    // 60秒後に一時ファイルを削除
-    setTimeout(() => {
+    // 60秒後に一時ファイルを削除（非同期）
+    setTimeout(async () => {
       try {
-        if (fs.existsSync(tempFilePath)) {
-          fs.unlinkSync(tempFilePath);
-        }
+        await fs.promises.access(tempFilePath, fs.constants.F_OK);
+        await fs.promises.unlink(tempFilePath);
       } catch (e) {
         console.warn('一時ファイル削除失敗:', e);
       }
@@ -667,6 +688,7 @@ ipcMain.handle('get-printers', async () => {
 });
 
 // 直接印刷（プリンター指定）- spawn使用で日本語プリンター名に対応
+// BUG修正: 同期ファイル操作を非同期に変更
 ipcMain.handle('print-pdf-direct', async (event, options) => {
   const { pdfBase64Data, printerName, copies, pageRanges } = options;
   const tempDir = app.getPath('temp');
@@ -674,7 +696,7 @@ ipcMain.handle('print-pdf-direct', async (event, options) => {
 
   try {
     const buffer = Buffer.from(pdfBase64Data, 'base64');
-    fs.writeFileSync(tempFilePath, buffer);
+    await fs.promises.writeFile(tempFilePath, buffer);
 
     // SumatraPDFのパスを取得
     let sumatraPath = path.join(
@@ -715,12 +737,11 @@ ipcMain.handle('print-pdf-direct', async (event, options) => {
       });
 
       proc.on('close', (code) => {
-        // 30秒後に一時ファイル削除
-        setTimeout(() => {
+        // 30秒後に一時ファイル削除（非同期）
+        setTimeout(async () => {
           try {
-            if (fs.existsSync(tempFilePath)) {
-              fs.unlinkSync(tempFilePath);
-            }
+            await fs.promises.access(tempFilePath, fs.constants.F_OK);
+            await fs.promises.unlink(tempFilePath);
           } catch (e) {
             console.warn('一時ファイル削除失敗:', e);
           }
@@ -745,13 +766,14 @@ ipcMain.handle('print-pdf-direct', async (event, options) => {
 });
 
 // システム印刷ダイアログで印刷（spawn版：ダイアログ終了まで待機）
+// BUG修正: 同期ファイル操作を非同期に変更
 ipcMain.handle('print-pdf-with-dialog', async (event, pdfBase64Data) => {
   const tempDir = app.getPath('temp');
   const tempFilePath = path.join(tempDir, `mojiq-print-${Date.now()}.pdf`);
 
   try {
     const buffer = Buffer.from(pdfBase64Data, 'base64');
-    fs.writeFileSync(tempFilePath, buffer);
+    await fs.promises.writeFile(tempFilePath, buffer);
 
     // SumatraPDFのパスを取得
     let sumatraPath = path.join(
@@ -775,12 +797,11 @@ ipcMain.handle('print-pdf-with-dialog', async (event, pdfBase64Data) => {
       });
 
       proc.on('close', (code) => {
-        // 60秒後に一時ファイル削除
-        setTimeout(() => {
+        // 60秒後に一時ファイル削除（非同期）
+        setTimeout(async () => {
           try {
-            if (fs.existsSync(tempFilePath)) {
-              fs.unlinkSync(tempFilePath);
-            }
+            await fs.promises.access(tempFilePath, fs.constants.F_OK);
+            await fs.promises.unlink(tempFilePath);
           } catch (e) {
             console.warn('一時ファイル削除失敗:', e);
           }
@@ -836,7 +857,8 @@ ipcMain.handle('list-directory', async (event, dirPath) => {
       return { success: false, error: 'アクセスが許可されていないパスです' };
     }
 
-    const items = fs.readdirSync(targetPath, { withFileTypes: true });
+    // BUG修正: 同期ファイル操作を非同期に変更
+    const items = await fs.promises.readdir(targetPath, { withFileTypes: true });
 
     const result = items.map(item => ({
       name: item.name,
@@ -852,9 +874,10 @@ ipcMain.handle('list-directory', async (event, dirPath) => {
 });
 
 // ファイルサイズを取得
+// BUG修正: 同期ファイル操作を非同期に変更
 ipcMain.handle('get-file-size', async (event, filePath) => {
   try {
-    const stats = fs.statSync(filePath);
+    const stats = await fs.promises.stat(filePath);
     return { success: true, size: stats.size };
   } catch (error) {
     return { success: false, error: error.message };
@@ -862,23 +885,29 @@ ipcMain.handle('get-file-size', async (event, filePath) => {
 });
 
 // ファイルの存在確認
+// BUG修正: 同期ファイル操作を非同期に変更
 ipcMain.handle('file-exists', async (event, filePath) => {
   try {
-    return { success: true, exists: fs.existsSync(filePath) };
+    await fs.promises.access(filePath, fs.constants.F_OK);
+    return { success: true, exists: true };
   } catch (error) {
+    if (error.code === 'ENOENT') {
+      return { success: true, exists: false };
+    }
     return { success: false, error: error.message };
   }
 });
 
 // ファイルをバイナリで読み込み（Base64変換なし、大きなファイル対応）
 // ElectronのIPCはArrayBufferを直接シリアライズ可能
+// BUG修正: 同期ファイル操作を非同期に変更
 ipcMain.handle('read-file-binary', async (event, filePath) => {
   try {
     // BUG-011修正: パストラバーサル対策 - パスの安全性チェック
     if (!isPathSafe(filePath)) {
       return { success: false, error: '不正なファイルパスです' };
     }
-    const data = fs.readFileSync(filePath);
+    const data = await fs.promises.readFile(filePath);
     // BufferをUint8Arrayとして返す（IPCで直接転送可能）
     return { success: true, data: new Uint8Array(data) };
   } catch (error) {
@@ -887,6 +916,7 @@ ipcMain.handle('read-file-binary', async (event, filePath) => {
 });
 
 // JSONファイルを直接読み込み（パス指定）
+// BUG修正: 同期ファイル操作を非同期に変更
 ipcMain.handle('read-json-file', async (event, filePath) => {
   try {
     // パストラバーサル防止: JSONフォルダ内のパスかチェック
@@ -894,7 +924,7 @@ ipcMain.handle('read-json-file', async (event, filePath) => {
       return { success: false, error: 'アクセスが許可されていないパスです' };
     }
 
-    const data = fs.readFileSync(filePath, 'utf-8');
+    const data = await fs.promises.readFile(filePath, 'utf-8');
     return { success: true, data: JSON.parse(data), rawData: data };
   } catch (error) {
     return { success: false, error: error.message };
@@ -1226,6 +1256,7 @@ ipcMain.handle('get-calibration-base-path', () => {
 });
 
 // 校正チェックデータ用のフォルダ一覧を取得
+// BUG修正: 同期ファイル操作を非同期に変更
 ipcMain.handle('list-calibration-directory', async (event, dirPath) => {
   try {
     const targetPath = dirPath || TXT_FOLDER_BASE_PATH;
@@ -1234,7 +1265,7 @@ ipcMain.handle('list-calibration-directory', async (event, dirPath) => {
       return { success: false, error: 'アクセスが許可されていないパスです' };
     }
 
-    const items = fs.readdirSync(targetPath, { withFileTypes: true });
+    const items = await fs.promises.readdir(targetPath, { withFileTypes: true });
 
     const result = items.map(item => ({
       name: item.name,
@@ -1250,13 +1281,14 @@ ipcMain.handle('list-calibration-directory', async (event, dirPath) => {
 });
 
 // 校正チェックデータJSONファイルを読み込み
+// BUG修正: 同期ファイル操作を非同期に変更
 ipcMain.handle('read-calibration-file', async (event, filePath) => {
   try {
     if (!isPathInTxtFolder(filePath)) {
       return { success: false, error: 'アクセスが許可されていないパスです' };
     }
 
-    const data = fs.readFileSync(filePath, 'utf-8');
+    const data = await fs.promises.readFile(filePath, 'utf-8');
     return { success: true, data: JSON.parse(data) };
   } catch (error) {
     return { success: false, error: error.message };

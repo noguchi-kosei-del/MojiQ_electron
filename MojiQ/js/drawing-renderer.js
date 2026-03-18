@@ -3862,7 +3862,11 @@ window.MojiQDrawingRenderer = (function() {
         if (!hasSelection && xOffset === 0) {
             const cachedCanvas = getDrawingCache(pageNum, canvasWidth, canvasHeight, version);
             if (cachedCanvas) {
+                // キャッシュはdprスケール済みなので、メインctxのスケールをリセットして転送
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
                 ctx.drawImage(cachedCanvas, 0, 0);
+                ctx.restore();
                 cullingStats.renderedObjects = objects.length;
                 cullingStats.lastRenderTime = performance.now() - startTime;
                 return;
@@ -3906,11 +3910,19 @@ window.MojiQDrawingRenderer = (function() {
         // 選択がなくキャッシュ可能な場合は、オフスクリーンキャンバスに描画
         let cacheCtx = null;
         let cacheCanvas = null;
+        let cacheDpr = 1;
         if (!hasSelection && xOffset === 0 && objects.length > 10) {
             cacheCanvas = document.createElement('canvas');
             cacheCanvas.width = canvasWidth;
             cacheCanvas.height = canvasHeight;
             cacheCtx = cacheCanvas.getContext('2d');
+            // キャッシュキャンバスにもdprスケールを適用（ぼやけ防止）
+            // dprはキャンバスの物理サイズとCSS論理サイズの比率から計算
+            const cssWidth = ctx.canvas.style.width ? parseFloat(ctx.canvas.style.width) : (canvasWidth / 2);
+            cacheDpr = canvasWidth / cssWidth;
+            if (cacheDpr > 0 && isFinite(cacheDpr)) {
+                cacheCtx.scale(cacheDpr, cacheDpr);
+            }
         }
 
         const targetCtx = cacheCtx || ctx;
@@ -3968,7 +3980,11 @@ window.MojiQDrawingRenderer = (function() {
         // キャッシュに保存して描画
         if (cacheCanvas && cacheCtx) {
             setDrawingCache(pageNum, cacheCanvas, canvasWidth, canvasHeight, version);
+            // キャッシュはdprスケール済みなので、メインctxのスケールをリセットして転送
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.drawImage(cacheCanvas, 0, 0);
+            ctx.restore();
         }
 
         // 複数選択時は全体のバウンディングボックスの右下に削除ボタンを描画

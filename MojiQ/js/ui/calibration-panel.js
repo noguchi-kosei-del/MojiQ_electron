@@ -441,16 +441,25 @@ const CalibrationPanel = (() => {
 
   /**
    * 再帰的にJSONファイルを収集
+   * BUG修正: 深さ制限を追加（スタックオーバーフロー防止）
    * @param {string} dirPath - ディレクトリパス
+   * @param {number} depth - 現在の再帰深度
    */
-  async function collectJsonFilesRecursive(dirPath) {
+  const MAX_RECURSION_DEPTH = 20;
+  async function collectJsonFilesRecursive(dirPath, depth = 0) {
+    // 深さ制限チェック（スタックオーバーフロー防止）
+    if (depth > MAX_RECURSION_DEPTH) {
+      console.warn('collectJsonFilesRecursive: 最大再帰深度に達しました', dirPath);
+      return;
+    }
+
     try {
       const result = await window.electronAPI.listCalibrationDirectory(dirPath);
       if (!result.success) return;
 
       for (const item of result.items) {
         if (item.isDirectory) {
-          await collectJsonFilesRecursive(item.path);
+          await collectJsonFilesRecursive(item.path, depth + 1);
         } else if (item.isFile && item.name.toLowerCase().endsWith('.json')) {
           // 相対パスを計算
           const relativePath = item.path.replace(basePath, '').replace(/^[\\\/]/, '');

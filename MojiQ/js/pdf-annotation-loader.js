@@ -210,6 +210,9 @@ window.MojiQPdfAnnotationLoader = (function() {
         const width = containerWidth || 595;
         const height = containerHeight || 842;
 
+        // pageMappingから表示サイズを取得するための参照
+        const PdfManager = window.MojiQPdfManager;
+
         let totalAnnotations = 0;
 
         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
@@ -217,13 +220,21 @@ window.MojiQPdfAnnotationLoader = (function() {
                 const page = await pdf.getPage(pageNum);
                 const viewport = page.getViewport({ scale: 1 });
 
-                // 表示サイズを計算（renderPageと同じロジック）
-                const scale = Math.min(
-                    width / viewport.width,
-                    height / viewport.height
-                );
-                const displayWidth = viewport.width * scale;
-                const displayHeight = viewport.height * scale;
+                // pageMappingにdisplayWidthがあればそれを使用（座標計算の一貫性のため）
+                let displayWidth, displayHeight;
+                const pageSize = PdfManager && PdfManager.getDisplayPageSize ? PdfManager.getDisplayPageSize(pageNum) : null;
+                if (pageSize && pageSize.width && pageSize.height) {
+                    displayWidth = pageSize.width;
+                    displayHeight = pageSize.height;
+                } else {
+                    // フォールバック: 表示サイズを計算（renderPageと同じロジック）
+                    const scale = Math.min(
+                        width / viewport.width,
+                        height / viewport.height
+                    );
+                    displayWidth = viewport.width * scale;
+                    displayHeight = viewport.height * scale;
+                }
 
                 const objects = await extractPdfAnnotations(page, displayWidth, displayHeight);
 

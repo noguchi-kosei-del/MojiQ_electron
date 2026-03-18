@@ -532,8 +532,11 @@ window.MojiQModeController = (function() {
     /**
      * 画像をキャンバス中央に配置（Photoshop風埋め込み方式）
      * @param {HTMLImageElement} img - 配置する画像
+     * @param {number} [offsetX=0] - X方向のオフセット（複数画像配置時に使用）
+     * @param {number} [offsetY=0] - Y方向のオフセット（複数画像配置時に使用）
+     * @param {boolean} [selectAfterPlace=true] - 配置後に選択状態にするか
      */
-    function placeImageAtCenter(img) {
+    function placeImageAtCenter(img, offsetX = 0, offsetY = 0, selectAfterPlace = true) {
         // 表示領域のサイズを取得
         const canvasWrapper = document.getElementById('canvas-wrapper');
         if (!canvasWrapper) return;
@@ -570,9 +573,9 @@ window.MojiQModeController = (function() {
             imgHeight = img.naturalHeight;
         }
 
-        // 中央配置の座標を計算
-        const startX = centerX - imgWidth / 2;
-        const startY = centerY - imgHeight / 2;
+        // 中央配置の座標を計算（オフセットを適用）
+        const startX = centerX - imgWidth / 2 + offsetX;
+        const startY = centerY - imgHeight / 2 + offsetY;
 
         // 画像オブジェクトを作成して保存
         const imageObj = {
@@ -599,15 +602,17 @@ window.MojiQModeController = (function() {
         }
 
         // 選択モードに切り替え（配置後すぐに移動・リサイズできるように）
-        setMode('select');
-        // 配置した画像を選択状態にする
-        if (window.MojiQDrawingObjects) {
-            const objects = MojiQDrawingObjects.getPageObjects(currentPage);
-            const lastIndex = objects.length - 1;
-            if (lastIndex >= 0) {
-                MojiQDrawingObjects.selectObject(currentPage, lastIndex);
-                if (window.MojiQDrawing) {
-                    MojiQDrawing.redrawCanvas();
+        if (selectAfterPlace) {
+            setMode('select');
+            // 配置した画像を選択状態にする
+            if (window.MojiQDrawingObjects) {
+                const objects = MojiQDrawingObjects.getPageObjects(currentPage);
+                const lastIndex = objects.length - 1;
+                if (lastIndex >= 0) {
+                    MojiQDrawingObjects.selectObject(currentPage, lastIndex);
+                    if (window.MojiQDrawing) {
+                        MojiQDrawing.redrawCanvas();
+                    }
                 }
             }
         }
@@ -616,14 +621,17 @@ window.MojiQModeController = (function() {
     /**
      * 画像ファイルを読み込んで配置（JPEG, PNG, TIF等）
      * @param {File} file - 画像ファイル
+     * @param {number} [offsetX=0] - X方向のオフセット
+     * @param {number} [offsetY=0] - Y方向のオフセット
+     * @param {boolean} [selectAfterPlace=true] - 配置後に選択状態にするか
      */
-    function loadImageFile(file) {
+    function loadImageFile(file, offsetX = 0, offsetY = 0, selectAfterPlace = true) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (event) => {
                 const img = new Image();
                 img.onload = () => {
-                    placeImageAtCenter(img);
+                    placeImageAtCenter(img, offsetX, offsetY, selectAfterPlace);
                     resolve();
                 };
                 img.onerror = () => {
@@ -639,10 +647,76 @@ window.MojiQModeController = (function() {
     }
 
     /**
+     * 複数の画像/PDFファイルを読み込んで配置
+     * @param {File[]} files - ファイルの配列（画像またはPDF）
+     * @returns {Promise<{success: number, skipped: number}>} 配置結果
+     */
+    async function loadMultipleImageFiles(files) {
+        let successCount = 0;
+        let skippedCount = 0;
+        const offsetStep = 30; // 各画像のオフセット間隔
+
+        // 合計ファイルサイズを計算（1MB = 1048576バイト）
+        const totalSize = Array.from(files).reduce((sum, f) => sum + f.size, 0);
+        const LARGE_FILE_THRESHOLD = 1 * 1024 * 1024; // 1MB
+        const showProgress = files.length > 1 || totalSize > LARGE_FILE_THRESHOLD;
+
+        // プログレス表示（大きいファイルまたは複数ファイルの場合）
+        if (showProgress && window.MojiQPdfManager && window.MojiQPdfManager.showProgress) {
+            window.MojiQPdfManager.showProgress('画像を配置しています...');
+            window.MojiQPdfManager.updateProgress(0, files.length, 'ファイル');
+        }
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+            const isImage = file.type.startsWith('image/');
+
+            // 画像でもPDFでもない場合はスキップ
+            if (!isImage && !isPdf) {
+                skippedCount++;
+                continue;
+            }
+
+            // プログレス更新
+            if (showProgress && window.MojiQPdfManager && window.MojiQPdfManager.updateProgress) {
+                window.MojiQPdfManager.updateProgress(i + 1, files.length, 'ファイル');
+            }
+
+            try {
+                // 複数ファイルの場合、最後以外は選択状態にしない
+                const isLast = (i === files.length - 1);
+                const offsetX = successCount * offsetStep;
+                const offsetY = successCount * offsetStep;
+
+                if (isPdf) {
+                    await loadPdfAsImage(file, offsetX, offsetY, isLast);
+                } else {
+                    await loadImageFile(file, offsetX, offsetY, isLast);
+                }
+                successCount++;
+            } catch (error) {
+                console.warn('ファイル配置をスキップ:', file.name, error);
+                skippedCount++;
+            }
+        }
+
+        // プログレス非表示
+        if (showProgress && window.MojiQPdfManager && window.MojiQPdfManager.hideProgress) {
+            window.MojiQPdfManager.hideProgress();
+        }
+
+        return { success: successCount, skipped: skippedCount };
+    }
+
+    /**
      * PDFファイルを読み込んで最初のページを画像として配置
      * @param {File} file - PDFファイル
+     * @param {number} [offsetX=0] - X方向のオフセット
+     * @param {number} [offsetY=0] - Y方向のオフセット
+     * @param {boolean} [selectAfterPlace=true] - 配置後に選択状態にするか
      */
-    async function loadPdfAsImage(file) {
+    async function loadPdfAsImage(file, offsetX = 0, offsetY = 0, selectAfterPlace = true) {
         // pdf.jsが利用可能か確認
         if (!window.pdfjsLib) {
             throw new Error('PDF.jsが読み込まれていません');
@@ -670,7 +744,7 @@ window.MojiQModeController = (function() {
         return new Promise((resolve, reject) => {
             const img = new Image();
             img.onload = () => {
-                placeImageAtCenter(img);
+                placeImageAtCenter(img, offsetX, offsetY, selectAfterPlace);
                 resolve();
             };
             img.onerror = () => {
@@ -682,8 +756,17 @@ window.MojiQModeController = (function() {
 
     /**
      * イベントリスナーのセットアップ
+     * BUG修正: 多重登録防止フラグを追加
      */
+    let eventListenersInitialized = false;
     function setupEventListeners() {
+        // 多重登録防止
+        if (eventListenersInitialized) {
+            console.warn('ModeController.setupEventListeners: イベントリスナーは既に初期化済みです');
+            return;
+        }
+        eventListenersInitialized = true;
+
         // ハンドラを保存しながらリスナーを登録
         boundHandlers.selectBtn = () => setMode('select');
         boundHandlers.drawBtn = () => setMode('draw');
@@ -917,6 +1000,7 @@ window.MojiQModeController = (function() {
         toggleEditModeForSection,
         turnOffAllSectionModes,
         loadImageFile,      // ドラッグ&ドロップからの画像配置用
-        loadPdfAsImage      // ドラッグ&ドロップからのPDF画像配置用
+        loadPdfAsImage,     // ドラッグ&ドロップからのPDF画像配置用
+        loadMultipleImageFiles  // 複数画像の一括配置用
     };
 })();

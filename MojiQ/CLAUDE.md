@@ -29,7 +29,105 @@ npm run start        # 開発用起動
 - **指示入れモード**: PDF/画像に校正指示を書き込む
 - **校正チェックモード**: 校正チェックリストを表示・管理
 
-## 最近の変更 (2026-03-17)
+## 最近の変更 (2026-03-18)
+
+### バグ修正: 校正チェックモード関連の致命的バグ
+- 再帰関数深さ制限: `collectJsonFilesRecursive`に最大深度20の制限を追加（スタックオーバーフロー防止）
+- イベントリスナー多重登録防止: `mode-controller.js`の`setupEventListeners`に初期化フラグを追加
+- PDF注釈読み込みUIブロック対策: 10ページごとにUIに制御を返すチャンク処理を追加
+- 関連ファイル: `MojiQ/js/ui/calibration-panel.js`, `MojiQ/js/mode-controller.js`, `MojiQ/js/ui/proofreading-panel.js`
+
+### バグ修正: フロントエンドのメモリリーク・例外ハンドリング問題
+- Blob URLメモリリーク修正: 画像ページのBlob URLを使用後に`URL.revokeObjectURL()`で解放
+- Promise二重resolve防止: `canvasToPngWithTimeout`/`canvasToJpegWithTimeout`に`safeResolve`フラグを追加
+- FileReader例外ハンドリング: `readAsArrayBuffer()`の例外をキャッチ
+- 圧縮ループ全体タイムアウト: 3分の全体タイムアウトを追加（UIフリーズ防止）
+- イベントリスナー多重登録防止: `setupEventListeners`に初期化済みフラグを追加
+- 未処理例外防止: `insertBlankPage`関数にtry-catchを追加
+- 関連ファイル: `MojiQ/js/pdf-lib-saver.js`, `MojiQ/js/pdf-manager.js`, `MojiQ/js/page-manager.js`
+
+### バグ修正: Electronメインプロセスの同期操作によるフリーズ問題
+- メインプロセスで同期的ファイル操作（readFileSync, writeFileSync, readdirSync等）を使用していたため、大きなファイルやネットワークドライブアクセス時にUIがフリーズする問題を修正
+- 修正内容:
+  - `execSync` → `exec`（promisify）に変更（ディスク容量チェック）
+  - `readFileSync` → `fs.promises.readFile` に変更（ファイル読み込み）
+  - `writeFileSync` → `fs.promises.writeFile` に変更（ファイル保存、印刷用一時ファイル）
+  - `accessSync` → `fs.promises.access` に変更（権限チェック）
+  - `readdirSync` → `fs.promises.readdir` に変更（フォルダ一覧取得）
+  - `statSync` → `fs.promises.stat` に変更（ファイルサイズ取得）
+  - `existsSync` → `fs.promises.access` に変更（ファイル存在確認）
+  - `renameSync` → `fs.promises.rename` に変更（アトミックリネーム）
+  - `unlinkSync` → `fs.promises.unlink` に変更（一時ファイル削除）
+- 関連ファイル: `MojiQ/electron/main.js`
+
+### バグ修正: オブジェクト数が多い時に描画がぼやける問題
+- オブジェクト数が10個以上の場合に使用されるキャッシュキャンバスにdprスケールが適用されていなかった
+- 原因: キャッシュキャンバスのコンテキストに`ctx.scale(dpr, dpr)`が未適用で、低解像度で描画されていた
+- 修正内容:
+  - キャッシュキャンバス作成時にdprスケールを適用
+  - キャッシュ転送時にメインctxのスケールをリセット（setTransform）してから描画
+  - 既存キャッシュからの復元時も同様にスケールをリセット
+- 関連ファイル: `MojiQ/js/drawing-renderer.js`
+
+### バグ修正: 保存機能の致命的バグ（ボタンが押せない・保存できない）
+- 透過PDF保存機能にロック処理が不完全だった問題を修正
+  - `saveTransparentPdf()`: `isProcessing`チェックと`acquireSaveLock()`を追加、finallyで`isProcessing = false`と`releaseSaveLock()`を追加
+  - `saveTransparentPdfDirect()`: 同様に`isProcessing`チェック、`acquireSaveLock()`/`releaseSaveLock()`を追加
+- これにより、保存処理の競合によるボタン無効化状態の永続化を防止
+- 関連ファイル: `MojiQ/js/pdf-manager.js`
+
+### 新機能: 確認済みコメントを描画JSONから除外
+- 校正チェックモードのコメントタブでチェックを入れた（済スタンプ付き）コメントオブジェクトを、描画データ保存時に除外
+- PDF注釈由来のテキストオブジェクト（`_pdfAnnotationSource`プロパティを持つもの）が対象
+- コメントタブから自動配置された済スタンプ（`commentIndex`を持つもの）もセットで除外
+- 済スタンプツールで手動配置した済スタンプは保存対象のまま
+- テキスト内容または座標の近接判定で確認済みコメントを特定
+- 未確認のコメント、その他の描画はそのまま保存
+- すべてのコメントが確認済みで他の描画がない場合は、「描画データを追加保存」にチェックが入っていても描画JSONを保存しない
+- 関連ファイル: `MojiQ/js/ui/proofreading-panel.js`, `MojiQ/js/drawing-export-import.js`
+
+### バグ修正: 見開きPDF読み込み直後に座標計算がずれる問題
+- 見開きPDF（横長PDF）を読み込んだ直後に保存すると、描画オブジェクトの座標計算が正しく適用されない場合がある問題を修正
+- 原因: `prefetchRenderPage`（プリロード時）で`displayWidth`/`displayHeight`をキャッシュにのみ保存し、`pageMapping`には設定していなかった
+- 修正内容:
+  - `prefetchRenderPage`でキャッシュ保存時に`mapItem.displayWidth`/`displayHeight`も設定
+  - 圧縮保存時も見開きモードを考慮するよう`saveWithCompression`と`createCompressedPdf`を修正
+  - `renderSpreadDrawingObjectsToPng`で左右判定閾値をCSS座標系に修正
+  - `loadPdfAnnotationsForAllPages`で`getDisplayPageSize`を使用して座標計算の一貫性を確保
+- 関連ファイル: `MojiQ/js/pdf-manager.js`, `MojiQ/js/pdf-lib-saver.js`, `MojiQ/js/pdf-annotation-loader.js`
+
+### バグ修正: コメントチェック時の済スタンプ配置
+- 見開きPDFでコメントにチェックを入れた時に、済スタンプが正しい位置に配置されない問題を修正
+- テキストを編集した場合でも済スタンプが配置されるよう2段階検索を実装:
+  1. まずテキスト内容で完全一致検索
+  2. 見つからない場合は座標で最も近いPDF注釈由来のテキストオブジェクトを検索
+- `loadPdfComments`で`canvasRect`計算時に`displayWidth`/`displayHeight`でスケール変換を適用
+- 関連ファイル: `MojiQ/js/ui/proofreading-panel.js`
+
+### バグ修正: 小さいサイズの描画がプレビューとして残る問題
+- 枠線、楕円、直線ツールで最小サイズ（5px）以下の描画をした場合、プレビューがキャンバスに残る問題を修正
+- 保存されない場合にも明示的にredrawCanvas(false)を呼ぶことでプレビューをクリア
+- 関連ファイル: `MojiQ/js/drawing.js`
+
+### UI改善: PDF圧縮保存時のプログレスバー表示
+- パーセント表示で浮動小数点の誤差（例: 18.200000000000003）が表示される問題を修正
+- `updateLoadingProgress`関数でパーセント表示の場合は`Math.round()`で四捨五入して整数表示するよう修正
+- 関連ファイル: `MojiQ/js/pdf-manager.js`
+
+### 新機能: 複数ファイルの一括ドラッグ＆ドロップ配置
+- 複数の画像/PDFファイルを選択してドラッグ＆ドロップで一度に配置可能に
+- PDF/JPEG/PNG等の複数ファイルをドロップすると確認ダイアログを表示
+  - 「画像として配置」: 各ファイルを画像として配置（PDFは1ページ目を画像化）
+  - 「原稿として読み込み」: 従来の原稿読み込み処理
+- 各ファイルは30pxずつオフセットして配置（重ならないよう）
+- 非対応ファイルが混在している場合は自動でスキップ
+- `loadMultipleImageFiles`関数を新規追加（PDF対応）
+- `placeImageAtCenter`、`loadImageFile`、`loadPdfAsImage`にオフセットパラメータを追加
+- 関連ファイル: `MojiQ/js/mode-controller.js`, `MojiQ/js/pdf-manager.js`
+
+---
+
+## 過去の変更 (2026-03-17)
 
 ### 新機能: JSON読み込みのバリデーション
 - 校正チェックJSON形式のバリデーション機能を追加
