@@ -1188,39 +1188,56 @@ const ProofreadingPanel = (() => {
         if (window.MojiQDrawingObjects && window.MojiQDrawingObjects.getPageObjects) {
             const pageObjects = window.MojiQDrawingObjects.getPageObjects(pdfPage);
             if (pageObjects) {
-                // 1. まずテキスト内容が一致するPDF注釈由来のテキストオブジェクトを検索
+                // コメントの座標情報を取得
+                let targetX = null;
+                let targetY = null;
+                if (comment.canvasRect) {
+                    targetX = comment.canvasRect.x;
+                    targetY = comment.canvasRect.y;
+                }
+
+                // 1. テキスト内容が一致 + 座標が最も近いオブジェクトを検索
+                // （同じ文言のコメントが複数ある場合を考慮）
+                let matchingObjects = [];
                 for (const obj of pageObjects) {
                     if (obj.type === 'text' && obj._pdfAnnotationSource && obj.text === contents && obj.startPos) {
-                        canvasX = obj.startPos.x;
-                        canvasY = obj.startPos.y;
-                        break;
+                        matchingObjects.push(obj);
                     }
                 }
 
-                // 2. テキスト内容で見つからない場合（編集された場合）は座標で検索
-                if (canvasX === undefined) {
-                    // コメントの座標情報を取得
-                    let targetX = null;
-                    let targetY = null;
-                    if (comment.canvasRect) {
-                        targetX = comment.canvasRect.x;
-                        targetY = comment.canvasRect.y;
+                if (matchingObjects.length === 1) {
+                    // 1件のみの場合はそのまま使用
+                    canvasX = matchingObjects[0].startPos.x;
+                    canvasY = matchingObjects[0].startPos.y;
+                } else if (matchingObjects.length > 1 && targetX !== null && targetY !== null) {
+                    // 複数件ある場合は座標が最も近いものを選択
+                    let minDistance = Infinity;
+                    for (const obj of matchingObjects) {
+                        const dx = Math.abs(obj.startPos.x - targetX);
+                        const dy = Math.abs(obj.startPos.y - targetY);
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            canvasX = obj.startPos.x;
+                            canvasY = obj.startPos.y;
+                        }
                     }
+                }
 
-                    if (targetX !== null && targetY !== null) {
-                        let minDistance = Infinity;
-                        for (const obj of pageObjects) {
-                            if (obj.type !== 'text' || !obj._pdfAnnotationSource || !obj.startPos) {
-                                continue;
-                            }
-                            const dx = Math.abs(obj.startPos.x - targetX);
-                            const dy = Math.abs(obj.startPos.y - targetY);
-                            const distance = Math.sqrt(dx * dx + dy * dy);
-                            if (distance < minDistance) {
-                                minDistance = distance;
-                                canvasX = obj.startPos.x;
-                                canvasY = obj.startPos.y;
-                            }
+                // 2. テキスト内容で見つからない場合（編集された場合）は座標のみで検索
+                if (canvasX === undefined && targetX !== null && targetY !== null) {
+                    let minDistance = Infinity;
+                    for (const obj of pageObjects) {
+                        if (obj.type !== 'text' || !obj._pdfAnnotationSource || !obj.startPos) {
+                            continue;
+                        }
+                        const dx = Math.abs(obj.startPos.x - targetX);
+                        const dy = Math.abs(obj.startPos.y - targetY);
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            canvasX = obj.startPos.x;
+                            canvasY = obj.startPos.y;
                         }
                     }
                 }
