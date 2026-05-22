@@ -14,13 +14,13 @@ const ProofreadingPanel = (() => {
     let isInitialized = false;
 
     // DOM要素キャッシュ
-    let panel, panelToggle, colorSwatches, customColorSwatch, eyedropperBtn, colorPicker, rainbowPicker;
+    let panel, panelToggle, colorSwatches, customColorSwatch, eyedropperBtn, colorPicker;
     let lineWidthInput, lineWidthSlider;
     let correctnessContent, proposalContent, correctnessCount, proposalCount;
     let commentsContent, commentsCount;
     let tabButtons, tabContents;
     let searchInput, searchClearBtn, searchCountEl;
-    let proofDoneStampBtn, proofRubyStampBtn;
+    let proofDoneStampBtn, proofRubyStampBtn, proofQuestionStampBtn;
 
     // 現在の状態
     let currentColor = '#ff0000';
@@ -51,7 +51,6 @@ const ProofreadingPanel = (() => {
         customColorSwatch = document.getElementById('proofCustomColorSwatch');
         eyedropperBtn = document.getElementById('proofEyedropperBtn');
         colorPicker = document.getElementById('proofColorPicker');
-        rainbowPicker = document.getElementById('proofRainbowPicker');
 
         // 線の太さ関連
         lineWidthInput = document.getElementById('proofLineWidthInput');
@@ -77,6 +76,7 @@ const ProofreadingPanel = (() => {
         // 済スタンプ・ルビスタンプボタン
         proofDoneStampBtn = document.getElementById('proofDoneStampBtn');
         proofRubyStampBtn = document.getElementById('proofRubyStampBtn');
+        proofQuestionStampBtn = document.getElementById('proofQuestionStampBtn');
 
         setupEventListeners();
     }
@@ -114,49 +114,44 @@ const ProofreadingPanel = (() => {
         // カラースウォッチのクリック
         colorSwatches.forEach(swatch => {
             swatch.addEventListener('click', () => {
-                const color = swatch.dataset.color;
-                if (color) {
-                    setColor(color);
+                if (swatch === customColorSwatch) {
+                    // カスタムカラースウォッチ: 色があれば適用しつつ、常にカラーピッカーも開く
+                    // （指示入れモードと同じ挙動: setupColorPaletteEvents + setupCustomColorSwatch の両方が発火）
+                    const color = swatch.dataset.color;
+                    if (color) {
+                        setColor(color);
+                    }
                     updateActiveColorSwatch(swatch);
-                } else if (swatch === customColorSwatch) {
-                    // カスタムカラーパレットをクリック: 色が設定されている場合はその色を選択
-                    // カラーピッカーは開かない（レインボーピッカーで色を選択する）
-                    const customColor = customColorSwatch.style.backgroundColor;
-                    if (customColor && customColor !== 'transparent') {
-                        // RGB形式をHEX形式に変換
-                        const hexColor = rgbToHex(customColor);
-                        if (hexColor) {
-                            setColor(hexColor);
-                            updateActiveColorSwatch(customColorSwatch);
-                        }
+                    if (colorPicker) {
+                        colorPicker.click();
+                    }
+                } else {
+                    const color = swatch.dataset.color;
+                    if (color) {
+                        setColor(color);
+                        updateActiveColorSwatch(swatch);
                     }
                 }
             });
         });
 
-        // カラーピッカー変更
+        // カラーピッカー変更（inputでリアルタイム反映 + changeで確定時反映。指示入れモードと同じ挙動）
         if (colorPicker) {
-            colorPicker.addEventListener('input', (e) => {
-                const color = e.target.value;
+            // リアルタイム反映（ドラッグ中に選択オブジェクトの色が変わる）
+            colorPicker.addEventListener('input', () => {
+                const color = colorPicker.value;
                 setColor(color);
-                customColorSwatch.style.backgroundColor = color;
-                customColorSwatch.style.border = '2px solid #ddd';
-                updateActiveColorSwatch(customColorSwatch);
             });
-        }
 
-        // レインボーピッカー
-        if (rainbowPicker) {
-            rainbowPicker.addEventListener('click', (e) => {
-                const rect = rainbowPicker.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const ratio = x / rect.width;
-
-                // レインボーグラデーションから色を計算
-                const color = getColorFromRainbow(ratio);
+            // 確定時にカスタムカラースウォッチのUI・data-colorを更新
+            colorPicker.addEventListener('change', () => {
+                const color = colorPicker.value;
                 setColor(color);
-                customColorSwatch.style.backgroundColor = color;
-                customColorSwatch.style.border = '2px solid #ddd';
+                if (customColorSwatch) {
+                    customColorSwatch.style.backgroundColor = color;
+                    customColorSwatch.style.border = '2px solid #ddd';
+                    customColorSwatch.setAttribute('data-color', color);
+                }
                 updateActiveColorSwatch(customColorSwatch);
             });
         }
@@ -188,6 +183,16 @@ const ProofreadingPanel = (() => {
                 if (window.MojiQModeController && window.MojiQModeController.setMode) {
                     window.MojiQModeController.setMode('rubyStamp');
                     updateActiveStampButton(proofRubyStampBtn);
+                }
+            });
+        }
+
+        // ？スタンプボタン
+        if (proofQuestionStampBtn) {
+            proofQuestionStampBtn.addEventListener('click', () => {
+                if (window.MojiQModeController && window.MojiQModeController.setMode) {
+                    window.MojiQModeController.setMode('questionStamp');
+                    updateActiveStampButton(proofQuestionStampBtn);
                 }
             });
         }
@@ -259,18 +264,38 @@ const ProofreadingPanel = (() => {
                     updateSliderGradient(value);
                 }
             });
-
-            // ファイル読み込み完了イベントを監視してデータをリセット＆再読み込み
-            window.addEventListener('mojiq:file-loaded', () => {
-                // 少し遅延を入れてファイル読み込み処理が完全に終わるのを待つ
-                setTimeout(() => {
-                    // 全データをリセット
-                    resetAllProofreadingData();
-                    // コメントを再読み込み
-                    loadPdfComments();
-                }, 200);
-            });
         }
+
+        // ファイル読み込み完了イベントを監視してデータをリセット＆再読み込み
+        window.addEventListener('mojiq:file-loaded', () => {
+            // 少し遅延を入れてファイル読み込み処理が完全に終わるのを待つ
+            setTimeout(() => {
+                // 全データをリセット
+                resetAllProofreadingData();
+                // コメントを再読み込み
+                loadPdfComments();
+            }, 200);
+        });
+
+        // オブジェクト変更イベントを監視してコメントタブをリアルタイム更新
+        let objectsChangedTimeout = null;
+        window.addEventListener('mojiq:objects-changed', (e) => {
+            // コメントタブに関連するオブジェクトタイプのみ更新
+            const relevantTypes = ['text', 'rect', 'ellipse', 'line'];
+            const objectType = e.detail?.objectType;
+            if (objectType && !relevantTypes.includes(objectType)) {
+                return; // 関係ないオブジェクトタイプは無視
+            }
+
+            // debounce: 連続した変更をまとめて処理（300ms）
+            if (objectsChangedTimeout) {
+                clearTimeout(objectsChangedTimeout);
+            }
+            objectsChangedTimeout = setTimeout(() => {
+                // 常にコメントデータを更新（カウント表示のため）
+                loadPdfComments();
+            }, 300);
+        });
 
         // 検索関連のイベントリスナー
         if (searchInput) {
@@ -303,49 +328,16 @@ const ProofreadingPanel = (() => {
         window.addEventListener('mojiq:mode-changed', (e) => {
             const mode = e.detail?.mode;
             // スタンプモード以外になったらスタンプボタンの選択を解除
-            if (mode !== 'doneStamp' && mode !== 'rubyStamp') {
+            if (mode !== 'doneStamp' && mode !== 'rubyStamp' && mode !== 'questionStamp') {
                 resetStampButtons();
             } else if (mode === 'doneStamp') {
                 updateActiveStampButton(proofDoneStampBtn);
             } else if (mode === 'rubyStamp') {
                 updateActiveStampButton(proofRubyStampBtn);
+            } else if (mode === 'questionStamp') {
+                updateActiveStampButton(proofQuestionStampBtn);
             }
         });
-    }
-
-    /**
-     * レインボーグラデーションから色を取得
-     */
-    function getColorFromRainbow(ratio) {
-        // 12段階のグラデーション
-        const colors = [
-            [255, 0, 0],     // 赤
-            [255, 128, 0],   // オレンジ
-            [255, 255, 0],   // 黄
-            [128, 255, 0],   // 黄緑
-            [0, 255, 0],     // 緑
-            [0, 255, 128],   // 青緑
-            [0, 255, 255],   // シアン
-            [0, 128, 255],   // 水色
-            [0, 0, 255],     // 青
-            [128, 0, 255],   // 紫
-            [255, 0, 255],   // マゼンタ
-            [255, 0, 128],   // ピンク
-            [255, 0, 0]      // 赤（ループ）
-        ];
-
-        const index = ratio * (colors.length - 1);
-        const i = Math.floor(index);
-        const t = index - i;
-
-        const c1 = colors[Math.min(i, colors.length - 1)];
-        const c2 = colors[Math.min(i + 1, colors.length - 1)];
-
-        const r = Math.round(c1[0] + (c2[0] - c1[0]) * t);
-        const g = Math.round(c1[1] + (c2[1] - c1[1]) * t);
-        const b = Math.round(c1[2] + (c2[2] - c1[2]) * t);
-
-        return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
     }
 
     /**
@@ -376,6 +368,10 @@ const ProofreadingPanel = (() => {
             if (bgColor && bgColor !== 'transparent') {
                 customColorSwatch.style.backgroundColor = bgColor;
                 customColorSwatch.style.border = '2px solid #ddd';
+                const hexColor = rgbToHex(bgColor);
+                if (hexColor) {
+                    customColorSwatch.setAttribute('data-color', hexColor);
+                }
             }
         }
     }
@@ -409,10 +405,15 @@ const ProofreadingPanel = (() => {
             window.MojiQStore.set('drawing.color', color);
         }
 
-        // 既存のカラーピッカーUIも同期
-        const mainColorPicker = document.getElementById('colorPicker');
-        if (mainColorPicker) {
-            mainColorPicker.value = color;
+        // 描画コンテキストの色を更新（ctx.strokeStyle/fillStyle + colorPicker.value + UI同期）
+        if (window.MojiQCanvasContext) {
+            window.MojiQCanvasContext.setColor(color);
+        } else {
+            // フォールバック: CanvasContextが未初期化の場合は手動で同期
+            const mainColorPicker = document.getElementById('colorPicker');
+            if (mainColorPicker) {
+                mainColorPicker.value = color;
+            }
         }
 
         // パレットの選択状態も同期
@@ -424,8 +425,7 @@ const ProofreadingPanel = (() => {
         }
 
         // 選択中のオブジェクトがあればその色を変更（指示入れモードと挙動を共通化）
-        const currentMode = window.MojiQStore && window.MojiQStore.get('drawing.currentMode');
-        if (currentMode === 'select' && window.MojiQDrawingSelect && window.MojiQDrawingSelect.hasSelection()) {
+        if (window.MojiQDrawingSelect && window.MojiQDrawingSelect.hasSelection()) {
             window.MojiQDrawingSelect.setSelectedColor(color);
         }
     }
@@ -439,10 +439,12 @@ const ProofreadingPanel = (() => {
             activeSwatch.classList.add('active');
         }
 
-        // カスタムカラースウォッチが選択されていない場合は点線に戻す
+        // カスタムカラースウォッチが選択されていない場合は点線に戻し、data-colorもクリア
+        // （指示入れモードと同じ挙動: 他のスウォッチ選択時にカスタムカラーをリセット）
         if (customColorSwatch && activeSwatch !== customColorSwatch) {
             customColorSwatch.style.backgroundColor = 'transparent';
             customColorSwatch.style.border = '2px dashed #ccc';
+            customColorSwatch.removeAttribute('data-color');
         }
 
         // スポイトの選択状態をリセット
@@ -453,6 +455,7 @@ const ProofreadingPanel = (() => {
         // スタンプボタンの選択状態をリセット
         if (proofDoneStampBtn) proofDoneStampBtn.classList.remove('active');
         if (proofRubyStampBtn) proofRubyStampBtn.classList.remove('active');
+        if (proofQuestionStampBtn) proofQuestionStampBtn.classList.remove('active');
     }
 
     /**
@@ -463,6 +466,7 @@ const ProofreadingPanel = (() => {
         // 両方のスタンプボタンからactiveクラスを削除
         if (proofDoneStampBtn) proofDoneStampBtn.classList.remove('active');
         if (proofRubyStampBtn) proofRubyStampBtn.classList.remove('active');
+        if (proofQuestionStampBtn) proofQuestionStampBtn.classList.remove('active');
 
         // 指定されたボタンにactiveクラスを追加
         if (activeBtn) {
@@ -484,6 +488,7 @@ const ProofreadingPanel = (() => {
     function resetStampButtons() {
         if (proofDoneStampBtn) proofDoneStampBtn.classList.remove('active');
         if (proofRubyStampBtn) proofRubyStampBtn.classList.remove('active');
+        if (proofQuestionStampBtn) proofQuestionStampBtn.classList.remove('active');
     }
 
     /**
@@ -562,7 +567,7 @@ const ProofreadingPanel = (() => {
     /**
      * チェックデータをレンダリング
      */
-    function renderCheckData(data) {
+    function renderCheckData(data, options) {
         if (!data || !data.checks) {
             renderEmpty();
             return;
@@ -570,7 +575,10 @@ const ProofreadingPanel = (() => {
 
         // 新しいデータ読み込み時は正誤・提案の確認済み状態のみリセット
         // コメントの確認済み状態は維持（PDFコメントは校正チェックJSONとは独立）
-        checkedItems.clear();
+        // モード切替による再表示時はチェック状態を保持する
+        if (!options || !options.preserveChecked) {
+            checkedItems.clear();
+        }
 
         // 全アイテムを収集
         const allItems = [];
@@ -871,14 +879,17 @@ const ProofreadingPanel = (() => {
                 const itemKey = category + '_' + idx;
                 const isItemChecked = checkedItems.has(itemKey);
                 const itemCheckedClass = isItemChecked ? ' checked' : '';
-                html += '<tr class="proofreading-item' + itemCheckedClass + '" data-item-key="' + escapeAttr(itemKey) + '" data-content="' + escapeAttr(item.content || '') + '" onclick="ProofreadingPanel.selectItem(this)">';
-                html += '<td class="cal-checkbox" onclick="event.stopPropagation()">';
+                html += '<tr class="proofreading-item' + itemCheckedClass + '" data-item-key="' + escapeAttr(itemKey) + '" data-content="' + escapeAttr(item.content || '') + '">';
+                html += '<td class="cal-checkbox">';
                 html += '<label class="proofreading-item-checkbox">';
                 html += '<input type="checkbox" ' + (isItemChecked ? 'checked' : '') + ' onchange="ProofreadingPanel.toggleItemChecked(this, \'' + escapeAttr(itemKey) + '\')">';
                 html += '<span class="proofreading-item-checkbox-icon"></span>';
                 html += '</label>';
                 html += '</td>';
-                html += '<td class="cal-page" onclick="event.stopPropagation(); ProofreadingPanel.jumpToPage(\'' + escapeAttr(item.page) + '\')">' + formatPage(item.page) + '</td>';
+                html += '<td class="cal-text-btn" onclick="ProofreadingPanel.selectItem(this.parentElement)" title="クリックで内容を追記">';
+                html += '<span class="cal-text-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3 L21 7 L8 20 L4 20 L4 16 Z"/><line x1="14" y1="6" x2="18" y2="10"/></svg></span>';
+                html += '</td>';
+                html += '<td class="cal-page" onclick="ProofreadingPanel.jumpToPage(\'' + escapeAttr(item.page) + '\')">' + formatPage(item.page) + '</td>';
                 html += '<td class="cal-excerpt">' + escapeHtml(item.excerpt || '') + '</td>';
                 html += '<td class="cal-content">' + escapeHtml(item.content || '') + '</td>';
                 html += '</tr>';
@@ -1099,8 +1110,43 @@ const ProofreadingPanel = (() => {
             itemRow.classList.remove('checked');
         }
 
+        // カテゴリ内のすべての項目がチェックされているか確認
+        const category = itemRow.closest('.proofreading-category');
+        if (category) {
+            checkAllItemsInCategory(category);
+        }
+
         // タブの済状態を更新
         updateTabDoneStatus();
+    }
+
+    /**
+     * カテゴリ内のすべての項目がチェックされているか確認し、
+     * すべてチェックされていればカテゴリも自動でチェックして畳む
+     * @param {HTMLElement} categoryElement - カテゴリ要素
+     */
+    function checkAllItemsInCategory(categoryElement) {
+        const items = categoryElement.querySelectorAll('.proofreading-item');
+        const checkedItemsInCategory = categoryElement.querySelectorAll('.proofreading-item.checked');
+        const categoryName = categoryElement.getAttribute('data-category');
+        const categoryCheckbox = categoryElement.querySelector('.proofreading-category-checkbox input[type="checkbox"]');
+
+        // すべての項目がチェックされている場合
+        if (items.length > 0 && items.length === checkedItemsInCategory.length) {
+            // カテゴリがまだチェックされていない場合のみ処理
+            if (categoryCheckbox && !categoryCheckbox.checked) {
+                categoryCheckbox.checked = true;
+                checkedCategories.add(categoryName);
+                categoryElement.classList.add('checked', 'collapsed');
+            }
+        } else {
+            // 全チェックが崩れた場合、カテゴリのチェックを解除
+            if (categoryCheckbox && categoryCheckbox.checked) {
+                categoryCheckbox.checked = false;
+                checkedCategories.delete(categoryName);
+                categoryElement.classList.remove('checked', 'collapsed');
+            }
+        }
     }
 
     /**
@@ -1182,10 +1228,34 @@ const ProofreadingPanel = (() => {
 
         const pdfPage = comment.pdfPage;
         const contents = comment.contents;
+        const isMojiQText = comment._isMojiQText; // MojiQテキストかどうか
+        const isFromMetadata = comment._fromMetadata; // メタデータ由来かどうか
+        const commentType = comment.type; // コメントのタイプ（'MojiQ', 'rect', 'ellipse', 'line'など）
+        const isShapeWithText = (commentType === 'rect' || commentType === 'ellipse' || commentType === 'line');
 
-        // 既存のテキストオブジェクト（PDF注釈から読み込まれたもの）を検索
         let canvasX, canvasY;
-        if (window.MojiQDrawingObjects && window.MojiQDrawingObjects.getPageObjects) {
+
+        // メタデータ由来のコメントは、保存時の座標を現在の表示サイズに変換
+        // （DrawingObjectsには対応するオブジェクトが存在しないため）
+        if (isFromMetadata && comment.canvasRect) {
+            // 現在の表示サイズを取得
+            const displaySize = window.MojiQPdfManager && window.MojiQPdfManager.getDisplayPageSize ?
+                window.MojiQPdfManager.getDisplayPageSize(pdfPage) : null;
+
+            // 保存時の表示サイズがある場合は、スケール変換を行う
+            if (displaySize && comment.savedDisplayWidth && comment.savedDisplayHeight) {
+                const scaleX = displaySize.width / comment.savedDisplayWidth;
+                const scaleY = displaySize.height / comment.savedDisplayHeight;
+                canvasX = comment.canvasRect.x * scaleX;
+                canvasY = comment.canvasRect.y * scaleY;
+            } else {
+                // フォールバック: 直接使用
+                canvasX = comment.canvasRect.x;
+                canvasY = comment.canvasRect.y;
+            }
+        }
+        // 既存のテキストオブジェクトを検索
+        else if (window.MojiQDrawingObjects && window.MojiQDrawingObjects.getPageObjects) {
             const pageObjects = window.MojiQDrawingObjects.getPageObjects(pdfPage);
             if (pageObjects) {
                 // コメントの座標情報を取得
@@ -1200,26 +1270,43 @@ const ProofreadingPanel = (() => {
                 // （同じ文言のコメントが複数ある場合を考慮）
                 let matchingObjects = [];
                 for (const obj of pageObjects) {
-                    if (obj.type === 'text' && obj._pdfAnnotationSource && obj.text === contents && obj.startPos) {
-                        matchingObjects.push(obj);
+                    // 図形+テキストの場合: テキストの位置（annotation.x, annotation.y）を使用
+                    if (isShapeWithText && obj.type === commentType && obj.annotation && obj.annotation.text === contents) {
+                        if (typeof obj.annotation.x === 'number' && typeof obj.annotation.y === 'number') {
+                            matchingObjects.push({ obj, pos: { x: obj.annotation.x, y: obj.annotation.y } });
+                        }
+                    }
+                    // テキストオブジェクトの場合
+                    else if (!isShapeWithText && obj.type === 'text' && obj.text === contents && obj.startPos) {
+                        // MojiQテキストの場合: _pdfAnnotationSourceがない
+                        // PDF注釈の場合: _pdfAnnotationSourceがある
+                        if (isMojiQText) {
+                            if (!obj._pdfAnnotationSource) {
+                                matchingObjects.push({ obj, pos: obj.startPos });
+                            }
+                        } else {
+                            if (obj._pdfAnnotationSource) {
+                                matchingObjects.push({ obj, pos: obj.startPos });
+                            }
+                        }
                     }
                 }
 
                 if (matchingObjects.length === 1) {
                     // 1件のみの場合はそのまま使用
-                    canvasX = matchingObjects[0].startPos.x;
-                    canvasY = matchingObjects[0].startPos.y;
+                    canvasX = matchingObjects[0].pos.x;
+                    canvasY = matchingObjects[0].pos.y;
                 } else if (matchingObjects.length > 1 && targetX !== null && targetY !== null) {
                     // 複数件ある場合は座標が最も近いものを選択
                     let minDistance = Infinity;
-                    for (const obj of matchingObjects) {
-                        const dx = Math.abs(obj.startPos.x - targetX);
-                        const dy = Math.abs(obj.startPos.y - targetY);
+                    for (const match of matchingObjects) {
+                        const dx = Math.abs(match.pos.x - targetX);
+                        const dy = Math.abs(match.pos.y - targetY);
                         const distance = Math.sqrt(dx * dx + dy * dy);
                         if (distance < minDistance) {
                             minDistance = distance;
-                            canvasX = obj.startPos.x;
-                            canvasY = obj.startPos.y;
+                            canvasX = match.pos.x;
+                            canvasY = match.pos.y;
                         }
                     }
                 }
@@ -1228,20 +1315,67 @@ const ProofreadingPanel = (() => {
                 if (canvasX === undefined && targetX !== null && targetY !== null) {
                     let minDistance = Infinity;
                     for (const obj of pageObjects) {
-                        if (obj.type !== 'text' || !obj._pdfAnnotationSource || !obj.startPos) {
-                            continue;
+                        let pos = null;
+
+                        // 図形+テキストの場合: テキストの位置を使用
+                        if (isShapeWithText && obj.type === commentType && obj.annotation) {
+                            if (typeof obj.annotation.x === 'number' && typeof obj.annotation.y === 'number') {
+                                pos = { x: obj.annotation.x, y: obj.annotation.y };
+                            }
                         }
-                        const dx = Math.abs(obj.startPos.x - targetX);
-                        const dy = Math.abs(obj.startPos.y - targetY);
+                        // テキストオブジェクトの場合
+                        else if (!isShapeWithText && obj.type === 'text' && obj.startPos) {
+                            // MojiQテキストの場合: _pdfAnnotationSourceがないものを検索
+                            // PDF注釈の場合: _pdfAnnotationSourceがあるものを検索
+                            if (isMojiQText && obj._pdfAnnotationSource) {
+                                continue;
+                            }
+                            if (!isMojiQText && !obj._pdfAnnotationSource) {
+                                continue;
+                            }
+                            pos = obj.startPos;
+                        }
+
+                        if (!pos) continue;
+
+                        const dx = Math.abs(pos.x - targetX);
+                        const dy = Math.abs(pos.y - targetY);
                         const distance = Math.sqrt(dx * dx + dy * dy);
                         if (distance < minDistance) {
                             minDistance = distance;
-                            canvasX = obj.startPos.x;
-                            canvasY = obj.startPos.y;
+                            canvasX = pos.x;
+                            canvasY = pos.y;
                         }
                     }
                 }
             }
+        }
+
+        // DrawingObjectが見つからない場合、PDF座標から現在の表示サイズに合わせて座標を計算
+        // （MojiQ保存済みPDFの場合、PDF注釈はオブジェクト化されないため）
+        if (canvasX === undefined && comment.rect && comment.viewportWidth && comment.viewportHeight) {
+            // 現在の表示サイズを取得
+            const displaySize = window.MojiQPdfManager && window.MojiQPdfManager.getDisplayPageSize ?
+                window.MojiQPdfManager.getDisplayPageSize(pdfPage) : null;
+
+            if (displaySize) {
+                // 現在の表示サイズに合わせてスケールを計算
+                const scaleX = displaySize.width / comment.viewportWidth;
+                const scaleY = displaySize.height / comment.viewportHeight;
+
+                const [x1, y1, x2, y2] = comment.rect;
+                // 左上座標をキャンバス座標に変換（スケール適用）
+                canvasX = x1 * scaleX;
+                canvasY = (comment.viewportHeight - y2) * scaleY;
+            } else if (comment.canvasRect) {
+                // フォールバック: canvasRectを直接使用
+                canvasX = comment.canvasRect.x;
+                canvasY = comment.canvasRect.y;
+            }
+        } else if (canvasX === undefined && comment.canvasRect) {
+            // rectがない場合（MojiQテキストなど）はcanvasRectを使用
+            canvasX = comment.canvasRect.x;
+            canvasY = comment.canvasRect.y;
         }
 
         if (canvasX === undefined) {
@@ -1455,7 +1589,7 @@ const ProofreadingPanel = (() => {
         if (window.MojiQStore) {
             const data = window.MojiQStore.get('proofreadingMode.currentData');
             if (data) {
-                renderCheckData(data);
+                renderCheckData(data, { preserveChecked: true });
             }
         }
 
@@ -1466,19 +1600,12 @@ const ProofreadingPanel = (() => {
         updateTextLayerButtonState();
         updatePageBarButtonState();
 
-        // DOM更新後も再度更新（確実に反映させる）
-        setTimeout(() => {
+        // BUG修正: 複数の非同期更新を単一のrequestAnimationFrameに統合
+        // DOM更新後に一度だけ同期（過剰な更新呼び出しを防止）
+        requestAnimationFrame(() => {
             syncLineWidthFromMainUI();
             updateTextLayerButtonState();
             updatePageBarButtonState();
-        }, 50);
-
-        // さらにrequestAnimationFrameでレンダリング後にも更新
-        requestAnimationFrame(() => {
-            syncLineWidthFromMainUI();
-            requestAnimationFrame(() => {
-                syncLineWidthFromMainUI();
-            });
         });
 
         // 指示入れモードのカスタムカラー情報を引き継ぐ
@@ -1533,6 +1660,7 @@ const ProofreadingPanel = (() => {
         setColor(color);
         customColorSwatch.style.backgroundColor = color;
         customColorSwatch.style.border = '2px solid #ddd';
+        customColorSwatch.setAttribute('data-color', color);
         updateActiveColorSwatch(customColorSwatch);
 
         // スポイトボタンの選択状態をリセット
@@ -1556,8 +1684,8 @@ const ProofreadingPanel = (() => {
             content.classList.toggle('active', content.dataset.tab === tabName);
         });
 
-        // コメントタブ選択時、まだデータがなければPDF注釈を読み込み
-        if (tabName === 'comments' && pdfCommentsData.length === 0) {
+        // コメントタブ選択時、常にデータを再読み込み（MojiQテキストの追加を反映するため）
+        if (tabName === 'comments') {
             loadPdfComments();
         }
 
@@ -1572,6 +1700,33 @@ const ProofreadingPanel = (() => {
     function getActiveTab() {
         const activeTab = panel ? panel.querySelector('.proofreading-tab.active') : null;
         return activeTab ? activeTab.dataset.tab : 'correctness';
+    }
+
+    /**
+     * 注釈が読み込み済み確認済みリストに含まれるかチェック
+     * @param {number} pageNum - ページ番号
+     * @param {string} contents - コメント内容
+     * @param {Object|null} canvasRect - キャンバス座標
+     * @param {Array} checkedList - 確認済みリスト
+     * @returns {boolean}
+     */
+    function isAnnotationChecked(pageNum, contents, canvasRect, checkedList) {
+        for (const checked of checkedList) {
+            if (checked.pdfPage !== pageNum) continue;
+            // テキスト内容が一致
+            if (contents === checked.contents) {
+                return true;
+            }
+            // 座標で判定（テキストが編集されている可能性を考慮）
+            if (checked.canvasRect && canvasRect) {
+                const dx = Math.abs(canvasRect.x - checked.canvasRect.x);
+                const dy = Math.abs(canvasRect.y - checked.canvasRect.y);
+                if (dx < 30 && dy < 30) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -1617,7 +1772,14 @@ const ProofreadingPanel = (() => {
 
         try {
             pdfCommentsData = [];
-            resetCheckedComments(); // 確認済み状態をリセット
+            // 注: 確認済み状態はファイル読み込み時のみリセット（resetAllProofreadingData()）
+            // リアルタイム更新時は確認済み状態を維持
+
+            // 確認済みコメント情報を取得（済スタンプ付きコメントは除外）
+            let loadedCheckedComments = null;
+            if (window.MojiQPdfManager && window.MojiQPdfManager.getLoadedCheckedComments) {
+                loadedCheckedComments = window.MojiQPdfManager.getLoadedCheckedComments();
+            }
 
             // BUG修正: UIブロック対策 - 一定間隔でUIに制御を返す
             const CHUNK_SIZE = 10; // 10ページごとにUIに制御を返す
@@ -1718,6 +1880,11 @@ const ProofreadingPanel = (() => {
                                     canvasRect = { x: canvasX, y: canvasY };
                                 }
 
+                                // 確認済みコメントに該当する場合はスキップ（済スタンプ付きのため）
+                                if (loadedCheckedComments && isAnnotationChecked(appPageNum, annot.contents, canvasRect, loadedCheckedComments)) {
+                                    continue;
+                                }
+
                                 pdfCommentsData.push({
                                     page: displayNombre,
                                     pdfPage: appPageNum, // アプリ上のページ番号（ジャンプ用）
@@ -1737,10 +1904,179 @@ const ProofreadingPanel = (() => {
                 }
             }
 
+            // MojiQで入力したテキストオブジェクトも収集
+            if (window.MojiQDrawingObjects && window.MojiQDrawingObjects.getPageObjects) {
+                const totalPages = window.MojiQPdfManager.getPageCount ? window.MojiQPdfManager.getPageCount() : pageMapping.length;
+                for (let appPageNum = 1; appPageNum <= totalPages; appPageNum++) {
+                    const pageObjects = window.MojiQDrawingObjects.getPageObjects(appPageNum);
+                    if (!pageObjects || pageObjects.length === 0) continue;
+
+                    // pageMappingからmapItemを取得（存在する場合のみ）
+                    const mapItem = (appPageNum > 0 && appPageNum <= pageMapping.length) ? pageMapping[appPageNum - 1] : null;
+
+                    for (const obj of pageObjects) {
+                        // MojiQで入力したテキスト、または図形+テキスト（annotation付き）を収集
+                        let textContent = null;
+                        let textPos = null;
+                        let objType = null;
+
+                        // テキストオブジェクト（PDF注釈由来でないもの）
+                        if (obj.type === 'text' && !obj._pdfAnnotationSource && obj.text && obj.text.trim()) {
+                            textContent = obj.text;
+                            textPos = obj.startPos;
+                            objType = 'MojiQ';
+                        }
+                        // 枠線、楕円、直線 + テキスト（annotation付き）
+                        else if ((obj.type === 'rect' || obj.type === 'ellipse' || obj.type === 'line') &&
+                                 obj.annotation && obj.annotation.text && obj.annotation.text.trim()) {
+                            textContent = obj.annotation.text;
+                            // テキストの位置を使用（annotation.x, annotation.y）
+                            if (typeof obj.annotation.x === 'number' && typeof obj.annotation.y === 'number') {
+                                textPos = { x: obj.annotation.x, y: obj.annotation.y };
+                            }
+                            objType = obj.type; // 'rect', 'ellipse', 'line'
+                        }
+
+                        if (textContent && objType) {
+                            // 表示用ノンブルを計算
+                            let displayNombre = appPageNum;
+
+                            if (isLandscapeSpread && mapItem && mapItem.pageNum >= 2) {
+                                // 横長原稿の場合: テキストのX座標で左右ページを判定
+                                const actualPdfPageNum = mapItem.pageNum;
+                                const baseNombre = (actualPdfPageNum - 1) * 2;
+
+                                // テキストの中心X座標を取得
+                                let textCenterX = null;
+                                if (textPos) {
+                                    textCenterX = textPos.x;
+                                }
+
+                                // 表示サイズを取得
+                                const displaySize = window.MojiQPdfManager.getDisplayPageSize ?
+                                    window.MojiQPdfManager.getDisplayPageSize(appPageNum) : null;
+                                const pageWidth = displaySize ? displaySize.width : 800;
+
+                                if (textCenterX !== null) {
+                                    if (textCenterX < pageWidth / 2) {
+                                        // 左側 = 奇数ノンブル
+                                        displayNombre = baseNombre + 1;
+                                    } else {
+                                        // 右側 = 偶数ノンブル
+                                        displayNombre = baseNombre;
+                                    }
+                                } else {
+                                    displayNombre = baseNombre + '-' + (baseNombre + 1);
+                                }
+                            } else if (isSpreadViewMode && !isLandscapeSpread) {
+                                // アプリの見開きモード
+                                const spreadIndex = Math.floor((appPageNum - 1) / 2);
+                                if (spreadIndex === 0) {
+                                    displayNombre = 1;
+                                } else {
+                                    if (appPageNum % 2 === 1) {
+                                        displayNombre = spreadIndex * 2;
+                                    } else {
+                                        displayNombre = spreadIndex * 2 + 1;
+                                    }
+                                }
+                            }
+
+                            pdfCommentsData.push({
+                                page: displayNombre,
+                                pdfPage: appPageNum,
+                                type: objType,
+                                contents: textContent,
+                                color: obj.color,
+                                canvasRect: textPos ? { x: textPos.x, y: textPos.y } : null,
+                                _isMojiQText: true
+                            });
+                        }
+                    }
+                }
+            }
+
+            // PDFメタデータからMojiQテキスト情報を取得（保存済みPDFの再読み込み用）
+            await loadMojiQTextFromMetadata(pdfDocs, pageMapping, isLandscapeSpread, isSpreadViewMode);
+
             renderComments(pdfCommentsData);
         } catch (e) {
             console.error('PDF注釈の読み込みに失敗:', e);
             renderCommentsEmpty('PDF注釈の読み込みに失敗しました');
+        }
+    }
+
+    /**
+     * PDFメタデータからMojiQテキスト情報を取得
+     * @param {Array} pdfDocs - PDFドキュメント配列
+     * @param {Array} pageMapping - ページマッピング
+     * @param {boolean} isLandscapeSpread - 横長原稿かどうか
+     * @param {boolean} isSpreadViewMode - 見開きモードかどうか
+     */
+    async function loadMojiQTextFromMetadata(pdfDocs, pageMapping, isLandscapeSpread, isSpreadViewMode) {
+        if (!pdfDocs || pdfDocs.length === 0) return;
+
+        try {
+            // pdf-libで復元済みのMojiQテキスト情報を取得
+            const textData = window.MojiQPdfManager && window.MojiQPdfManager.getLoadedMojiQTexts
+                ? window.MojiQPdfManager.getLoadedMojiQTexts()
+                : null;
+
+            if (!textData || !Array.isArray(textData) || textData.length === 0) return;
+
+            // 既存のMojiQテキスト（メモリ上のもの）のテキスト内容を収集
+            const existingTexts = new Set();
+            for (const comment of pdfCommentsData) {
+                if (comment._isMojiQText && comment.contents) {
+                    existingTexts.add(comment.contents);
+                }
+            }
+
+            // メタデータから取得したテキストをコメントデータに追加
+            for (const item of textData) {
+                // 既にメモリ上に同じテキストがある場合はスキップ
+                if (existingTexts.has(item.contents)) continue;
+
+                const pageNum = item.pdfPage;
+                let displayNombre = pageNum;
+
+                // ノンブル計算（簡易版）
+                if (isLandscapeSpread && pageNum >= 2) {
+                    const baseNombre = (pageNum - 1) * 2;
+                    const pageWidth = item.displayWidth || 800;
+                    const itemX = item.canvasRect ? item.canvasRect.x : 0;
+                    if (itemX < pageWidth / 2) {
+                        displayNombre = baseNombre + 1;
+                    } else {
+                        displayNombre = baseNombre;
+                    }
+                } else if (isSpreadViewMode && !isLandscapeSpread) {
+                    const spreadIndex = Math.floor((pageNum - 1) / 2);
+                    if (spreadIndex === 0) {
+                        displayNombre = 1;
+                    } else {
+                        if (pageNum % 2 === 1) {
+                            displayNombre = spreadIndex * 2;
+                        } else {
+                            displayNombre = spreadIndex * 2 + 1;
+                        }
+                    }
+                }
+
+                pdfCommentsData.push({
+                    page: displayNombre,
+                    pdfPage: pageNum,
+                    type: 'MojiQ',
+                    contents: item.contents,
+                    canvasRect: item.canvasRect,
+                    savedDisplayWidth: item.displayWidth,  // 保存時の表示幅
+                    savedDisplayHeight: item.displayHeight, // 保存時の表示高
+                    _isMojiQText: true,
+                    _fromMetadata: true // メタデータ由来であることを示す
+                });
+            }
+        } catch (e) {
+            console.warn('MojiQテキストメタデータの読み込みに失敗:', e);
         }
     }
 
@@ -1782,7 +2118,6 @@ const ProofreadingPanel = (() => {
             // コメント本体
             html += `<div class="proofreading-comment-body">`;
             html += `<div class="proofreading-comment-header">`;
-            html += `<span class="proofreading-comment-done">済</span>`;
             html += `<span class="proofreading-comment-page" onclick="ProofreadingPanel.jumpToCommentPage('${jumpPage}')">${comment.page}P</span>`;
             html += `<span class="proofreading-comment-type ${typeClass}">${escapeHtml(typeLabel)}</span>`;
             html += `</div>`;
@@ -1827,7 +2162,11 @@ const ProofreadingPanel = (() => {
             'PolyLine': '折れ線',
             'Stamp': 'スタンプ',
             'Caret': 'キャレット',
-            'FileAttachment': '添付ファイル'
+            'FileAttachment': '添付ファイル',
+            'MojiQ': '入力テキスト',
+            'rect': '入力テキスト',
+            'ellipse': '入力テキスト',
+            'line': '入力テキスト'
         };
         return labels[type] || type;
     }
@@ -2012,8 +2351,9 @@ const ProofreadingPanel = (() => {
         syncCustomColorToMain
     };
 
-    // windowオブジェクトに登録（script.jsからのアクセス用）
-    window.ProofreadingPanel = api;
+    // MojiQ名前空間 + windowオブジェクトに登録（script.jsからのアクセス用）
+    window.MojiQProofreadingPanel = api;
+    window.ProofreadingPanel = api; // 後方互換性
 
     return api;
 })();

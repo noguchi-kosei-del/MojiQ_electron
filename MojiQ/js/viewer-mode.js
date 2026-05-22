@@ -433,6 +433,9 @@ window.MojiQViewerMode = (function() {
     function navigatePage(direction) {
         if (!state) return;
 
+        // モーダル表示中はページ移動をブロック
+        if (window.MojiQUtils && MojiQUtils.isModalOpen()) return;
+
         // 連打対策: クールダウン中は無視
         const now = performance.now();
         if (now - lastNavigateTime < NAVIGATE_COOLDOWN_MS) {

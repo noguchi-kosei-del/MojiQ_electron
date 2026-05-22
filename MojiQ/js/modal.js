@@ -800,6 +800,181 @@ window.MojiQModal = (function() {
     }
 
     /**
+     * 終了確認ダイアログを表示（3ボタン: 保存して終了 / 終了する / キャンセル）
+     * @returns {Promise<'save'|'quit'|'cancel'>} ユーザーの選択
+     */
+    function showCloseConfirm() {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.tabIndex = -1;
+            modal.style.display = 'flex';
+            modal.style.zIndex = '1100';
+
+            const content = document.createElement('div');
+            content.className = 'modal-content';
+            content.style.width = '420px';
+
+            const header = document.createElement('div');
+            header.className = 'modal-header';
+            header.innerHTML = '<span>終了確認</span>';
+
+            const messageP = document.createElement('p');
+            messageP.style.cssText = 'margin:15px 0; line-height:1.5; white-space:pre-wrap;';
+            messageP.textContent = '描画内容が保存されていません。保存しますか？';
+
+            const actions = document.createElement('div');
+            actions.className = 'modal-actions';
+            actions.style.justifyContent = 'flex-end';
+            actions.style.gap = '8px';
+
+            let resolved = false;
+            const closeModal = (value) => {
+                if (resolved) return;
+                resolved = true;
+                if (modal.parentNode) {
+                    document.body.removeChild(modal);
+                }
+                resolve(value);
+            };
+
+            // キャンセルボタン
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = 'キャンセル';
+            cancelBtn.addEventListener('click', () => closeModal('cancel'));
+
+            // 終了するボタン（保存しない）
+            const quitBtn = document.createElement('button');
+            quitBtn.textContent = '終了する';
+            quitBtn.style.cssText = 'background-color: #e53935; color: white;';
+            quitBtn.addEventListener('click', () => closeModal('quit'));
+
+            // 保存して終了するボタン（プライマリ）
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = '保存して終了する';
+            saveBtn.classList.add('active');
+            saveBtn.style.cssText = 'background-color: #2196f3; color: white;';
+            saveBtn.addEventListener('click', () => closeModal('save'));
+
+            actions.appendChild(cancelBtn);
+            actions.appendChild(quitBtn);
+            actions.appendChild(saveBtn);
+
+            content.appendChild(header);
+            content.appendChild(messageP);
+            content.appendChild(actions);
+            modal.appendChild(content);
+
+            // 背景クリックでキャンセル
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeModal('cancel');
+            });
+
+            // Escキーでキャンセル
+            modal.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeModal('cancel');
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    closeModal('save');
+                }
+            });
+
+            // コンテンツのクリックは伝播を止める
+            content.addEventListener('click', (e) => e.stopPropagation());
+
+            document.body.appendChild(modal);
+            ensureFocus(saveBtn);
+        });
+    }
+
+    /**
+     * アップデート通知ダイアログ（2ボタン）
+     * @param {string} currentVersion
+     * @param {string} latestVersion
+     * @returns {Promise<'update'|'later'>}
+     */
+    function showUpdateAvailable(currentVersion, latestVersion) {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.tabIndex = -1;
+            modal.style.display = 'flex';
+            modal.style.zIndex = '1100';
+
+            const content = document.createElement('div');
+            content.className = 'modal-content';
+            content.style.width = '420px';
+
+            const header = document.createElement('div');
+            header.className = 'modal-header';
+            header.innerHTML = '<span>アップデートのお知らせ</span>';
+
+            const messageP = document.createElement('p');
+            messageP.style.cssText = 'margin:15px 0 8px; line-height:1.5; font-weight:bold;';
+            messageP.textContent = '新しいバージョンが見つかりました';
+
+            const detailP = document.createElement('p');
+            detailP.style.cssText = 'margin:0 0 15px; line-height:1.6; white-space:pre-wrap;';
+            detailP.textContent = `現在のバージョン: v${currentVersion}\n最新バージョン: v${latestVersion}\n\nアップデートを開始しますか？`;
+
+            const actions = document.createElement('div');
+            actions.className = 'modal-actions';
+            actions.style.justifyContent = 'flex-end';
+            actions.style.gap = '8px';
+
+            let resolved = false;
+            const closeModal = (value) => {
+                if (resolved) return;
+                resolved = true;
+                if (modal.parentNode) {
+                    document.body.removeChild(modal);
+                }
+                resolve(value);
+            };
+
+            const laterBtn = document.createElement('button');
+            laterBtn.textContent = '後で';
+            laterBtn.addEventListener('click', () => closeModal('later'));
+
+            const updateBtn = document.createElement('button');
+            updateBtn.textContent = '今すぐ更新';
+            updateBtn.classList.add('active');
+            updateBtn.style.cssText = 'background-color: #2196f3; color: white;';
+            updateBtn.addEventListener('click', () => closeModal('update'));
+
+            actions.appendChild(laterBtn);
+            actions.appendChild(updateBtn);
+
+            content.appendChild(header);
+            content.appendChild(messageP);
+            content.appendChild(detailP);
+            content.appendChild(actions);
+            modal.appendChild(content);
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeModal('later');
+            });
+
+            modal.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeModal('later');
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    closeModal('update');
+                }
+            });
+
+            content.addEventListener('click', (e) => e.stopPropagation());
+
+            document.body.appendChild(modal);
+            ensureFocus(updateBtn);
+        });
+    }
+
+    /**
      * 確認ダイアログを閉じる（OK）
      */
     function submitConfirmModal() {
@@ -1019,6 +1194,8 @@ window.MojiQModal = (function() {
         showAlert,   // 汎用アラートモーダル
         showConfirm,  // 汎用確認ダイアログ
         showChoice,  // 複数選択肢ダイアログ
+        showCloseConfirm,  // 終了確認ダイアログ（3ボタン）
+        showUpdateAvailable,  // アップデート通知ダイアログ（2ボタン）
         showSingleCharInput  // 一文字入力モーダル
     };
 })();

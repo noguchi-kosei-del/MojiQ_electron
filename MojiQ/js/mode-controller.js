@@ -33,6 +33,7 @@ window.MojiQModeController = (function() {
     let eraserBtn = null;
     let doneStampBtn = null;
     let rubyStampBtn = null;
+    let questionStampBtn = null;
     let toruStampBtn = null;
     let torutsumeStampBtn = null;
     let torumamaStampBtn = null;
@@ -79,6 +80,7 @@ window.MojiQModeController = (function() {
         eraserBtn: null,
         doneStampBtn: null,
         rubyStampBtn: null,
+        questionStampBtn: null,
         toruStampBtn: null,
         torutsumeStampBtn: null,
         torumamaStampBtn: null,
@@ -126,6 +128,7 @@ window.MojiQModeController = (function() {
         eraserBtn = elements.eraserBtn;
         doneStampBtn = elements.doneStampBtn;
         rubyStampBtn = elements.rubyStampBtn;
+        questionStampBtn = elements.questionStampBtn;
         toruStampBtn = elements.toruStampBtn;
         torutsumeStampBtn = elements.torutsumeStampBtn;
         torumamaStampBtn = elements.torumamaStampBtn;
@@ -176,76 +179,92 @@ window.MojiQModeController = (function() {
      * @param {string} sectionType - 'size' または 'font'
      */
     function toggleDeleteModeForSection(sectionType) {
-        const sectionId = sectionType === 'size' ? 'sizeDeleteModeBtn' : 'fontDeleteModeBtn';
+        const sectionId = sectionType === 'size' ? 'sizeDeleteModeBtn'
+            : sectionType === 'sizeAdjust' ? 'sizeAdjustDeleteModeBtn'
+            : 'fontDeleteModeBtn';
         const sectionBtn = document.getElementById(sectionId);
-        const sectionClass = sectionType === 'size' ? '.stamp-section' : '.font-section';
+        const sectionClass = sectionType === 'size' ? '.stamp-section'
+            : sectionType === 'sizeAdjust' ? '.sizeadjust-section'
+            : '.font-section';
         const sectionEl = stampContainer.querySelector(sectionClass);
 
         if (!sectionBtn) return;
 
+        // turnOffAllSectionModesでクラスが消えるため、先にアクティブ状態を保存
+        const wasActive = sectionBtn.classList.contains('active-delete');
+
         // まず全セクションのモードを解除
         turnOffAllSectionModes();
 
-        // 削除モードがすでにアクティブなら解除のみ
-        if (sectionBtn.classList.contains('active-delete')) {
-            sectionBtn.classList.remove('active-delete');
-            sectionBtn.textContent = '削除';
-            if (sectionEl) sectionEl.classList.remove('delete-mode');
-            state.isDeleteMode = false;
-            state.deleteModeSection = null;
-        } else {
-            // 削除モードをON
-            sectionBtn.classList.add('active-delete');
-            sectionBtn.textContent = '削除中';
-            if (sectionEl) sectionEl.classList.add('delete-mode');
-            state.isDeleteMode = true;
-            state.deleteModeSection = sectionType;
+        // 削除モードがすでにアクティブだった場合は解除のみ
+        if (wasActive) {
+            return;
         }
+
+        // 削除モードをON
+        sectionBtn.classList.add('active-delete');
+        sectionBtn.textContent = '削除中';
+        if (sectionEl) sectionEl.classList.add('delete-mode');
+        state.isDeleteMode = true;
+        state.deleteModeSection = sectionType;
     }
 
     /**
      * セクション別編集モード切替
-     * @param {string} sectionType - 'font' のみサポート
+     * @param {string} sectionType - 'size' または 'font'
      */
     function toggleEditModeForSection(sectionType) {
-        if (sectionType !== 'font') return;
+        if (sectionType !== 'font' && sectionType !== 'size' && sectionType !== 'sizeAdjust') return;
 
-        const sectionBtn = document.getElementById('fontEditModeBtn');
-        const sectionEl = stampContainer.querySelector('.font-section');
+        const sectionBtnId = sectionType === 'size' ? 'sizeEditModeBtn'
+            : sectionType === 'sizeAdjust' ? 'sizeAdjustEditModeBtn'
+            : 'fontEditModeBtn';
+        const sectionClass = sectionType === 'size' ? '.stamp-section'
+            : sectionType === 'sizeAdjust' ? '.sizeadjust-section'
+            : '.font-section';
+        const sectionBtn = document.getElementById(sectionBtnId);
+        const sectionEl = stampContainer ? stampContainer.querySelector(sectionClass) : null;
 
         if (!sectionBtn) return;
+
+        // turnOffAllSectionModesでクラスが消えるため、先にアクティブ状態を保存
+        const wasActive = sectionBtn.classList.contains('active-edit');
 
         // まず全セクションのモードを解除
         turnOffAllSectionModes();
 
-        // 編集モードがすでにアクティブなら解除のみ
-        if (sectionBtn.classList.contains('active-edit')) {
-            sectionBtn.classList.remove('active-edit');
-            sectionBtn.textContent = '編集';
-            if (sectionEl) sectionEl.classList.remove('edit-mode');
-            state.isEditMode = false;
-            state.editingTargetBtn = null;
-        } else {
-            // 編集モードをON
-            sectionBtn.classList.add('active-edit');
-            sectionBtn.textContent = '編集中';
-            if (sectionEl) sectionEl.classList.add('edit-mode');
-            state.isEditMode = true;
+        // 編集モードがすでにアクティブだった場合は解除のみ
+        if (wasActive) {
+            return;
         }
+
+        // 編集モードをON
+        sectionBtn.classList.add('active-edit');
+        sectionBtn.textContent = '編集中';
+        if (sectionEl) sectionEl.classList.add('edit-mode');
+        state.isEditMode = true;
     }
 
     /**
      * 全セクションのモードを解除
      */
     function turnOffAllSectionModes() {
-        // 文字サイズ削除ボタン
+        // 文字サイズ編集・削除ボタン
+        const sizeEditBtn = document.getElementById('sizeEditModeBtn');
         const sizeDeleteBtn = document.getElementById('sizeDeleteModeBtn');
         const sizeSection = stampContainer ? stampContainer.querySelector('.stamp-section') : null;
+        if (sizeEditBtn) {
+            sizeEditBtn.classList.remove('active-edit');
+            sizeEditBtn.textContent = '編集';
+        }
         if (sizeDeleteBtn) {
             sizeDeleteBtn.classList.remove('active-delete');
             sizeDeleteBtn.textContent = '削除';
         }
-        if (sizeSection) sizeSection.classList.remove('delete-mode');
+        if (sizeSection) {
+            sizeSection.classList.remove('delete-mode');
+            sizeSection.classList.remove('edit-mode');
+        }
 
         // フォント編集・削除ボタン
         const fontEditBtn = document.getElementById('fontEditModeBtn');
@@ -262,6 +281,23 @@ window.MojiQModeController = (function() {
         if (fontSection) {
             fontSection.classList.remove('delete-mode');
             fontSection.classList.remove('edit-mode');
+        }
+
+        // 文字サイズ（アップ・ダウン）編集・削除ボタン
+        const sizeAdjustEditBtn = document.getElementById('sizeAdjustEditModeBtn');
+        const sizeAdjustDeleteBtn = document.getElementById('sizeAdjustDeleteModeBtn');
+        const sizeAdjustSection = stampContainer ? stampContainer.querySelector('.sizeadjust-section') : null;
+        if (sizeAdjustEditBtn) {
+            sizeAdjustEditBtn.classList.remove('active-edit');
+            sizeAdjustEditBtn.textContent = '編集';
+        }
+        if (sizeAdjustDeleteBtn) {
+            sizeAdjustDeleteBtn.classList.remove('active-delete');
+            sizeAdjustDeleteBtn.textContent = '削除';
+        }
+        if (sizeAdjustSection) {
+            sizeAdjustSection.classList.remove('delete-mode');
+            sizeAdjustSection.classList.remove('edit-mode');
         }
 
         state.isDeleteMode = false;
@@ -315,20 +351,15 @@ window.MojiQModeController = (function() {
         // Simulatorのキャリブレーション/グリッドモードを解除
         if (window.SimulatorState) {
             const simMode = window.SimulatorState.get('currentMode');
-            if (simMode === 'calibration' || simMode === 'grid') {
+            if (simMode === 'calibration' || simMode === 'grid' || simMode === 'sampleGrid') {
                 // グリッド調整中の場合は確定してから解除
                 if (window.SimulatorTools) {
                     if (window.SimulatorState.get('isGridAdjusting')) {
                         window.SimulatorTools.confirmGrid();
                     }
                     window.SimulatorTools.exitCalibrationMode();
+                    window.SimulatorTools.deactivateAllTools();
                 }
-                window.SimulatorState.set('currentMode', null);
-                // ボタンのアクティブ状態を解除
-                const calibrateBtn = document.getElementById('calibrateBtn');
-                const gridBtn = document.getElementById('gridBtn');
-                if (calibrateBtn) calibrateBtn.classList.remove('active');
-                if (gridBtn) gridBtn.classList.remove('active');
                 // Simulatorのキャンバスカーソルをリセット
                 const simCanvas = document.getElementById('sim-whiteboard');
                 if (simCanvas) simCanvas.style.cursor = 'default';
@@ -496,7 +527,7 @@ window.MojiQModeController = (function() {
         } else if (mode === 'eyedropper') {
             // スポイトモード: カスタムカーソルを設定
             mojiqCanvas.style.cursor = 'crosshair';
-        } else if (mode === 'doneStamp' || mode === 'rubyStamp' || mode === 'toruStamp' || mode === 'torutsumeStamp' || mode === 'torumamaStamp' || mode === 'zenkakuakiStamp' || mode === 'nibunakiStamp' || mode === 'shibunakiStamp' || mode === 'kaigyouStamp') {
+        } else if (mode === 'doneStamp' || mode === 'rubyStamp' || mode === 'questionStamp' || mode === 'toruStamp' || mode === 'torutsumeStamp' || mode === 'torumamaStamp' || mode === 'zenkakuakiStamp' || mode === 'nibunakiStamp' || mode === 'shibunakiStamp' || mode === 'kaigyouStamp') {
             mojiqCanvas.style.cursor = 'pointer';
         } else if (mode === 'rectSymbolStamp' || mode === 'triangleSymbolStamp') {
             mojiqCanvas.style.cursor = 'crosshair';
@@ -511,6 +542,7 @@ window.MojiQModeController = (function() {
         // （deactivateStamps が全 .stamp-btn から active を削除するため）
         if (mode === 'doneStamp' && doneStampBtn) doneStampBtn.classList.add('active');
         if (mode === 'rubyStamp' && rubyStampBtn) rubyStampBtn.classList.add('active');
+        if (mode === 'questionStamp' && questionStampBtn) questionStampBtn.classList.add('active');
         if (mode === 'toruStamp' && toruStampBtn) toruStampBtn.classList.add('active');
         if (mode === 'torutsumeStamp' && torutsumeStampBtn) torutsumeStampBtn.classList.add('active');
         if (mode === 'torumamaStamp' && torumamaStampBtn) torumamaStampBtn.classList.add('active');
@@ -792,6 +824,7 @@ window.MojiQModeController = (function() {
         boundHandlers.eraserBtn = () => setMode('eraser');
         boundHandlers.doneStampBtn = () => setMode('doneStamp');
         boundHandlers.rubyStampBtn = () => setMode('rubyStamp');
+        boundHandlers.questionStampBtn = () => setMode('questionStamp');
         boundHandlers.toruStampBtn = () => setMode('toruStamp');
         boundHandlers.torutsumeStampBtn = () => setMode('torutsumeStamp');
         boundHandlers.torumamaStampBtn = () => setMode('torumamaStamp');
@@ -827,6 +860,7 @@ window.MojiQModeController = (function() {
         if (eraserBtn) eraserBtn.addEventListener('click', boundHandlers.eraserBtn);
         if (doneStampBtn) doneStampBtn.addEventListener('click', boundHandlers.doneStampBtn);
         if (rubyStampBtn) rubyStampBtn.addEventListener('click', boundHandlers.rubyStampBtn);
+        if (questionStampBtn) questionStampBtn.addEventListener('click', boundHandlers.questionStampBtn);
         if (toruStampBtn) toruStampBtn.addEventListener('click', boundHandlers.toruStampBtn);
         if (torutsumeStampBtn) torutsumeStampBtn.addEventListener('click', boundHandlers.torutsumeStampBtn);
         if (torumamaStampBtn) torumamaStampBtn.addEventListener('click', boundHandlers.torumamaStampBtn);
@@ -966,6 +1000,7 @@ window.MojiQModeController = (function() {
         if (eraserBtn) eraserBtn.removeEventListener('click', boundHandlers.eraserBtn);
         if (doneStampBtn) doneStampBtn.removeEventListener('click', boundHandlers.doneStampBtn);
         if (rubyStampBtn) rubyStampBtn.removeEventListener('click', boundHandlers.rubyStampBtn);
+        if (questionStampBtn) questionStampBtn.removeEventListener('click', boundHandlers.questionStampBtn);
         if (toruStampBtn) toruStampBtn.removeEventListener('click', boundHandlers.toruStampBtn);
         if (torutsumeStampBtn) torutsumeStampBtn.removeEventListener('click', boundHandlers.torutsumeStampBtn);
         if (torumamaStampBtn) torumamaStampBtn.removeEventListener('click', boundHandlers.torumamaStampBtn);

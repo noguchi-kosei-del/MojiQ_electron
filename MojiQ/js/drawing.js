@@ -393,6 +393,9 @@ window.MojiQDrawing = (function() {
             });
             return nearest;
         } else if (normalizedMode === 'line') {
+            if (state.currentMode === 'doubleArrowAnnotated') {
+                return { x: shapeEndPos.x, y: shapeEndPos.y };
+            }
             return { x: (startPos.x + shapeEndPos.x) / 2, y: (startPos.y + shapeEndPos.y) / 2 };
         } else if (normalizedMode === 'ellipse') {
             const w = Math.abs(shapeEndPos.x - startPos.x);
@@ -442,6 +445,9 @@ window.MojiQDrawing = (function() {
             });
             return nearest;
         } else if (normalizedMode === 'line') {
+            if (state.currentMode === 'doubleArrowAnnotated') {
+                return { x: endCanvas.x, y: endCanvas.y };
+            }
             return { x: (startCanvas.x + endCanvas.x) / 2, y: (startCanvas.y + endCanvas.y) / 2 };
         } else if (normalizedMode === 'ellipse') {
             const w = Math.abs(endCanvas.x - startCanvas.x);
@@ -622,7 +628,7 @@ window.MojiQDrawing = (function() {
         // Simulatorのキャリブレーション/グリッドモード時はMojiQDrawingの処理をスキップ
         if (window.SimulatorState) {
             const simMode = window.SimulatorState.get('currentMode');
-            if (simMode === 'calibration' || simMode === 'grid') {
+            if (simMode === 'calibration' || simMode === 'grid' || simMode === 'sampleGrid') {
                 return;
             }
         }
@@ -654,7 +660,8 @@ window.MojiQDrawing = (function() {
         const isSpaceLeftDrag = (state.isSpacePressed && isLeftClick);
         // 選択モードではShift+クリックは複数選択用なのでパン操作にしない
         // ペン・マーカー・直線モードではShift+クリックはスナップ描画用なのでパン操作にしない
-        const shiftSnapModes = ['select', 'draw', 'marker', 'line', 'lineAnnotated', 'rect', 'rectAnnotated', 'ellipse', 'ellipseAnnotated'];
+        // 折れ線モードではShift+クリックで頂点を直角スナップしながら追加するためパン操作にしない
+        const shiftSnapModes = ['select', 'draw', 'marker', 'line', 'lineAnnotated', 'rect', 'rectAnnotated', 'ellipse', 'ellipseAnnotated', 'polyline'];
         const isShiftLeftDrag = (state.isShiftPressed && isLeftClick && !shiftSnapModes.includes(state.currentMode));
         const isCtrlRightDrag = ((e.ctrlKey || e.metaKey) && isRightClick);
 
@@ -754,6 +761,51 @@ window.MojiQDrawing = (function() {
             return;
         }
 
+        // ？スタンプモードの処理（クリックで即座にスタンプを配置）
+        if (state.currentMode === 'questionStamp') {
+            const style = getCurrentDrawingStyle();
+            const stampSize = Constants ? Constants.STAMP_SIZES.QUESTION : 16;
+            saveObjectToPage({
+                type: 'questionStamp',
+                startPos: { x: pos.x, y: pos.y },
+                color: style.color,
+                size: stampSize
+            });
+            if (saveHistoryCallback) saveHistoryCallback();
+            redrawCanvas(false);
+            return;
+        }
+
+        // 校正記号スタンプのクリック配置
+        const symbolStampSpecs = {
+            'rectSymbolStamp':     { w: 20, h: 20 },
+            'triangleSymbolStamp': { w: 20, h: 20 },
+            'chevron':             { w: 15, h: 20, orientation: 'vertical' },
+            'lshape':              { w: 20, h: 20, direction: 0 },
+            'zshape':              { w: 20, h: 20, rotated: false }
+        };
+        if (Object.prototype.hasOwnProperty.call(symbolStampSpecs, state.currentMode)) {
+            const style = getCurrentDrawingStyle();
+            const spec = symbolStampSpecs[state.currentMode];
+            const halfW = spec.w / 2;
+            const halfH = spec.h / 2;
+            const obj = {
+                type: state.currentMode,
+                startPos: { x: pos.x - halfW, y: pos.y - halfH },
+                endPos:   { x: pos.x + halfW, y: pos.y + halfH },
+                color: style.color,
+                lineWidth: 2
+            };
+            if (spec.orientation !== undefined) obj.orientation = spec.orientation;
+            if (spec.direction !== undefined)   obj.direction = spec.direction;
+            if (spec.rotated !== undefined)     obj.rotated = spec.rotated;
+            if (spec.flipped !== undefined)     obj.flipped = spec.flipped;
+            saveObjectToPage(obj);
+            if (saveHistoryCallback) saveHistoryCallback();
+            redrawCanvas(false);
+            return;
+        }
+
         // 指示スタンプモードの処理（ドラッグで指示線を描画可能）
         const instructionStampModes = [
             'toruStamp', 'torutsumeStamp', 'torumamaStamp',
@@ -802,9 +854,17 @@ window.MojiQDrawing = (function() {
                 polylineSnapshot = ctx.getImageData(0, 0, mojiqCanvas.width, mojiqCanvas.height);
                 state.interactionState = 3;  // 折れ線描画中を示す状態
             } else {
-                // 2回目以降のクリック：クリック位置をそのまま頂点として追加
-                polylinePoints.push({ x: pos.x, y: pos.y });
-                polylinePointsCanvas.push({ x: canvasPos.x, y: canvasPos.y });
+                // 2回目以降のクリック：Shift押下なら前頂点から水平/垂直に直角スナップ
+                let nextPos = { x: pos.x, y: pos.y };
+                let nextCanvasPos = { x: canvasPos.x, y: canvasPos.y };
+                if (e.shiftKey) {
+                    const prev = polylinePoints[polylinePoints.length - 1];
+                    const prevCanvas = polylinePointsCanvas[polylinePointsCanvas.length - 1];
+                    nextPos = snapToRightAngle(prev, nextPos);
+                    nextCanvasPos = snapToRightAngle(prevCanvas, nextCanvasPos);
+                }
+                polylinePoints.push(nextPos);
+                polylinePointsCanvas.push(nextCanvasPos);
             }
             return;
         }
@@ -866,7 +926,7 @@ window.MojiQDrawing = (function() {
         // Simulatorのキャリブレーション/グリッドモード時はMojiQDrawingの処理をスキップ
         if (window.SimulatorState) {
             const simMode = window.SimulatorState.get('currentMode');
-            if (simMode === 'calibration' || simMode === 'grid') {
+            if (simMode === 'calibration' || simMode === 'grid' || simMode === 'sampleGrid') {
                 return;
             }
         }
@@ -948,11 +1008,14 @@ window.MojiQDrawing = (function() {
             }
             ctx.stroke();
 
-            // 現在のマウス位置までのプレビュー線を描画
+            // 現在のマウス位置までのプレビュー線を描画（Shift押下時は直角スナップ）
             const lastPoint = polylinePointsCanvas[polylinePointsCanvas.length - 1];
+            const previewEnd = e.shiftKey
+                ? snapToRightAngle(lastPoint, canvasPos)
+                : canvasPos;
             ctx.beginPath();
             ctx.moveTo(lastPoint.x, lastPoint.y);
-            ctx.lineTo(canvasPos.x, canvasPos.y);
+            ctx.lineTo(previewEnd.x, previewEnd.y);
             ctx.stroke();
 
             return;
@@ -1209,218 +1272,6 @@ window.MojiQDrawing = (function() {
                     const cy = startPosCanvas.y + h / 2;
                     ctx.ellipse(cx, cy, Math.abs(w) / 2, Math.abs(h) / 2, 0, 0, 2 * Math.PI);
                     ctx.stroke();
-                } else if (state.currentMode === 'semicircle') {
-                    // プレビューはキャンバス座標で描画（ページ回転を適用）
-                    const w = Math.abs(canvasPos.x - startPosCanvas.x);
-                    const h = Math.abs(canvasPos.y - startPosCanvas.y);
-                    const cx = startPosCanvas.x + (canvasPos.x - startPosCanvas.x) / 2;
-                    const cy = startPosCanvas.y + (canvasPos.y - startPosCanvas.y) / 2;
-                    // 画面座標で縦横の比率を判定
-                    const screenW = Math.abs(currentPosScreen.x - startPosScreen.x);
-                    const screenH = Math.abs(currentPosScreen.y - startPosScreen.y);
-                    ctx.beginPath();
-                    if (screenH > screenW) {
-                        // 縦に長い場合: 縦向きの弧（右側の弧）
-                        ctx.ellipse(cx, cy, w / 2, h / 2, 0, -0.5 * Math.PI, 0.5 * Math.PI);
-                    } else {
-                        // 横に長い場合: 横向きの弧（上側の弧）
-                        ctx.ellipse(cx, cy, w / 2, h / 2, 0, Math.PI, 2 * Math.PI);
-                    }
-                    ctx.stroke();
-                } else if (state.currentMode === 'chevron') {
-                    // プレビューはキャンバス座標で描画
-                    const topY = Math.min(startPosCanvas.y, canvasPos.y);
-                    const bottomY = Math.max(startPosCanvas.y, canvasPos.y);
-                    const leftX = Math.min(startPosCanvas.x, canvasPos.x);
-                    const rightX = Math.max(startPosCanvas.x, canvasPos.x);
-                    const midY = (topY + bottomY) / 2;
-                    const midX = (leftX + rightX) / 2;
-
-                    ctx.beginPath();
-                    // Ctrlキーで頂点位置を下に変更
-                    if (e.ctrlKey || e.metaKey) {
-                        // Ctrl押下時: 常に ∨の形（頂点が下側）
-                        ctx.moveTo(leftX, topY);
-                        ctx.lineTo(midX, bottomY);
-                        ctx.lineTo(rightX, topY);
-                    } else {
-                        // 通常時: 常に ＜の形（頂点が左側）
-                        ctx.moveTo(rightX, topY);
-                        ctx.lineTo(leftX, midY);
-                        ctx.lineTo(rightX, bottomY);
-                    }
-                    ctx.stroke();
-                } else if (state.currentMode === 'lshape') {
-                    // プレビューはキャンバス座標で描画（ページ回転を適用）
-                    const topY = Math.min(startPosCanvas.y, canvasPos.y);
-                    const bottomY = Math.max(startPosCanvas.y, canvasPos.y);
-                    const leftX = Math.min(startPosCanvas.x, canvasPos.x);
-                    const rightX = Math.max(startPosCanvas.x, canvasPos.x);
-                    const centerX = (leftX + rightX) / 2;
-                    const centerY = (topY + bottomY) / 2;
-                    // 画面座標でドラッグ方向を判定
-                    const screenDx = currentPosScreen.x - startPosScreen.x;
-                    const screenDy = currentPosScreen.y - startPosScreen.y;
-
-                    ctx.beginPath();
-                    // ドラッグ方向で4つの向きを決定（画面座標で判定）
-                    if (screenDx >= 0 && screenDy >= 0) {
-                        // 右下にドラッグ: L（標準形、左上が角）
-                        ctx.moveTo(leftX, bottomY);
-                        ctx.lineTo(leftX, topY);
-                        ctx.lineTo(rightX, topY);
-                    } else if (screenDx < 0 && screenDy >= 0) {
-                        // 左下にドラッグ: ⌐（右上が角）
-                        ctx.moveTo(rightX, bottomY);
-                        ctx.lineTo(rightX, topY);
-                        ctx.lineTo(leftX, topY);
-                    } else if (screenDx >= 0 && screenDy < 0) {
-                        // 右上にドラッグ: Γ（左下が角）
-                        ctx.moveTo(leftX, topY);
-                        ctx.lineTo(leftX, bottomY);
-                        ctx.lineTo(rightX, bottomY);
-                    } else {
-                        // 左上にドラッグ: ⌝（右下が角）
-                        ctx.moveTo(rightX, topY);
-                        ctx.lineTo(rightX, bottomY);
-                        ctx.lineTo(leftX, bottomY);
-                    }
-                    ctx.stroke();
-                } else if (state.currentMode === 'zshape') {
-                    // プレビューはキャンバス座標で描画
-                    ctx.beginPath();
-                    // Ctrlキーで90度回転したクランク形状
-                    if (e.ctrlKey || e.metaKey) {
-                        // Ctrl押下時: 横→縦→横の形状
-                        const dx = canvasPos.x - startPosCanvas.x;
-                        const midX = startPosCanvas.x + dx / 2;
-
-                        ctx.moveTo(startPosCanvas.x, startPosCanvas.y);
-                        ctx.lineTo(midX, startPosCanvas.y);
-                        ctx.lineTo(midX, canvasPos.y);
-                        ctx.lineTo(canvasPos.x, canvasPos.y);
-                    } else {
-                        // 通常時: 縦→横→縦の形状
-                        const dy = canvasPos.y - startPosCanvas.y;
-                        const midY = startPosCanvas.y + dy / 2;
-
-                        ctx.moveTo(startPosCanvas.x, startPosCanvas.y);
-                        ctx.lineTo(startPosCanvas.x, midY);
-                        ctx.lineTo(canvasPos.x, midY);
-                        ctx.lineTo(canvasPos.x, canvasPos.y);
-                    }
-                    ctx.stroke();
-                } else if (state.currentMode === 'bracket') {
-                    // プレビューはキャンバス座標で描画（ページ回転を適用）
-                    const w = Math.abs(canvasPos.x - startPosCanvas.x);
-                    const h = Math.abs(canvasPos.y - startPosCanvas.y);
-                    // セリフ（はみ出し部分）のサイズ
-                    const serifSize = Math.min(w, h) * 0.15;
-                    const topY = Math.min(startPosCanvas.y, canvasPos.y);
-                    const bottomY = Math.max(startPosCanvas.y, canvasPos.y);
-                    const leftX = Math.min(startPosCanvas.x, canvasPos.x);
-                    const rightX = Math.max(startPosCanvas.x, canvasPos.x);
-                    const centerX = (leftX + rightX) / 2;
-                    const centerY = (topY + bottomY) / 2;
-                    // 画面座標で判定
-                    const screenW = Math.abs(currentPosScreen.x - startPosScreen.x);
-                    const screenH = Math.abs(currentPosScreen.y - startPosScreen.y);
-                    const screenDx = currentPosScreen.x - startPosScreen.x;
-                    const screenDy = currentPosScreen.y - startPosScreen.y;
-
-                    // 縦横の比率で向きを決定（画面座標で判定）
-                    if (screenH > screenW) {
-                        // 縦に長い場合: 縦向きのコの字
-                        if (screenDx >= 0) {
-                            // 右にドラッグ: ⊐の形（開口部が左側）
-                            ctx.beginPath();
-                            ctx.moveTo(leftX, topY);
-                            ctx.lineTo(rightX, topY);
-                            ctx.lineTo(rightX, bottomY);
-                            ctx.lineTo(leftX, bottomY);
-                            ctx.stroke();
-                            ctx.beginPath();
-                            ctx.moveTo(leftX, topY);
-                            ctx.lineTo(leftX, topY - serifSize);
-                            ctx.stroke();
-                            ctx.beginPath();
-                            ctx.moveTo(leftX, bottomY);
-                            ctx.lineTo(leftX, bottomY + serifSize);
-                            ctx.stroke();
-                        } else {
-                            // 左にドラッグ: ⊏の形（開口部が右側）
-                            ctx.beginPath();
-                            ctx.moveTo(rightX, topY);
-                            ctx.lineTo(leftX, topY);
-                            ctx.lineTo(leftX, bottomY);
-                            ctx.lineTo(rightX, bottomY);
-                            ctx.stroke();
-                            ctx.beginPath();
-                            ctx.moveTo(rightX, topY);
-                            ctx.lineTo(rightX, topY - serifSize);
-                            ctx.stroke();
-                            ctx.beginPath();
-                            ctx.moveTo(rightX, bottomY);
-                            ctx.lineTo(rightX, bottomY + serifSize);
-                            ctx.stroke();
-                        }
-                    } else {
-                        // 横に長い場合: 横向きのコの字
-                        if (screenDy >= 0) {
-                            // 下にドラッグ: ⊔の形（開口部が上側）
-                            ctx.beginPath();
-                            ctx.moveTo(leftX, topY);
-                            ctx.lineTo(leftX, bottomY);
-                            ctx.lineTo(rightX, bottomY);
-                            ctx.lineTo(rightX, topY);
-                            ctx.stroke();
-                            ctx.beginPath();
-                            ctx.moveTo(leftX, topY);
-                            ctx.lineTo(leftX - serifSize, topY);
-                            ctx.stroke();
-                            ctx.beginPath();
-                            ctx.moveTo(rightX, topY);
-                            ctx.lineTo(rightX + serifSize, topY);
-                            ctx.stroke();
-                        } else {
-                            // 上にドラッグ: ⊓の形（開口部が下側）
-                            ctx.beginPath();
-                            ctx.moveTo(leftX, bottomY);
-                            ctx.lineTo(leftX, topY);
-                            ctx.lineTo(rightX, topY);
-                            ctx.lineTo(rightX, bottomY);
-                            ctx.stroke();
-                            ctx.beginPath();
-                            ctx.moveTo(leftX, bottomY);
-                            ctx.lineTo(leftX - serifSize, bottomY);
-                            ctx.stroke();
-                            ctx.beginPath();
-                            ctx.moveTo(rightX, bottomY);
-                            ctx.lineTo(rightX + serifSize, bottomY);
-                            ctx.stroke();
-                        }
-                    }
-                } else if (state.currentMode === 'rectSymbolStamp') {
-                    // 全角アキ（□）のドラッグ中プレビュー
-                    const w = canvasPos.x - startPosCanvas.x;
-                    const h = canvasPos.y - startPosCanvas.y;
-                    ctx.beginPath();
-                    ctx.rect(startPosCanvas.x, startPosCanvas.y, w, h);
-                    ctx.stroke();
-                } else if (state.currentMode === 'triangleSymbolStamp') {
-                    // 半角アキ（△）のドラッグ中プレビュー
-                    const topY = Math.min(startPosCanvas.y, canvasPos.y);
-                    const bottomY = Math.max(startPosCanvas.y, canvasPos.y);
-                    const leftX = Math.min(startPosCanvas.x, canvasPos.x);
-                    const rightX = Math.max(startPosCanvas.x, canvasPos.x);
-                    const midX = (leftX + rightX) / 2;
-                    ctx.beginPath();
-                    // 上向きの三角形
-                    ctx.moveTo(midX, topY);
-                    ctx.lineTo(leftX, bottomY);
-                    ctx.lineTo(rightX, bottomY);
-                    ctx.closePath();
-                    ctx.stroke();
                 } else if (normalizedModeForDraw === 'line') {
                     // Shiftキーで水平・垂直の直線に制限（縮尺合わせと同様の挙動）
                     // プレビューはキャンバス座標で描画
@@ -1440,29 +1291,35 @@ window.MojiQDrawing = (function() {
                     ctx.moveTo(startPosCanvas.x, startPosCanvas.y);
                     ctx.lineTo(endX, endY);
                     ctx.stroke();
-                    // 矢印プレビュー：矢頭を描画
-                    if (state.currentMode === 'arrow' || state.currentMode === 'doubleArrow' || state.currentMode === 'doubleArrowAnnotated') {
+                    // 字間指示入れ: startPos側にY字（外向き）を描画、終端からは引出線が伸びるためY字を描かない
+                    if (state.currentMode === 'doubleArrowAnnotated') {
                         const headLen = Math.max(5, (ctx.lineWidth || 2) * 2);
                         const angle = Math.atan2(endY - startPosCanvas.y, endX - startPosCanvas.x);
-                        // 字間指示入れは外向き(+)、それ以外は内向き(-)
-                        const sign = (state.currentMode === 'doubleArrowAnnotated') ? 1 : -1;
-                        // endPos側の矢頭
+                        const reverseAngle = angle + Math.PI;
+                        ctx.beginPath();
+                        ctx.moveTo(startPosCanvas.x, startPosCanvas.y);
+                        ctx.lineTo(startPosCanvas.x + headLen * Math.cos(reverseAngle - Math.PI / 6), startPosCanvas.y + headLen * Math.sin(reverseAngle - Math.PI / 6));
+                        ctx.moveTo(startPosCanvas.x, startPosCanvas.y);
+                        ctx.lineTo(startPosCanvas.x + headLen * Math.cos(reverseAngle + Math.PI / 6), startPosCanvas.y + headLen * Math.sin(reverseAngle + Math.PI / 6));
+                        ctx.stroke();
+                    }
+                    // 矢印 / 両矢印: 終端（および両矢印は始端）に矢頭を描画
+                    if (state.currentMode === 'arrow' || state.currentMode === 'doubleArrow') {
+                        const headLen = Math.max(5, (ctx.lineWidth || 2) * 2);
+                        const angle = Math.atan2(endY - startPosCanvas.y, endX - startPosCanvas.x);
                         ctx.beginPath();
                         ctx.moveTo(endX, endY);
-                        ctx.lineTo(endX + sign * headLen * Math.cos(angle - Math.PI / 6), endY + sign * headLen * Math.sin(angle - Math.PI / 6));
+                        ctx.lineTo(endX - headLen * Math.cos(angle - Math.PI / 6), endY - headLen * Math.sin(angle - Math.PI / 6));
                         ctx.moveTo(endX, endY);
-                        ctx.lineTo(endX + sign * headLen * Math.cos(angle + Math.PI / 6), endY + sign * headLen * Math.sin(angle + Math.PI / 6));
-                        ctx.stroke();
-                        if (state.currentMode === 'doubleArrow' || state.currentMode === 'doubleArrowAnnotated') {
-                            // startPos側の矢頭
+                        ctx.lineTo(endX - headLen * Math.cos(angle + Math.PI / 6), endY - headLen * Math.sin(angle + Math.PI / 6));
+                        if (state.currentMode === 'doubleArrow') {
                             const reverseAngle = angle + Math.PI;
-                            ctx.beginPath();
                             ctx.moveTo(startPosCanvas.x, startPosCanvas.y);
-                            ctx.lineTo(startPosCanvas.x + sign * headLen * Math.cos(reverseAngle - Math.PI / 6), startPosCanvas.y + sign * headLen * Math.sin(reverseAngle - Math.PI / 6));
+                            ctx.lineTo(startPosCanvas.x - headLen * Math.cos(reverseAngle - Math.PI / 6), startPosCanvas.y - headLen * Math.sin(reverseAngle - Math.PI / 6));
                             ctx.moveTo(startPosCanvas.x, startPosCanvas.y);
-                            ctx.lineTo(startPosCanvas.x + sign * headLen * Math.cos(reverseAngle + Math.PI / 6), startPosCanvas.y + sign * headLen * Math.sin(reverseAngle + Math.PI / 6));
-                            ctx.stroke();
+                            ctx.lineTo(startPosCanvas.x - headLen * Math.cos(reverseAngle + Math.PI / 6), startPosCanvas.y - headLen * Math.sin(reverseAngle + Math.PI / 6));
                         }
+                        ctx.stroke();
                     }
                 } else if (state.currentMode === 'text') {
                     // プレビューはキャンバス座標で描画
@@ -1493,6 +1350,70 @@ window.MojiQDrawing = (function() {
                     ctx.setLineDash([5, 5]);
                     ctx.strokeRect(startPosCanvas.x, startPosCanvas.y, w, h);
                     ctx.restore();
+                } else if (state.currentMode === 'semicircle') {
+                    // 半円: ドラッグ中の bbox から orientation を判定して弧をプレビュー
+                    const w = Math.abs(canvasPos.x - startPosCanvas.x);
+                    const h = Math.abs(canvasPos.y - startPosCanvas.y);
+                    const cx = startPosCanvas.x + (canvasPos.x - startPosCanvas.x) / 2;
+                    const cy = startPosCanvas.y + (canvasPos.y - startPosCanvas.y) / 2;
+                    const orientation = h > w ? 'vertical' : 'horizontal';
+                    if (orientation === 'vertical') {
+                        ctx.ellipse(cx, cy, w / 2, h / 2, 0, -0.5 * Math.PI, 0.5 * Math.PI);
+                    } else {
+                        ctx.ellipse(cx, cy, w / 2, h / 2, 0, Math.PI, 2 * Math.PI);
+                    }
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.stroke();
+                } else if (state.currentMode === 'bracket') {
+                    // 全体移動: ドラッグ中の bbox から orientation/flipped を判定してコの字をプレビュー
+                    const w = Math.abs(canvasPos.x - startPosCanvas.x);
+                    const h = Math.abs(canvasPos.y - startPosCanvas.y);
+                    const orientation = h > w ? 'vertical' : 'horizontal';
+                    const dx = canvasPos.x - startPosCanvas.x;
+                    const dy = canvasPos.y - startPosCanvas.y;
+                    const flipped = orientation === 'vertical' ? (dx < 0) : (dy >= 0);
+                    const serifSize = Math.min(w, h) * 0.15;
+                    const leftX = Math.min(startPosCanvas.x, canvasPos.x);
+                    const rightX = Math.max(startPosCanvas.x, canvasPos.x);
+                    const topY = Math.min(startPosCanvas.y, canvasPos.y);
+                    const bottomY = Math.max(startPosCanvas.y, canvasPos.y);
+                    if (orientation === 'vertical') {
+                        if (flipped) {
+                            ctx.moveTo(rightX, topY - serifSize);
+                            ctx.lineTo(rightX, topY);
+                            ctx.lineTo(leftX, topY);
+                            ctx.lineTo(leftX, bottomY);
+                            ctx.lineTo(rightX, bottomY);
+                            ctx.lineTo(rightX, bottomY + serifSize);
+                        } else {
+                            ctx.moveTo(leftX, topY - serifSize);
+                            ctx.lineTo(leftX, topY);
+                            ctx.lineTo(rightX, topY);
+                            ctx.lineTo(rightX, bottomY);
+                            ctx.lineTo(leftX, bottomY);
+                            ctx.lineTo(leftX, bottomY + serifSize);
+                        }
+                    } else {
+                        if (flipped) {
+                            ctx.moveTo(leftX - serifSize, topY);
+                            ctx.lineTo(leftX, topY);
+                            ctx.lineTo(leftX, bottomY);
+                            ctx.lineTo(rightX, bottomY);
+                            ctx.lineTo(rightX, topY);
+                            ctx.lineTo(rightX + serifSize, topY);
+                        } else {
+                            ctx.moveTo(leftX - serifSize, bottomY);
+                            ctx.lineTo(leftX, bottomY);
+                            ctx.lineTo(leftX, topY);
+                            ctx.lineTo(rightX, topY);
+                            ctx.lineTo(rightX, bottomY);
+                            ctx.lineTo(rightX + serifSize, bottomY);
+                        }
+                    }
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.stroke();
                 } else if ([
                     'toruStamp', 'torutsumeStamp', 'torumamaStamp',
                     'zenkakuakiStamp', 'nibunakiStamp', 'shibunakiStamp',
@@ -1525,7 +1446,7 @@ window.MojiQDrawing = (function() {
         // Simulatorのキャリブレーション/グリッドモード時はMojiQDrawingの処理をスキップ
         if (window.SimulatorState) {
             const simMode = window.SimulatorState.get('currentMode');
-            if (simMode === 'calibration' || simMode === 'grid') {
+            if (simMode === 'calibration' || simMode === 'grid' || simMode === 'sampleGrid') {
                 return;
             }
         }
@@ -1726,6 +1647,7 @@ window.MojiQDrawing = (function() {
             }
 
             const normalizedModeForSave = normalizeMode(state.currentMode);
+            let shapeSaved = false;  // 図形が実際に保存されたかどうか
 
             if (normalizedModeForSave === 'line') {
                 // Shiftキーで水平・垂直の直線に制限（縮尺合わせと同様の挙動）
@@ -1746,9 +1668,9 @@ window.MojiQDrawing = (function() {
                 const dist = Math.sqrt(Math.pow(endX - startPos.x, 2) + Math.pow(endY - startPos.y, 2));
                 if (dist > 5) {
                     let lineType = 'line';
-                    if (state.currentMode === 'arrow') lineType = 'arrow';
+                    if (state.currentMode === 'doubleArrowAnnotated') lineType = 'doubleArrowAnnotated';
+                    else if (state.currentMode === 'arrow') lineType = 'arrow';
                     else if (state.currentMode === 'doubleArrow') lineType = 'doubleArrow';
-                    else if (state.currentMode === 'doubleArrowAnnotated') lineType = 'doubleArrowAnnotated';
                     saveObjectToPage({
                         type: lineType,
                         startPos: { ...startPos },
@@ -1756,17 +1678,45 @@ window.MojiQDrawing = (function() {
                         color: style.color,
                         lineWidth: style.lineWidth
                     });
-                    // 矢印ツールはプレビューに矢頭が含まれないため再描画が必要
-                    if (lineType !== 'line') {
+                    shapeSaved = true;
+                    // 字間指示入れはプレビューに矢頭が含まれないため再描画が必要
+                    if (lineType === 'doubleArrowAnnotated') {
                         // annotationModeの場合はsnapshot取得前に同期的再描画が必要
                         if (state.annotationMode) {
                             doRedrawCanvas();
                         } else {
                             redrawCanvas(false);
                         }
+                    } else if (lineType === 'arrow' || lineType === 'doubleArrow') {
+                        // 矢印/両矢印はプレビューに白フチが含まれないため再描画して renderArrow / renderDoubleArrow に委ねる
+                        redrawCanvas(false);
                     }
                 } else {
                     // サイズが小さすぎて保存されない場合、プレビューをクリア
+                    redrawCanvas(false);
+                }
+            }
+
+            // 全体移動（コの字）はドラッグで描画
+            if (state.currentMode === 'bracket' && DrawingModes && DrawingModes.finalizeBracket) {
+                const obj = DrawingModes.finalizeBracket(startPos, currentPos, style.color, style.lineWidth);
+                if (obj) {
+                    saveObjectToPage(obj);
+                    shapeSaved = true;
+                    redrawCanvas(false);
+                } else {
+                    redrawCanvas(false);
+                }
+            }
+
+            // 半円はドラッグで描画
+            if (state.currentMode === 'semicircle' && DrawingModes && DrawingModes.finalizeSemicircle) {
+                const obj = DrawingModes.finalizeSemicircle(startPos, currentPos, style.color, style.lineWidth);
+                if (obj) {
+                    saveObjectToPage(obj);
+                    shapeSaved = true;
+                    redrawCanvas(false);
+                } else {
                     redrawCanvas(false);
                 }
             }
@@ -1834,6 +1784,7 @@ window.MojiQDrawing = (function() {
                         color: style.color,
                         lineWidth: style.lineWidth
                     });
+                    shapeSaved = true;
                 } else {
                     // サイズが小さすぎて保存されない場合、プレビューをクリア
                     redrawCanvas(false);
@@ -1874,182 +1825,11 @@ window.MojiQDrawing = (function() {
                         color: style.color,
                         lineWidth: style.lineWidth
                     });
+                    shapeSaved = true;
                 } else {
                     // サイズが小さすぎて保存されない場合、プレビューをクリア
                     redrawCanvas(false);
                 }
-            }
-
-            if (state.currentMode === 'semicircle') {
-                // 半円をオブジェクトとして保存（指示線機能なし）
-                const w = Math.abs(currentPos.x - startPos.x);
-                const h = Math.abs(currentPos.y - startPos.y);
-                if (w > 5 || h > 5) {
-                    // 画面座標で縦横の比率を計算（ページ回転に影響されない向き判定）
-                    const screenW = Math.abs(currentPosScreen.x - startPosScreen.x);
-                    const screenH = Math.abs(currentPosScreen.y - startPosScreen.y);
-                    const orientation = screenH > screenW ? 'vertical' : 'horizontal';
-                    saveObjectToPage({
-                        type: 'semicircle',
-                        startPos: { ...startPos },
-                        endPos: { ...currentPos },
-                        color: style.color,
-                        lineWidth: style.lineWidth,
-                        orientation: orientation
-                    });
-                }
-                // 半円は指示線モードに移行しない
-                state.interactionState = 0;
-                if (saveHistoryCallback) saveHistoryCallback();
-                return;
-            }
-
-            if (state.currentMode === 'chevron') {
-                // くの字をオブジェクトとして保存（指示線機能なし）
-                const w = Math.abs(currentPos.x - startPos.x);
-                const h = Math.abs(currentPos.y - startPos.y);
-                if (w > 5 || h > 5) {
-                    // Ctrlキーで頂点位置を下に変更
-                    // 通常時: 常にvertical（頂点右）、Ctrl時: horizontal（頂点下）
-                    const isCtrlPressed = e && (e.ctrlKey || e.metaKey);
-                    const orientation = isCtrlPressed ? 'horizontal' : 'vertical';
-                    const flipped = false; // 常にfalse（方向はorientationで決定）
-                    saveObjectToPage({
-                        type: 'chevron',
-                        startPos: { ...startPos },
-                        endPos: { ...currentPos },
-                        color: style.color,
-                        lineWidth: style.lineWidth,
-                        orientation: orientation,
-                        flipped: flipped
-                    });
-                }
-                // くの字は指示線モードに移行しない
-                state.interactionState = 0;
-                if (saveHistoryCallback) saveHistoryCallback();
-                return;
-            }
-
-            if (state.currentMode === 'lshape') {
-                // L字をオブジェクトとして保存（指示線機能なし）
-                const w = Math.abs(currentPos.x - startPos.x);
-                const h = Math.abs(currentPos.y - startPos.y);
-                if (w > 5 || h > 5) {
-                    // 画面座標でドラッグ方向を判定（ページ回転に影響されない向き判定）
-                    const screenDx = currentPosScreen.x - startPosScreen.x;
-                    const screenDy = currentPosScreen.y - startPosScreen.y;
-                    // direction: 0=右下(L), 1=左下(⌐), 2=右上(Γ), 3=左上(⌝)
-                    let direction;
-                    if (screenDx >= 0 && screenDy >= 0) {
-                        direction = 0;
-                    } else if (screenDx < 0 && screenDy >= 0) {
-                        direction = 1;
-                    } else if (screenDx >= 0 && screenDy < 0) {
-                        direction = 2;
-                    } else {
-                        direction = 3;
-                    }
-                    saveObjectToPage({
-                        type: 'lshape',
-                        startPos: { ...startPos },
-                        endPos: { ...currentPos },
-                        color: style.color,
-                        lineWidth: style.lineWidth,
-                        direction: direction
-                    });
-                }
-                // L字は指示線モードに移行しない
-                state.interactionState = 0;
-                if (saveHistoryCallback) saveHistoryCallback();
-                return;
-            }
-
-            if (state.currentMode === 'zshape') {
-                // Z字をオブジェクトとして保存（指示線機能なし、クランク形状）
-                const w = Math.abs(currentPos.x - startPos.x);
-                const h = Math.abs(currentPos.y - startPos.y);
-                if (w > 5 || h > 5) {
-                    // Ctrlキーで90度回転
-                    const isCtrlPressed = e && (e.ctrlKey || e.metaKey);
-                    saveObjectToPage({
-                        type: 'zshape',
-                        startPos: { ...startPos },
-                        endPos: { ...currentPos },
-                        color: style.color,
-                        lineWidth: style.lineWidth,
-                        rotated: isCtrlPressed  // trueの場合は横→縦→横の形状
-                    });
-                }
-                // Z字は指示線モードに移行しない
-                state.interactionState = 0;
-                if (saveHistoryCallback) saveHistoryCallback();
-                return;
-            }
-
-            if (state.currentMode === 'bracket') {
-                // コの字をオブジェクトとして保存（指示線機能なし）
-                const w = Math.abs(currentPos.x - startPos.x);
-                const h = Math.abs(currentPos.y - startPos.y);
-                if (w > 5 || h > 5) {
-                    // 画面座標で縦横の比率を計算（ページ回転に影響されない向き判定）
-                    const screenW = Math.abs(currentPosScreen.x - startPosScreen.x);
-                    const screenH = Math.abs(currentPosScreen.y - startPosScreen.y);
-                    const orientation = screenH > screenW ? 'vertical' : 'horizontal';
-                    // 画面座標でドラッグ方向を判定
-                    const screenDx = currentPosScreen.x - startPosScreen.x;
-                    const screenDy = currentPosScreen.y - startPosScreen.y;
-                    // 縦向きの場合は左にドラッグで反転、横向きの場合は下にドラッグで反転
-                    const flipped = (orientation === 'vertical') ? (screenDx < 0) : (screenDy >= 0);
-                    saveObjectToPage({
-                        type: 'bracket',
-                        startPos: { ...startPos },
-                        endPos: { ...currentPos },
-                        color: style.color,
-                        lineWidth: style.lineWidth,
-                        orientation: orientation,
-                        flipped: flipped
-                    });
-                }
-                // コの字は指示線モードに移行しない
-                state.interactionState = 0;
-                if (saveHistoryCallback) saveHistoryCallback();
-                return;
-            }
-
-            if (state.currentMode === 'rectSymbolStamp') {
-                // 全角アキ（□）をオブジェクトとして保存
-                const w = Math.abs(currentPos.x - startPos.x);
-                const h = Math.abs(currentPos.y - startPos.y);
-                if (w > 5 && h > 5) {
-                    saveObjectToPage({
-                        type: 'rectSymbolStamp',
-                        startPos: { ...startPos },
-                        endPos: { ...currentPos },
-                        color: style.color,
-                        lineWidth: style.lineWidth
-                    });
-                }
-                state.interactionState = 0;
-                if (saveHistoryCallback) saveHistoryCallback();
-                return;
-            }
-
-            if (state.currentMode === 'triangleSymbolStamp') {
-                // 半角アキ（△）をオブジェクトとして保存
-                const w = Math.abs(currentPos.x - startPos.x);
-                const h = Math.abs(currentPos.y - startPos.y);
-                if (w > 5 || h > 5) {
-                    saveObjectToPage({
-                        type: 'triangleSymbolStamp',
-                        startPos: { ...startPos },
-                        endPos: { ...currentPos },
-                        color: style.color,
-                        lineWidth: style.lineWidth
-                    });
-                }
-                state.interactionState = 0;
-                if (saveHistoryCallback) saveHistoryCallback();
-                return;
             }
 
             // 指示スタンプの共通処理
@@ -2189,7 +1969,7 @@ window.MojiQDrawing = (function() {
                 return;
             }
 
-            if (state.annotationMode) {
+            if (state.annotationMode && shapeSaved) {
                 if (saveHistoryCallback) saveHistoryCallback();
                 state.interactionState = 2;
                 shapeEndPos = { x: currentPos.x, y: currentPos.y };
@@ -2229,22 +2009,39 @@ window.MojiQDrawing = (function() {
     }
 
     /**
-     * 折れ線を確定して保存
+     * 前の点から見た現在位置を、水平/垂直の近い方にスナップ（折れ線 Shift 用）
+     * dx と dy の大きい方の軸を残し、もう一方を 0 に丸めて直角に揃える。
      */
-    function finalizePolyline() {
+    function snapToRightAngle(prev, curr) {
+        const dx = curr.x - prev.x;
+        const dy = curr.y - prev.y;
+        if (Math.abs(dx) >= Math.abs(dy)) {
+            return { x: curr.x, y: prev.y };  // 水平
+        } else {
+            return { x: prev.x, y: curr.y };  // 垂直
+        }
+    }
+
+    /**
+     * 折れ線を確定して保存
+     * @param {boolean} closeShape - 始点と終点を繋いで閉じた図形にするか（既定: true）
+     */
+    function finalizePolyline(closeShape = true) {
         if (polylinePoints.length < 2) {
             // 頂点が2つ未満の場合はキャンセル
             cancelPolyline();
             return;
         }
 
-        // 始点を末尾に追加して閉じた図形にする
-        const closedPoints = [...polylinePoints, { ...polylinePoints[0] }];
+        // closeShape=true なら始点を末尾に追加して閉じた図形にする
+        const finalPoints = closeShape
+            ? [...polylinePoints, { ...polylinePoints[0] }]
+            : [...polylinePoints];
 
         const style = getCurrentDrawingStyle();
         saveObjectToPage({
             type: 'polyline',
-            points: closedPoints,
+            points: finalPoints,
             color: style.color,
             lineWidth: style.lineWidth
         });
@@ -2337,7 +2134,7 @@ window.MojiQDrawing = (function() {
         boundDblclickHandler = (e) => {
             if (state.currentMode === 'polyline' && state.interactionState === 3) {
                 e.preventDefault();
-                finalizePolyline();
+                finalizePolyline(true);
             }
         };
         boundKeydownHandler = (e) => {
@@ -2367,15 +2164,43 @@ window.MojiQDrawing = (function() {
                 }
             }
 
+            // アノテーションモード：Escで引出線描画をキャンセル（枠描画後、引出線確定前）
+            if (state.interactionState === 2 && e.key === 'Escape') {
+                e.preventDefault();
+                state.interactionState = 0;
+                shapeEndPosCanvas = { x: 0, y: 0 };
+                mojiqCanvas.style.cursor = 'crosshair';
+                // 引出線プレビューを消してオブジェクト（枠）だけ再描画
+                redrawCanvas(false);
+            }
+
+            // ラベル付き枠線モード：Escで引出線描画をキャンセル
+            if (state.currentMode === 'labeledRect' && (state.interactionState === 1 || state.interactionState === 5)) {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    if (snapshot) {
+                        ctx.putImageData(snapshot, 0, 0);
+                    }
+                    state.interactionState = 0;
+                    labeledRectLeaderStart = null;
+                    labeledRectLeaderEnd = null;
+                    labeledRectLeaderStartCanvas = null;
+                    labeledRectLeaderEndCanvas = null;
+                    labeledRectSnapshot = null;
+                    mojiqCanvas.style.cursor = 'crosshair';
+                }
+            }
+
             // 折れ線モードでのキー操作
             if (state.currentMode === 'polyline' && state.interactionState === 3) {
                 if (e.key === 'Escape') {
+                    // Escキーで「開いた」折れ線として確定（始点と繋がない）
                     e.preventDefault();
-                    cancelPolyline();
+                    finalizePolyline(false);
                 } else if (e.key === 'Enter') {
-                    // Enterキーで確定
+                    // Enterキーで「閉じた」折れ線として確定
                     e.preventDefault();
-                    finalizePolyline();
+                    finalizePolyline(true);
                 } else if (e.key === 'Delete' || e.key === 'Backspace') {
                     // DeleteまたはBackspaceキーで最後の頂点を削除
                     e.preventDefault();

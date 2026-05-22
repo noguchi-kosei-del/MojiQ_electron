@@ -15,6 +15,7 @@ window.MojiQConstants = (function() {
         KOMOJI: 14,         // 小文字スタンプのデフォルトサイズ
         RUBY: 14,           // ルビスタンプのデフォルトサイズ
         TORU: 14,           // トルスタンプのデフォルトサイズ
+        QUESTION: 16,       // ？スタンプのデフォルトサイズ
         FONT_LABEL: 12      // フォントラベルのフォントサイズ
     };
 
@@ -248,7 +249,12 @@ window.MojiQConstants = (function() {
         MIN: 0.25,
         MAX: 4.0,
         STEP: 0.25,
-        DEFAULT: 1.0
+        DEFAULT: 1.0,
+        // ズーム時に画像/PDFがビューポートを溢れた場合に動的に付与する
+        // 余白（overscroll margin）のビューポート寸法に対する比率。
+        // PsDesign 準拠で 0.85 = ビューポートの85% を上下左右に確保。
+        // 0.5 = 控えめ / 1.0 = 画像をほぼ画面外まで送れる。
+        OVERSCROLL_FRACTION: 0.85
     };
 
     // ========================================
@@ -272,7 +278,8 @@ window.MojiQConstants = (function() {
         ERASER: 'eraser',
         DONE_STAMP: 'doneStamp',
         KOMOJI_STAMP: 'komojiStamp',
-        RUBY_STAMP: 'rubyStamp'
+        RUBY_STAMP: 'rubyStamp',
+        QUESTION_STAMP: 'questionStamp'
     };
 
     /** @type {Object} カーソルスタイル */

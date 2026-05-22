@@ -216,7 +216,6 @@ input[type="range"] {
     color: var(--color-primary-900);
 }
 
-
 /* モーダル (共通) */
 .modal-overlay {
     display: none;
@@ -343,14 +342,18 @@ input[type="range"] {
 }
 
 /* 削除モード時のスタイル */
-.stamp-section.delete-mode .stamp-btn {
+.stamp-section.delete-mode .stamp-btn,
+.font-section.delete-mode .stamp-btn,
+.sizeadjust-section.delete-mode .stamp-btn {
     cursor: not-allowed;
     opacity: 0.7;
     border-color: var(--color-proofreading-400);
     position: relative;
 }
 
-.stamp-section.delete-mode .stamp-btn::after {
+.stamp-section.delete-mode .stamp-btn::after,
+.font-section.delete-mode .stamp-btn::after,
+.sizeadjust-section.delete-mode .stamp-btn::after {
     content: "×";
     position: absolute;
     right: 2px;
@@ -386,13 +389,17 @@ input[type="range"] {
 }
 
 /* 編集モード時のスタンプエリアの見た目 */
-.stamp-section.edit-mode .stamp-btn {
+.stamp-section.edit-mode .stamp-btn,
+.font-section.edit-mode .stamp-btn,
+.sizeadjust-section.edit-mode .stamp-btn {
     cursor: alias;
     border-style: dashed;
     opacity: 1.0;
 }
 
-.stamp-section.edit-mode .stamp-btn:hover {
+.stamp-section.edit-mode .stamp-btn:hover,
+.font-section.edit-mode .stamp-btn:hover,
+.sizeadjust-section.edit-mode .stamp-btn:hover {
     background-color: var(--color-warning-100);
 }
 

@@ -336,7 +336,7 @@ window.MojiQUtils = (function() {
      * @returns {boolean} モーダルが開いているか
      */
     function isModalOpen() {
-        return document.querySelector('.modal[style*="display: flex"]') !== null;
+        return document.querySelector('.modal[style*="display: flex"], .modal-overlay[style*="display: flex"]') !== null;
     }
 
     // ========================================

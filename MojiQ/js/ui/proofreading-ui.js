@@ -86,15 +86,24 @@ window.MojiQProofreadingUI = (function() {
             'tojiruStampBtn': 'とじる',
             'hirakuStampBtn': 'ひらく',
             'labeledRectBtn': '小文字指定',
-            'doubleArrowAnnotatedBtn': '字間指示'
+            'doubleArrowAnnotatedBtn': '字間指示',
+            'arrowBtnSidebar': '矢印',
+            'doubleArrowBtnSidebar': '両矢印',
+            'bracketBtnSidebar': '全体移動',
+            'semicircleBtnSidebar': '半円'
         };
         // 描画モードに切り替えるスタンプボタン
         const drawingModeMapping = {
-            'doubleArrowAnnotatedBtn': 'doubleArrowAnnotated'
+            'doubleArrowAnnotatedBtn': 'doubleArrowAnnotated',
+            'arrowBtnSidebar': 'arrow',
+            'doubleArrowBtnSidebar': 'doubleArrow',
+            'bracketBtnSidebar': 'bracket',
+            'semicircleBtnSidebar': 'semicircle'
         };
         const shashokuStampLabelMapping = {
             'doneStampBtn': '済',
-            'rubyStampBtn': 'ルビ'
+            'rubyStampBtn': 'ルビ',
+            'questionStampBtn': '？'
         };
 
         // 校正記号スタンプボタン
@@ -104,23 +113,18 @@ window.MojiQProofreadingUI = (function() {
             'triangleSymbolStampBtn': null,
             'chevronBtnSidebar': 'chevronBtn',
             'lshapeBtnSidebar': 'lshapeBtn',
-            'zshapeBtnSidebar': 'zshapeBtn',
-            'bracketBtnSidebar': 'bracketBtn',
-            'semicircleBtnSidebar': null
+            'zshapeBtnSidebar': 'zshapeBtn'
         };
         const symbolDirectModeMapping = {
             'rectSymbolStampBtn': 'rectSymbolStamp',
-            'triangleSymbolStampBtn': 'triangleSymbolStamp',
-            'semicircleBtnSidebar': 'semicircle'
+            'triangleSymbolStampBtn': 'triangleSymbolStamp'
         };
         const symbolLabelMapping = {
             'rectSymbolStampBtn': '全角アキ',
             'triangleSymbolStampBtn': '半角アキ',
             'chevronBtnSidebar': 'アキ',
             'lshapeBtnSidebar': '行移動',
-            'zshapeBtnSidebar': '改行',
-            'bracketBtnSidebar': '全体移動',
-            'semicircleBtnSidebar': '半円'
+            'zshapeBtnSidebar': '改行'
         };
 
         instructionStampButtons.forEach(btn => {

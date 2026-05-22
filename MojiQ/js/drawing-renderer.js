@@ -325,6 +325,16 @@ window.MojiQDrawingRenderer = (function() {
                 maxY = obj.startPos.y + halfSize;
                 break;
 
+            case 'questionStamp':
+                // ？スタンプは中心位置からサイズで計算（円形）
+                const questionStampSize = obj.size || 16;
+                const questionHalfSize = questionStampSize / 2;
+                minX = obj.startPos.x - questionHalfSize;
+                maxX = obj.startPos.x + questionHalfSize;
+                minY = obj.startPos.y - questionHalfSize;
+                maxY = obj.startPos.y + questionHalfSize;
+                break;
+
             case 'komojiStamp':
                 // 小文字スタンプは中心位置からサイズで計算
                 const komojiStampSize = obj.size || 28;
@@ -504,6 +514,10 @@ window.MojiQDrawingRenderer = (function() {
                 maxX = Math.max(obj.startPos.x, obj.endPos.x);
                 minY = Math.min(obj.startPos.y, obj.endPos.y);
                 maxY = Math.max(obj.startPos.y, obj.endPos.y);
+                // 水平/垂直ラインはバウンディングボックスのディメンションが0になるためリサイズで破綻する。
+                // 最小10pxのパディングを与えて零ディメンションを回避する。
+                if (maxX === minX) { minX -= 5; maxX += 5; }
+                if (maxY === minY) { minY -= 5; maxY += 5; }
                 break;
 
             case 'rect':
@@ -654,6 +668,15 @@ window.MojiQDrawingRenderer = (function() {
                 maxX = obj.startPos.x + doneHalfSize;
                 minY = obj.startPos.y - doneHalfSize;
                 maxY = obj.startPos.y + doneHalfSize;
+                break;
+
+            case 'questionStamp':
+                const questionStampSize2 = obj.size || 16;
+                const questionHalfSize2 = questionStampSize2 / 2;
+                minX = obj.startPos.x - questionHalfSize2;
+                maxX = obj.startPos.x + questionHalfSize2;
+                minY = obj.startPos.y - questionHalfSize2;
+                maxY = obj.startPos.y + questionHalfSize2;
                 break;
 
             case 'komojiStamp':
@@ -906,6 +929,15 @@ window.MojiQDrawingRenderer = (function() {
                 const dxStamp = testPos.x - obj.startPos.x;
                 const dyStamp = testPos.y - obj.startPos.y;
                 hitOnObject = (dxStamp * dxStamp + dyStamp * dyStamp) <= (radiusHit * radiusHit);
+                break;
+
+            case 'questionStamp':
+                // ？スタンプの円形ヒットテスト
+                const questionSizeHit = obj.size || 16;
+                const questionRadiusHit = questionSizeHit / 2 + tolerance;
+                const dxQuestion = testPos.x - obj.startPos.x;
+                const dyQuestion = testPos.y - obj.startPos.y;
+                hitOnObject = (dxQuestion * dxQuestion + dyQuestion * dyQuestion) <= (questionRadiusHit * questionRadiusHit);
                 break;
 
             case 'komojiStamp':
@@ -1594,25 +1626,25 @@ window.MojiQDrawingRenderer = (function() {
             ctx.translate(-centerX, -centerY);
         }
 
-        ctx.strokeStyle = obj.color || '#000000';
-        ctx.lineWidth = obj.lineWidth || 2;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
         const { startPos, endPos } = obj;
+        const headLen = Math.max(5, (obj.lineWidth || 2) * 2);
+        const angle = Math.atan2(endPos.y - startPos.y, endPos.x - startPos.x);
+        const wing1X = endPos.x - headLen * Math.cos(angle - Math.PI / 6);
+        const wing1Y = endPos.y - headLen * Math.sin(angle - Math.PI / 6);
+        const wing2X = endPos.x - headLen * Math.cos(angle + Math.PI / 6);
+        const wing2Y = endPos.y - headLen * Math.sin(angle + Math.PI / 6);
 
-        // 直線を描画
+        // 直線＋矢頭を1本の連続パスとして描画（白フチが矢頭根元を分断しないように）
         ctx.beginPath();
         ctx.moveTo(startPos.x, startPos.y);
         ctx.lineTo(endPos.x, endPos.y);
-        ctx.stroke();
-
-        // 矢頭のサイズ（lineWidthに比例）
-        const headLen = Math.max(5, (obj.lineWidth || 2) * 2);
-        const angle = Math.atan2(endPos.y - startPos.y, endPos.x - startPos.x);
-
-        // endPos側の矢頭
-        drawArrowHead(ctx, endPos.x, endPos.y, angle, headLen);
+        ctx.lineTo(wing1X, wing1Y);
+        ctx.lineTo(endPos.x, endPos.y);
+        ctx.lineTo(wing2X, wing2Y);
+        strokePathWithWhiteOutline(ctx, obj.color, obj.lineWidth);
 
         ctx.restore();
     }
@@ -1633,27 +1665,33 @@ window.MojiQDrawingRenderer = (function() {
             ctx.translate(-centerX, -centerY);
         }
 
-        ctx.strokeStyle = obj.color || '#000000';
-        ctx.lineWidth = obj.lineWidth || 2;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
         const { startPos, endPos } = obj;
-
-        // 直線を描画
-        ctx.beginPath();
-        ctx.moveTo(startPos.x, startPos.y);
-        ctx.lineTo(endPos.x, endPos.y);
-        ctx.stroke();
-
-        // 矢頭のサイズ（lineWidthに比例）
         const headLen = Math.max(5, (obj.lineWidth || 2) * 2);
         const angle = Math.atan2(endPos.y - startPos.y, endPos.x - startPos.x);
+        const endWing1X = endPos.x - headLen * Math.cos(angle - Math.PI / 6);
+        const endWing1Y = endPos.y - headLen * Math.sin(angle - Math.PI / 6);
+        const endWing2X = endPos.x - headLen * Math.cos(angle + Math.PI / 6);
+        const endWing2Y = endPos.y - headLen * Math.sin(angle + Math.PI / 6);
+        // startPos 側の矢頭は反対向き（angle + π）→ cos/sin が反転するので符号が逆
+        const startWing1X = startPos.x + headLen * Math.cos(angle - Math.PI / 6);
+        const startWing1Y = startPos.y + headLen * Math.sin(angle - Math.PI / 6);
+        const startWing2X = startPos.x + headLen * Math.cos(angle + Math.PI / 6);
+        const startWing2Y = startPos.y + headLen * Math.sin(angle + Math.PI / 6);
 
-        // endPos側の矢頭
-        drawArrowHead(ctx, endPos.x, endPos.y, angle, headLen);
-        // startPos側の矢頭（反対方向）
-        drawArrowHead(ctx, startPos.x, startPos.y, angle + Math.PI, headLen);
+        // 直線＋両端の矢頭を1本の連続パスとして描画
+        ctx.beginPath();
+        ctx.moveTo(startWing1X, startWing1Y);
+        ctx.lineTo(startPos.x, startPos.y);
+        ctx.lineTo(startWing2X, startWing2Y);
+        ctx.lineTo(startPos.x, startPos.y);
+        ctx.lineTo(endPos.x, endPos.y);
+        ctx.lineTo(endWing1X, endWing1Y);
+        ctx.lineTo(endPos.x, endPos.y);
+        ctx.lineTo(endWing2X, endWing2Y);
+        strokePathWithWhiteOutline(ctx, obj.color, obj.lineWidth);
 
         ctx.restore();
     }
@@ -1709,9 +1747,7 @@ window.MojiQDrawingRenderer = (function() {
         const headLen = Math.max(5, (obj.lineWidth || 2) * 2);
         const angle = Math.atan2(endPos.y - startPos.y, endPos.x - startPos.x);
 
-        // endPos側の矢頭（外向き）
-        drawArrowHeadOutward(ctx, endPos.x, endPos.y, angle, headLen);
-        // startPos側の矢頭（外向き）
+        // startPos側の矢頭（外向き）のみ。endPos側には引出線が伸びるためY字は描かない
         drawArrowHeadOutward(ctx, startPos.x, startPos.y, angle + Math.PI, headLen);
 
         ctx.restore();
@@ -1840,6 +1876,26 @@ window.MojiQDrawingRenderer = (function() {
     }
 
     /**
+     * 校正記号スタンプの白フチ＋本体ストローク共通処理
+     * 現在のパスに対して白フチ→本体色の順でストロークする
+     */
+    function strokePathWithWhiteOutline(ctx, color, lineWidth) {
+        const baseLw = lineWidth || 2;
+        ctx.save();
+        ctx.strokeStyle = '#ffffff';
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 5;
+        for (let lw = baseLw + 4; lw >= baseLw + 2; lw--) {
+            ctx.lineWidth = lw;
+            ctx.stroke();
+        }
+        ctx.restore();
+        ctx.strokeStyle = color || '#000000';
+        ctx.lineWidth = baseLw;
+        ctx.stroke();
+    }
+
+    /**
      * 半円を描画
      */
     function renderSemicircle(ctx, obj) {
@@ -1869,9 +1925,9 @@ window.MojiQDrawingRenderer = (function() {
             // 横向きの弧（上側の弧）
             ctx.ellipse(cx, cy, w / 2, h / 2, 0, Math.PI, 2 * Math.PI);
         }
-        ctx.strokeStyle = obj.color || '#000000';
-        ctx.lineWidth = obj.lineWidth || 2;
-        ctx.stroke();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        strokePathWithWhiteOutline(ctx, obj.color, obj.lineWidth);
         ctx.restore();
     }
 
@@ -1923,11 +1979,9 @@ window.MojiQDrawingRenderer = (function() {
             ctx.lineTo(rightX, topY);
         }
 
-        ctx.strokeStyle = obj.color || '#000000';
-        ctx.lineWidth = obj.lineWidth || 2;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.stroke();
+        strokePathWithWhiteOutline(ctx, obj.color, obj.lineWidth);
         ctx.restore();
     }
 
@@ -1979,11 +2033,9 @@ window.MojiQDrawingRenderer = (function() {
                 break;
         }
 
-        ctx.strokeStyle = obj.color || '#000000';
-        ctx.lineWidth = obj.lineWidth || 2;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.stroke();
+        strokePathWithWhiteOutline(ctx, obj.color, obj.lineWidth);
         ctx.restore();
     }
 
@@ -2032,11 +2084,9 @@ window.MojiQDrawingRenderer = (function() {
             ctx.lineTo(obj.endPos.x, obj.endPos.y);
         }
 
-        ctx.strokeStyle = obj.color || '#000000';
-        ctx.lineWidth = obj.lineWidth || 2;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.stroke();
+        strokePathWithWhiteOutline(ctx, obj.color, obj.lineWidth);
         ctx.restore();
     }
 
@@ -2064,11 +2114,13 @@ window.MojiQDrawingRenderer = (function() {
         // セリフ（はみ出し部分）のサイズ
         const serifSize = Math.min(w, h) * 0.15;
 
-        ctx.strokeStyle = obj.color || '#000000';
-        ctx.lineWidth = obj.lineWidth || 2;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
+        // セリフを含めた1本の連続パスとして描画する。
+        // 別パスに分けて連続でストロークすると、後続パスの白フチが
+        // 直前パスの本体ストロークを上書きして角部の線が途切れて見える。
+        ctx.beginPath();
         if (orientation === 'vertical') {
             const topY = Math.min(obj.startPos.y, obj.endPos.y);
             const bottomY = Math.max(obj.startPos.y, obj.endPos.y);
@@ -2076,91 +2128,47 @@ window.MojiQDrawingRenderer = (function() {
             const rightX = Math.max(obj.startPos.x, obj.endPos.x);
 
             if (flipped) {
-                // 反転: ⊏の形（開口部が右側）
-                // メインのコの字
-                ctx.beginPath();
-                ctx.moveTo(rightX, topY);
+                // 反転: ⊏の形（開口部が右側、セリフは外側へ伸びる）
+                ctx.moveTo(rightX, topY - serifSize);
+                ctx.lineTo(rightX, topY);
                 ctx.lineTo(leftX, topY);
                 ctx.lineTo(leftX, bottomY);
                 ctx.lineTo(rightX, bottomY);
-                ctx.stroke();
-                // 上端のセリフ（90度外側）
-                ctx.beginPath();
-                ctx.moveTo(rightX, topY);
-                ctx.lineTo(rightX, topY - serifSize);
-                ctx.stroke();
-                // 下端のセリフ（90度外側）
-                ctx.beginPath();
-                ctx.moveTo(rightX, bottomY);
                 ctx.lineTo(rightX, bottomY + serifSize);
-                ctx.stroke();
             } else {
-                // 通常: ⊐の形（開口部が左側）
-                // メインのコの字
-                ctx.beginPath();
-                ctx.moveTo(leftX, topY);
+                // 通常: ⊐の形（開口部が左側、セリフは外側へ伸びる）
+                ctx.moveTo(leftX, topY - serifSize);
+                ctx.lineTo(leftX, topY);
                 ctx.lineTo(rightX, topY);
                 ctx.lineTo(rightX, bottomY);
                 ctx.lineTo(leftX, bottomY);
-                ctx.stroke();
-                // 上端のセリフ（90度外側）
-                ctx.beginPath();
-                ctx.moveTo(leftX, topY);
-                ctx.lineTo(leftX, topY - serifSize);
-                ctx.stroke();
-                // 下端のセリフ（90度外側）
-                ctx.beginPath();
-                ctx.moveTo(leftX, bottomY);
                 ctx.lineTo(leftX, bottomY + serifSize);
-                ctx.stroke();
             }
         } else {
-            // 横向きのコの字
             const leftX = Math.min(obj.startPos.x, obj.endPos.x);
             const rightX = Math.max(obj.startPos.x, obj.endPos.x);
             const topY = Math.min(obj.startPos.y, obj.endPos.y);
             const bottomY = Math.max(obj.startPos.y, obj.endPos.y);
 
             if (flipped) {
-                // 反転: ⊔の形（開口部が上側）
-                // メインのコの字
-                ctx.beginPath();
-                ctx.moveTo(leftX, topY);
+                // 反転: ⊔の形（開口部が上側、セリフは外側へ伸びる）
+                ctx.moveTo(leftX - serifSize, topY);
+                ctx.lineTo(leftX, topY);
                 ctx.lineTo(leftX, bottomY);
                 ctx.lineTo(rightX, bottomY);
                 ctx.lineTo(rightX, topY);
-                ctx.stroke();
-                // 左端のセリフ（90度外側）
-                ctx.beginPath();
-                ctx.moveTo(leftX, topY);
-                ctx.lineTo(leftX - serifSize, topY);
-                ctx.stroke();
-                // 右端のセリフ（90度外側）
-                ctx.beginPath();
-                ctx.moveTo(rightX, topY);
                 ctx.lineTo(rightX + serifSize, topY);
-                ctx.stroke();
             } else {
-                // 通常: ⊓の形（開口部が下側）
-                // メインのコの字
-                ctx.beginPath();
-                ctx.moveTo(leftX, bottomY);
+                // 通常: ⊓の形（開口部が下側、セリフは外側へ伸びる）
+                ctx.moveTo(leftX - serifSize, bottomY);
+                ctx.lineTo(leftX, bottomY);
                 ctx.lineTo(leftX, topY);
                 ctx.lineTo(rightX, topY);
                 ctx.lineTo(rightX, bottomY);
-                ctx.stroke();
-                // 左端のセリフ（90度外側）
-                ctx.beginPath();
-                ctx.moveTo(leftX, bottomY);
-                ctx.lineTo(leftX - serifSize, bottomY);
-                ctx.stroke();
-                // 右端のセリフ（90度外側）
-                ctx.beginPath();
-                ctx.moveTo(rightX, bottomY);
                 ctx.lineTo(rightX + serifSize, bottomY);
-                ctx.stroke();
             }
         }
+        strokePathWithWhiteOutline(ctx, obj.color, obj.lineWidth);
 
         ctx.restore();
     }
@@ -2185,9 +2193,9 @@ window.MojiQDrawingRenderer = (function() {
         const w = obj.endPos.x - obj.startPos.x;
         const h = obj.endPos.y - obj.startPos.y;
         ctx.rect(obj.startPos.x, obj.startPos.y, w, h);
-        ctx.strokeStyle = obj.color || '#000000';
-        ctx.lineWidth = obj.lineWidth || 2;
-        ctx.stroke();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        strokePathWithWhiteOutline(ctx, obj.color, obj.lineWidth);
         ctx.restore();
     }
 
@@ -2221,9 +2229,9 @@ window.MojiQDrawingRenderer = (function() {
         ctx.lineTo(rightX, bottomY);
         ctx.closePath();
 
-        ctx.strokeStyle = obj.color || '#000000';
-        ctx.lineWidth = obj.lineWidth || 2;
-        ctx.stroke();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        strokePathWithWhiteOutline(ctx, obj.color, obj.lineWidth);
         ctx.restore();
     }
 
@@ -2490,13 +2498,15 @@ window.MojiQDrawingRenderer = (function() {
                     ctx.save();
                     ctx.translate(item.currentX, item.currentY);
                     ctx.rotate(Math.PI / 2);
-                    for (let lw = 5; lw >= 1; lw--) {
+                    // パフォーマンス最適化: 5回→3回に削減
+                    for (const lw of [5, 3, 1]) {
                         ctx.lineWidth = lw;
                         ctx.strokeText(item.char, 0, 0);
                     }
                     ctx.restore();
                 } else {
-                    for (let lw = 5; lw >= 1; lw--) {
+                    // パフォーマンス最適化: 5回→3回に削減
+                    for (const lw of [5, 3, 1]) {
                         ctx.lineWidth = lw;
                         ctx.strokeText(item.char, item.px, item.py);
                     }
@@ -2809,6 +2819,13 @@ window.MojiQDrawingRenderer = (function() {
         renderRoundedRectStamp(ctx, obj, def);
     }
 
+    /**
+     * ？スタンプを描画（円なし、白フチ付きテキストのみ）
+     */
+    function renderQuestionStamp(ctx, obj) {
+        renderTextStamp(ctx, obj, '？');
+    }
+
     // ========================================
     // テキストスタンプ汎用描画関数（リファクタリング）
     // ========================================
@@ -2982,6 +2999,8 @@ window.MojiQDrawingRenderer = (function() {
         const lines = ann.text.split('\n');
 
         // 白い縁取り付きでテキストを描画（横書き用：shadowBlur+複数回描画）
+        // パフォーマンス最適化: ストローク回数を5回から3回に削減
+        const outlineWidths = [5, 3, 1];
         const drawWithOutline = (char, px, py) => {
             ctx.save();
             ctx.strokeStyle = '#ffffff';
@@ -2991,8 +3010,8 @@ window.MojiQDrawingRenderer = (function() {
             ctx.shadowBlur = 4;
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 0;
-            for (let lw = 5; lw >= 1; lw--) {
-                ctx.lineWidth = lw;
+            for (let i = 0; i < outlineWidths.length; i++) {
+                ctx.lineWidth = outlineWidths[i];
                 ctx.strokeText(char, px, py);
             }
             ctx.shadowBlur = 0;
@@ -3052,13 +3071,15 @@ window.MojiQDrawingRenderer = (function() {
                     ctx.save();
                     ctx.translate(item.currentX, item.currentY);
                     ctx.rotate(Math.PI / 2);
-                    for (let lw = 5; lw >= 1; lw--) {
+                    // パフォーマンス最適化: 5回→3回に削減
+                    for (const lw of [5, 3, 1]) {
                         ctx.lineWidth = lw;
                         ctx.strokeText(item.char, 0, 0);
                     }
                     ctx.restore();
                 } else {
-                    for (let lw = 5; lw >= 1; lw--) {
+                    // パフォーマンス最適化: 5回→3回に削減
+                    for (const lw of [5, 3, 1]) {
                         ctx.lineWidth = lw;
                         ctx.strokeText(item.char, item.px, item.py);
                     }
@@ -3775,6 +3796,9 @@ window.MojiQDrawingRenderer = (function() {
             case 'rubyStamp':
                 renderRubyStamp(ctx, obj);
                 break;
+            case 'questionStamp':
+                renderQuestionStamp(ctx, obj);
+                break;
             case 'toruStamp':
             case 'torutsumeStamp':
             case 'torumamaStamp':
@@ -3859,7 +3883,8 @@ window.MojiQDrawingRenderer = (function() {
         const canvasHeight = ctx.canvas.height;
 
         // 選択がなく、キャッシュが有効な場合はキャッシュから描画
-        if (!hasSelection && xOffset === 0) {
+        // ただし、エクスポートモード時はスケールが異なるためキャッシュを使わない
+        if (!hasSelection && xOffset === 0 && !exportMode) {
             const cachedCanvas = getDrawingCache(pageNum, canvasWidth, canvasHeight, version);
             if (cachedCanvas) {
                 // キャッシュはdprスケール済みなので、メインctxのスケールをリセットして転送
@@ -3908,20 +3933,27 @@ window.MojiQDrawingRenderer = (function() {
         }
 
         // 選択がなくキャッシュ可能な場合は、オフスクリーンキャンバスに描画
+        // ただし、エクスポートモード時はキャッシュを作成しない（スケールが異なるため）
         let cacheCtx = null;
         let cacheCanvas = null;
         let cacheDpr = 1;
-        if (!hasSelection && xOffset === 0 && objects.length > 10) {
+        if (!hasSelection && xOffset === 0 && objects.length > 10 && !exportMode) {
             cacheCanvas = document.createElement('canvas');
             cacheCanvas.width = canvasWidth;
             cacheCanvas.height = canvasHeight;
             cacheCtx = cacheCanvas.getContext('2d');
-            // キャッシュキャンバスにもdprスケールを適用（ぼやけ防止）
-            // dprはキャンバスの物理サイズとCSS論理サイズの比率から計算
-            const cssWidth = ctx.canvas.style.width ? parseFloat(ctx.canvas.style.width) : (canvasWidth / 2);
-            cacheDpr = canvasWidth / cssWidth;
-            if (cacheDpr > 0 && isFinite(cacheDpr)) {
-                cacheCtx.scale(cacheDpr, cacheDpr);
+            if (!cacheCtx) {
+                // getContextがnullの場合はキャッシュなしで直接描画にフォールバック
+                console.warn('[MojiQ] 描画キャッシュのCanvasコンテキスト取得に失敗');
+                cacheCanvas = null;
+            } else {
+                // キャッシュキャンバスにもdprスケールを適用（ぼやけ防止）
+                // dprはキャンバスの物理サイズとCSS論理サイズの比率から計算
+                const cssWidth = ctx.canvas.style.width ? parseFloat(ctx.canvas.style.width) : (canvasWidth / 2);
+                cacheDpr = canvasWidth / cssWidth;
+                if (cacheDpr > 0 && isFinite(cacheDpr)) {
+                    cacheCtx.scale(cacheDpr, cacheDpr);
+                }
             }
         }
 
@@ -4076,6 +4108,13 @@ window.MojiQDrawingRenderer = (function() {
         offscreen.height = Math.ceil(offscreenHeight * canvasScale);
         const offCtx = offscreen.getContext('2d');
 
+        // getContextがnullの場合（メモリ不足等）はフォールバック
+        if (!offCtx) {
+            console.warn('[MojiQ] オフスクリーンキャンバスの取得に失敗（消しゴム処理スキップ）');
+            renderObject(ctx, obj, isSelected);
+            return;
+        }
+
         // 現在のスケーリングに合わせる
         offCtx.scale(canvasScale, canvasScale);
 
@@ -4134,6 +4173,10 @@ window.MojiQDrawingRenderer = (function() {
                           offsetX, offsetY, offscreenWidth, offscreenHeight);
         }
 
+        // オフスクリーンキャンバスのメモリを解放
+        offscreen.width = 0;
+        offscreen.height = 0;
+
         // 選択ハンドルを描画（メインキャンバスに直接）
         if (isSelected) {
             const showHandles = selectedIndices.length <= 1;
@@ -4175,6 +4218,8 @@ window.MojiQDrawingRenderer = (function() {
         for (let i = objects.length - 1; i >= 0; i--) {
             // 消しゴムオブジェクトは選択不可
             if (objects[i].type === 'eraser') continue;
+            // コメントタブから配置された済スタンプは選択不可
+            if (objects[i].type === 'doneStamp' && objects[i].commentIndex !== undefined) continue;
             if (hitTest(pos, objects[i], tolerance)) {
                 return i;
             }

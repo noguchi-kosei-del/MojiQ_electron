@@ -25,12 +25,19 @@ window.MojiQShortcuts = (function() {
         return slideMenu && slideMenu.classList.contains('open');
     }
 
-    // モーダルが開いているかチェック
+    // モーダルが開いているかチェック（設定モーダル + 汎用モーダル）
     function isModalOpen() {
         const settingsModal = document.getElementById('settingsModal');
         const keyCaptureModal = document.getElementById('keyCaptureModal');
-        return (settingsModal && settingsModal.style.display !== 'none') ||
-               (keyCaptureModal && keyCaptureModal.style.display !== 'none');
+        if ((settingsModal && settingsModal.style.display !== 'none') ||
+               (keyCaptureModal && keyCaptureModal.style.display !== 'none')) {
+            return true;
+        }
+        // 汎用モーダル（アラート、確認ダイアログ等）
+        if (window.MojiQUtils && MojiQUtils.isModalOpen()) {
+            return true;
+        }
+        return false;
     }
 
     // ページナビゲーション用の状態管理
@@ -151,8 +158,9 @@ window.MojiQShortcuts = (function() {
                     }
                 }
 
-                // Ctrl/Cmd + 左右矢印: ページナビゲーション（選択がない場合）
-                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                // Ctrl/Cmd + 矢印キー: ページナビゲーション（選択がない場合）
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' ||
+                    e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                     e.preventDefault();
                     // フォーカスを外す（スライダーなどからフォーカスを解除）
                     if (document.activeElement && document.activeElement !== document.body) {
@@ -168,13 +176,27 @@ window.MojiQShortcuts = (function() {
                     const shouldInvert = isLeftBinding !== isUserInverted;
                     let navAction;
                     if (shouldInvert) {
-                        // 反転: 左キーで最初、右キーで最後
-                        navAction = e.key === 'ArrowLeft' ? 'first' : 'last';
+                        // 反転: 左/上キーで最初、右/下キーで最後
+                        navAction = (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? 'first' : 'last';
                     } else {
-                        // 通常: 左キーで最後、右キーで最初
-                        navAction = e.key === 'ArrowLeft' ? 'last' : 'first';
+                        // 通常: 左/上キーで最後、右/下キーで最初
+                        navAction = (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? 'last' : 'first';
                     }
                     window.dispatchEvent(new CustomEvent('mojiq:page-navigate', { detail: { action: navAction } }));
+                    return;
+                }
+
+                // Ctrl/Cmd + A: ブラウザのページ全体テキスト選択を防止
+                // INPUT/TEXTAREA/contenteditable 内では通常動作（編集中の全選択）を許可。
+                // それ以外（キャンバス上・UI余白）では preventDefault で止めて、
+                // UI 要素のラベル等にカーソルが入らないよう残留フォーカスも外す。
+                if ((e.key === 'a' || e.key === 'A') && !e.shiftKey && !e.altKey) {
+                    if (!isInputActive(e)) {
+                        e.preventDefault();
+                        if (document.activeElement && document.activeElement !== document.body) {
+                            document.activeElement.blur();
+                        }
+                    }
                     return;
                 }
             }
@@ -322,10 +344,23 @@ window.MojiQShortcuts = (function() {
                 window.dispatchEvent(new CustomEvent('mojiq:history', { detail: { action: 'undo' } }));
             }
 
+            // コピー
+            if (matchesShortcut(e, 'copy')) {
+                e.preventDefault();
+                window.dispatchEvent(new CustomEvent('mojiq:copy', { detail: {} }));
+            }
+
             // カット
             if (matchesShortcut(e, 'cut')) {
                 e.preventDefault();
                 window.dispatchEvent(new CustomEvent('mojiq:cut', { detail: {} }));
+            }
+
+            // 同じ位置にペースト (Ctrl+Shift+V) - pasteより先に判定
+            if (matchesShortcut(e, 'pasteInPlace')) {
+                e.preventDefault();
+                window.dispatchEvent(new CustomEvent('mojiq:paste', { detail: { inPlace: true } }));
+                return;
             }
 
             // ペースト (Ctrl+Vはツール切り替えと競合しないように先に処理)

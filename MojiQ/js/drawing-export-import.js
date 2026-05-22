@@ -189,17 +189,98 @@ const DrawingExportImport = {
                 height: pageSize.height
             };
 
-            // 確認済みコメント（済スタンプ付き）に対応するPDF注釈由来オブジェクトを除外
-            if (checkedSignatures.length > 0) {
-                filteredData[pageNum] = data[pageNum].filter(obj =>
-                    !this._isCheckedPdfAnnotation(obj, checkedSignatures, parseInt(pageNum))
-                );
-            } else {
-                filteredData[pageNum] = data[pageNum];
-            }
+            // PDF注釈由来オブジェクトをJSONから除外（PDF読み込み時に動的に再生成されるため）
+            // 確認済みコメント（済スタンプ付き）に対応する済スタンプも除外
+            filteredData[pageNum] = data[pageNum].filter(obj => {
+                // PDF注釈由来テキストは常に除外（動的ロードで再生成される）
+                if (obj._pdfAnnotationSource) {
+                    return false;
+                }
+                // 確認済みコメントの済スタンプも除外
+                if (checkedSignatures.length > 0 &&
+                    this._isCheckedPdfAnnotation(obj, checkedSignatures, parseInt(pageNum))) {
+                    return false;
+                }
+                return true;
+            });
         }
 
         return { data: filteredData, pageSizes };
+    },
+
+    /**
+     * PDF注釈由来のテキストオブジェクトをコメントデータとして準備する
+     * _pdfAnnotationSourceを除去して通常テキストとして保存可能にする
+     * @param {Object} data - ページごとの描画データ
+     * @returns {Promise<{data: Object, pageSizes: Object}>} コメントデータとページサイズ情報
+     */
+    async _prepareCommentData(data) {
+        const pageSizes = {};
+        const fallbackSize = this._getCurrentCanvasSize();
+        const commentData = {};
+
+        // ソース1: DrawingObjects上のPDF注釈由来オブジェクト
+        for (const pageNum in data) {
+            let pageSize = null;
+            if (window.MojiQPdfManager && window.MojiQPdfManager.getDisplayPageSize) {
+                pageSize = window.MojiQPdfManager.getDisplayPageSize(parseInt(pageNum));
+            }
+            if (!pageSize || !pageSize.width || !pageSize.height) {
+                pageSize = fallbackSize;
+            }
+            pageSizes[pageNum] = { width: pageSize.width, height: pageSize.height };
+
+            // _pdfAnnotationSource付きオブジェクトのみ抽出し、プロパティを削除
+            commentData[pageNum] = data[pageNum]
+                .filter(obj => obj._pdfAnnotationSource)
+                .map(obj => {
+                    const newObj = MojiQClone.deep(obj);
+                    delete newObj._pdfAnnotationSource;
+                    return newObj;
+                });
+        }
+
+        // ソース2: メタデータから復元したMojiQテキスト（再保存時にDrawingObjectsに無い場合）
+        if (window.MojiQPdfManager && window.MojiQPdfManager.getLoadedMojiQTexts) {
+            const loadedTexts = window.MojiQPdfManager.getLoadedMojiQTexts();
+            if (loadedTexts && loadedTexts.length > 0) {
+                for (const item of loadedTexts) {
+                    const pageNum = String(item.pdfPage);
+                    if (!commentData[pageNum]) {
+                        commentData[pageNum] = [];
+                        let pageSize = null;
+                        if (window.MojiQPdfManager && window.MojiQPdfManager.getDisplayPageSize) {
+                            pageSize = window.MojiQPdfManager.getDisplayPageSize(parseInt(pageNum));
+                        }
+                        if (!pageSize || !pageSize.width || !pageSize.height) {
+                            pageSize = fallbackSize;
+                        }
+                        pageSizes[pageNum] = { width: pageSize.width, height: pageSize.height };
+                    }
+
+                    // ページ+テキスト内容で重複排除
+                    const isDuplicate = commentData[pageNum].some(
+                        existing => existing.text === item.contents
+                    );
+                    if (!isDuplicate) {
+                        commentData[pageNum].push({
+                            type: 'text',
+                            text: item.contents,
+                            startPos: {
+                                x: item.canvasRect ? item.canvasRect.x : 0,
+                                y: item.canvasRect ? item.canvasRect.y : 0
+                            },
+                            fontSize: 14,
+                            color: '#000000',
+                            align: 'left',
+                            isVertical: false
+                        });
+                    }
+                }
+            }
+        }
+
+        return { data: commentData, pageSizes };
     },
 
     /**
@@ -255,14 +336,36 @@ const DrawingExportImport = {
         }
 
         const scaledData = {};
-        // 現在のキャンバスサイズを取得
-        const currentSize = this._getCurrentCanvasSize();
+        // フォールバック用: 現在のキャンバスサイズを取得
+        const fallbackSize = this._getCurrentCanvasSize();
 
         for (const pageNum in data) {
             const objects = data[pageNum];
 
-            // 保存時のサイズと現在のサイズを比較
+            // 保存時のサイズを取得
             const savedSize = savedPageSizes[pageNum];
+
+            // 現在のサイズを取得（ページごとに異なる場合に対応）
+            // PDF保存時と同じ getDisplayPageSize を使用して一貫性を保つ
+            let currentSize = null;
+            if (window.MojiQPdfManager && window.MojiQPdfManager.getDisplayPageSize) {
+                currentSize = window.MojiQPdfManager.getDisplayPageSize(parseInt(pageNum));
+            }
+            // getDisplayPageSize が無効な場合はフォールバック
+            if (!currentSize || !currentSize.width || currentSize.width <= 0 ||
+                !currentSize.height || currentSize.height <= 0 ||
+                !Number.isFinite(currentSize.width) || !Number.isFinite(currentSize.height)) {
+                currentSize = fallbackSize;
+            }
+
+            // currentSizeの検証（NaN/Infinity防止）
+            if (!currentSize || !currentSize.width || currentSize.width <= 0 ||
+                !currentSize.height || currentSize.height <= 0 ||
+                !Number.isFinite(currentSize.width) || !Number.isFinite(currentSize.height)) {
+                console.warn('[MojiQ DrawingExportImport] 無効な現在のサイズを検出:', currentSize);
+                scaledData[pageNum] = objects;
+                continue;
+            }
 
             if (savedSize && (savedSize.width !== currentSize.width || savedSize.height !== currentSize.height)) {
                 // 0除算防止: savedSize.width/heightが0または負の場合はスケーリングをスキップ
@@ -273,6 +376,13 @@ const DrawingExportImport = {
                 }
                 const scaleX = currentSize.width / savedSize.width;
                 const scaleY = currentSize.height / savedSize.height;
+
+                // BUG修正: スケール値の検証（NaN/Infinity防止）
+                if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY) || scaleX <= 0 || scaleY <= 0) {
+                    console.warn('[MojiQ DrawingExportImport] 無効なスケール値を検出:', { scaleX, scaleY, savedSize, currentSize });
+                    scaledData[pageNum] = objects;
+                    continue;
+                }
 
                 scaledData[pageNum] = objects.map(obj => this._scaleObjectCoordinates(obj, scaleX, scaleY));
             } else {
@@ -472,7 +582,9 @@ const DrawingExportImport = {
             importData = JSON.parse(jsonString);
             await _drawingExportNextFrame();
         } catch (e) {
-            throw new Error('JSONファイルの解析に失敗しました。ファイル形式を確認してください。');
+            // BUG修正: 元のエラーメッセージを含めてデバッグを容易にする
+            const errorDetail = e.message ? `: ${e.message}` : '';
+            throw new Error(`JSONファイルの解析に失敗しました${errorDetail}。ファイル形式を確認してください。`);
         }
 
         // バリデーション
@@ -504,6 +616,29 @@ const DrawingExportImport = {
             }
         }
 
+        // JSONに含まれていない既存オブジェクトを全ページから退避
+        // （PDF注釈由来テキスト、ペースト由来テキスト等を保護）
+        const savedNonJsonObjects = {};
+        const jsonObjectIds = new Set();
+        for (const pageNum in importData.data) {
+            if (importData.data[pageNum]) {
+                importData.data[pageNum].forEach(obj => {
+                    if (obj.id) jsonObjectIds.add(obj.id);
+                });
+            }
+        }
+        if (currentPageCount > 0) {
+            for (let i = 1; i <= currentPageCount; i++) {
+                const objects = MojiQDrawingObjects.getPageObjects(i);
+                if (objects && objects.length > 0) {
+                    const nonJsonObjs = objects.filter(obj => obj && !jsonObjectIds.has(obj.id));
+                    if (nonJsonObjs.length > 0) {
+                        savedNonJsonObjects[i] = nonJsonObjs;
+                    }
+                }
+            }
+        }
+
         // 既存の描画をクリア（全ページ）
         if (currentPageCount > 0) {
             for (let i = 1; i <= currentPageCount; i++) {
@@ -511,20 +646,40 @@ const DrawingExportImport = {
             }
         }
 
-        // データをフィルタリング（存在するページのみ）
+        // データをフィルタリング（存在するページのみ、PDF注釈由来オブジェクトを除外）
         const filteredData = {};
         for (const pageNum in importData.data) {
             const pn = parseInt(pageNum);
             if (currentPageCount === 0 || pn <= currentPageCount) {
-                filteredData[pageNum] = importData.data[pageNum];
+                // 古いJSONに含まれるPDF注釈由来オブジェクトを除外
+                // （PDF読み込み時に動的に再生成されるため）
+                filteredData[pageNum] = importData.data[pageNum].filter(obj =>
+                    !obj._pdfAnnotationSource
+                );
             }
         }
 
         // 座標を現在の表示サイズにスケーリング（v1.1以降のデータ）
         const scaledData = this._scaleCoordinatesForImport(filteredData, importData.pageSizes, importData.version);
 
-        // 描画データを復元
-        await MojiQDrawingObjects.deserializeAllPagesData(scaledData);
+        // 描画データを復元（失敗しても退避オブジェクトは必ず復元する）
+        try {
+            await MojiQDrawingObjects.deserializeAllPagesData(scaledData);
+        } catch (deserializeError) {
+            console.error('[MojiQ] 描画データのデシリアライズに失敗:', deserializeError);
+        }
+
+        // 退避したオブジェクト（PDF注釈由来テキスト、ペースト由来テキスト等）を復元
+        for (const pageNum in savedNonJsonObjects) {
+            savedNonJsonObjects[pageNum].forEach(obj => {
+                MojiQDrawingObjects.addObject(parseInt(pageNum), obj);
+            });
+        }
+
+        // オブジェクト変更イベントを発火（コメントタブ等の更新のため）
+        window.dispatchEvent(new CustomEvent('mojiq:objects-changed', {
+            detail: { action: 'import', objectType: 'text' }
+        }));
 
         // 再描画
         if (window.MojiQPdfManager) {
@@ -579,6 +734,40 @@ const DrawingExportImport = {
         }
 
         return { valid: true };
+    },
+
+    /**
+     * 同名ファイルが存在する場合、末尾に(1),(2)...を付与したユニークなパスを返す
+     * @param {string} filePath - 元のファイルパス
+     * @returns {Promise<string>} ユニークなファイルパス
+     */
+    async _getUniqueFilePath(filePath) {
+        const result = await window.electronAPI.fileExists(filePath);
+        if (!result || !result.success || !result.exists) {
+            return filePath;
+        }
+
+        // 拡張子部分を分離（.mojiq.json のような複合拡張子に対応）
+        const mojiqJsonMatch = filePath.match(/^(.+)(\.mojiq\.json)$/i);
+        let basePath, ext;
+        if (mojiqJsonMatch) {
+            basePath = mojiqJsonMatch[1];
+            ext = mojiqJsonMatch[2];
+        } else {
+            const lastDot = filePath.lastIndexOf('.');
+            basePath = lastDot > 0 ? filePath.substring(0, lastDot) : filePath;
+            ext = lastDot > 0 ? filePath.substring(lastDot) : '';
+        }
+
+        for (let i = 1; i <= 999; i++) {
+            const candidate = `${basePath}(${i})${ext}`;
+            const check = await window.electronAPI.fileExists(candidate);
+            if (!check || !check.success || !check.exists) {
+                return candidate;
+            }
+        }
+
+        return filePath;
     },
 
     /**
@@ -639,14 +828,15 @@ const DrawingExportImport = {
         await _drawingExportNextFrame();
 
         // ファイルパスから描画データのパスを生成（拡張子を_描画.jsonに置換）
-        const drawingFilePath = filePath.replace(/\.(pdf|jpg|jpeg|png)$/i, '_描画.json');
+        let drawingFilePath = filePath.replace(/\.(pdf|jpg|jpeg|png)$/i, '_描画.json');
 
         // Electron環境の場合（pdf-manager.jsと同じパターンで判定）
         if (window.MojiQElectron && window.MojiQElectron.isElectron) {
             try {
-                // 同名ファイルの存在確認（上書き保存時はスキップ）
-                // 上書き保存の場合は毎回確認ダイアログを出す必要はない
-                // → 初回保存時のみ確認（描画JSONが存在しない場合は新規作成）
+                // 同名ファイルが存在する場合は番号を付与して上書きを防止
+                if (window.electronAPI && window.electronAPI.fileExists) {
+                    drawingFilePath = await this._getUniqueFilePath(drawingFilePath);
+                }
 
                 // JSONをBase64エンコードして保存
                 const base64Data = btoa(unescape(encodeURIComponent(jsonString)));
@@ -664,8 +854,81 @@ const DrawingExportImport = {
         }
 
         return false;
+    },
+
+    /**
+     * PDF注釈由来のコメントデータをJSONファイルとして保存する
+     * @param {string} filePath - 保存されたPDFファイルのパス
+     * @returns {Promise<boolean>} 保存成功したかどうか
+     */
+    async exportCommentsToPath(filePath) {
+        // 見開きモードの場合は先に単ページに分割
+        const isSpreadMode = window.MojiQPdfManager &&
+            window.MojiQPdfManager.isSpreadViewMode &&
+            window.MojiQPdfManager.isSpreadViewMode();
+
+        let singlePageBackup = null;
+        if (isSpreadMode) {
+            singlePageBackup = MojiQDrawingObjects.backupSinglePageObjects();
+            window.MojiQPdfManager.splitSpreadDrawingsForExport();
+        }
+
+        const data = MojiQDrawingObjects.getAllPagesData();
+
+        if (isSpreadMode && singlePageBackup) {
+            MojiQDrawingObjects.restoreSinglePageObjects(singlePageBackup);
+            window.MojiQPdfManager.refreshSpreadDrawings();
+        }
+
+        // コメントデータを準備（_pdfAnnotationSource付きオブジェクト + メタデータ）
+        const { data: commentDataContent, pageSizes } = await this._prepareCommentData(data);
+
+        // コメントオブジェクトが存在するかチェック
+        const hasComments = Object.values(commentDataContent).some(pageData => pageData.length > 0);
+        if (!hasComments) {
+            return false; // コメントがない場合はエラーではなくスキップ
+        }
+
+        const exportData = {
+            version: this.VERSION,
+            exportedAt: new Date().toISOString(),
+            pageCount: Object.keys(commentDataContent).length,
+            pageSizes: pageSizes,
+            data: commentDataContent
+        };
+
+        await _drawingExportNextFrame();
+        const jsonString = JSON.stringify(exportData, null, 2);
+        await _drawingExportNextFrame();
+
+        // ファイルパスから_コメント.jsonのパスを生成
+        let commentFilePath = filePath.replace(/\.(pdf|jpg|jpeg|png)$/i, '_コメント.json');
+
+        if (window.MojiQElectron && window.MojiQElectron.isElectron) {
+            try {
+                // 同名ファイルが存在する場合は番号を付与して上書きを防止
+                if (window.electronAPI && window.electronAPI.fileExists) {
+                    commentFilePath = await this._getUniqueFilePath(commentFilePath);
+                }
+
+                const base64Data = btoa(unescape(encodeURIComponent(jsonString)));
+                const saveResult = await window.MojiQElectron.saveFile(commentFilePath, base64Data);
+                if (saveResult && saveResult.success) {
+                    return true;
+                } else {
+                    console.error('コメントデータ保存失敗:', saveResult?.error);
+                    return false;
+                }
+            } catch (error) {
+                console.error('コメントデータ保存エラー:', error);
+                return false;
+            }
+        }
+
+        return false;
     }
 };
 
-// グローバルに公開
-window.DrawingExportImport = DrawingExportImport;
+// グローバルに公開（MojiQ名前空間 + 後方互換性エイリアス）
+window.MojiQDrawingExportImport = DrawingExportImport;
+window.DrawingExportImport = DrawingExportImport; // 後方互換性

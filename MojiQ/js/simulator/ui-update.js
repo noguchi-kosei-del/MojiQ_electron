@@ -73,7 +73,8 @@ window.SimulatorUI = (function() {
             return;
         }
 
-        monPt.textContent = pendingGridState.ptSize;
+        // 小数点第一位で四捨五入して表示
+        monPt.textContent = Math.round(pendingGridState.ptSize * 10) / 10;
     }
 
     // Density UI状態更新
@@ -310,6 +311,11 @@ window.SimulatorUI = (function() {
             btnClearText.addEventListener('click', () => {
                 gridTextInput.value = '';
 
+                // セリフ見本ボタンの状態を更新（テキストが空になったので無効化）
+                if (window.SimulatorTools) {
+                    window.SimulatorTools.updateSampleGridButtonState();
+                }
+
                 // グリッド調整中であればテキストをクリアして1x1に戻す
                 const pendingGridState = State.get('pendingGridState');
                 if (pendingGridState) {
@@ -432,6 +438,12 @@ window.SimulatorUI = (function() {
         if (gridTextInput) {
             gridTextInput.addEventListener('input', () => {
                 const text = gridTextInput.value;
+
+                // セリフ見本ボタンの状態を更新
+                if (window.SimulatorTools) {
+                    window.SimulatorTools.updateSampleGridButtonState();
+                }
+
                 if (!text || text.trim().length === 0) return;
 
                 // 半角記号（組み合わせて1セルに収める）

@@ -33,8 +33,6 @@
             <span class="hamburger-line"></span>
         </button>
 
-        <div class="header-divider"></div>
-
         <!-- モード切替トグル（指示入れモード / 校正モード） -->
         <div class="mode-toggle-container menu-lockable" id="modeToggleContainer">
             <!-- 指示入れモードボタン -->
@@ -241,17 +239,11 @@
             </button>
         </div>
         <div class="slide-menu-content">
-            <a href="https://hyper-coast-743.notion.site/2aa34ea373ba80cbbbf3d5e5ab94f893?pvs=74" class="slide-menu-item" target="_blank">
+            <a href="https://www.notion.so/32f34ea373ba8039ae1cdd1565f978e6?source=copy_link" class="slide-menu-item" target="_blank">
                 <svg class="external-link-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
                 </svg>
                 校正のやり方
-            </a>
-            <a href="https://hyper-coast-743.notion.site/2e734ea373ba8009a6b3efbf43c9e1e0" class="slide-menu-item" target="_blank">
-                <svg class="external-link-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
-                </svg>
-                校正記号の入れ方/読み方
             </a>
         </div>
         <!-- 下部設定ボタン -->
@@ -336,7 +328,7 @@
             <label id="exportDrawingCheckLabel" class="page-edit-dropdown-item save-option drawing-export checkbox-item">
                 <input type="checkbox" id="exportDrawingCheck">
                 <span class="checkbox-icon"></span>
-                <span>描画データを追加保存</span>
+                <span>描画+コメントを<br>追加保存</span>
             </label>
             <label id="compressCheckLabel" class="page-edit-dropdown-item save-option compress-save checkbox-item">
                 <input type="checkbox" id="compressSaveCheck">
@@ -604,18 +596,6 @@
                         </svg>
                     </button>
                 </div>
-                <div id="rainbowPicker" style="
-                    width: 100%;
-                    height: 20px;
-                    margin: 8px 0;
-                    border-radius: 4px;
-                    cursor: crosshair;
-                    background: linear-gradient(to right,
-                        #ff0000, #ff8000, #ffff00, #80ff00,
-                        #00ff00, #00ff80, #00ffff, #0080ff,
-                        #0000ff, #8000ff, #ff00ff, #ff0080, #ff0000);
-                    border: 1px solid #ccc;
-                " title="クリックで色を選択"></div>
                 <input type="color" id="colorPicker" value="#ff0000" style="display:none;">
 
                 <!-- QA対策 #25,#26: 線幅の範囲制限 (1-20px) -->
@@ -630,54 +610,59 @@
                 <input type="number" id="fontSizeInput" min="1" max="500" value="12" style="font-weight:bold; font-size:14px;">
 
 
-                <div id="scaleDisplay" style="font-size:10px; color:#1976d2; margin-bottom:8px; margin-top:10px; text-align:left; font-weight:bold;">縮尺: 未設定</div>
+                <!-- 写植シミュレーター -->
+                <div class="simulator-section">
+                    <div class="simulator-section-label">写植シミュレーター</div>
 
-                <div id="sidebarToolButtons" style="display:flex; gap:8px; margin-bottom:10px;">
-                    <button id="calibrateBtn" class="sidebar-tool-btn" type="button" title="縮尺合わせ">
-                        <span class="sidebar-tool-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="5" width="18" height="10" rx="1.5"/><path d="M4 5v3"/><path d="M7 5v5"/><path d="M10 5v3"/><path d="M13 5v5"/><path d="M16 5v3"/></svg></span>
-                        <span class="sidebar-tool-label">縮尺合わせ</span>
-                    </button>
-                    <button id="gridBtn" class="sidebar-tool-btn" type="button" disabled title="先に「縮尺合わせ」を行ってください">
-                        <span class="sidebar-tool-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="16" height="16" rx="1"/><line x1="2" y1="7.33" x2="18" y2="7.33"/><line x1="2" y1="12.67" x2="18" y2="12.67"/><line x1="7.33" y1="2" x2="7.33" y2="18"/><line x1="12.67" y1="2" x2="12.67" y2="18"/></svg></span>
-                        <span class="sidebar-tool-label">写植グリッド</span>
-                    </button>
-                </div>
+                    <div id="scaleDisplay" style="font-size:10px; color:#1976d2; margin-bottom:8px; text-align:left; font-weight:bold;">縮尺: 未設定</div>
 
-                <div id="gridSettingsArea">
-                    <div style="font-size:11px; font-weight:bold; color:#2e7d32; margin-bottom:8px; border-bottom:1px solid #c5e1a5; padding-bottom:4px;">
-                        写植グリッド設定
-                    </div>
-                    <label>セリフサンプル</label>
-                    <textarea id="gridTextInput" placeholder="セリフを入れると文字数を自動計算" style="font-size:11px; height:45px;"></textarea>
-                    <div style="display:flex; gap:6px; margin-top:4px;">
-                        <button id="btnHorizontalMode" type="button" style="font-size:10px; padding:2px 8px; border:1px solid #81c784; border-radius:4px; background:#fff; color:#2e7d32; cursor:pointer;">横方向</button>
-                        <button id="btnClearText" type="button" style="font-size:10px; padding:2px 8px; border:1px solid #e57373; border-radius:4px; background:#fff; color:#c62828; cursor:pointer;">削除</button>
+                    <!-- ツールボタン（3列・アイコンのみ） -->
+                    <div id="sidebarToolButtons" style="display:flex; gap:6px; margin-bottom:10px;">
+                        <button id="calibrateBtn" class="sidebar-tool-btn sidebar-tool-btn-icon" type="button" title="縮尺合わせ">
+                            <span class="sidebar-tool-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="5" width="18" height="10" rx="1.5"/><path d="M4 5v3"/><path d="M7 5v5"/><path d="M10 5v3"/><path d="M13 5v5"/><path d="M16 5v3"/></svg></span>
+                        </button>
+                        <button id="gridBtn" class="sidebar-tool-btn sidebar-tool-btn-icon" type="button" disabled title="一文字グリッド">
+                            <span class="sidebar-tool-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="16" height="16" rx="1"/></svg></span>
+                        </button>
+                        <button id="sampleGridBtn" class="sidebar-tool-btn sidebar-tool-btn-icon" type="button" disabled title="セリフ見本">
+                            <span class="sidebar-tool-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="16" height="16" rx="1"/><line x1="2" y1="7.33" x2="18" y2="7.33"/><line x1="2" y1="12.67" x2="18" y2="12.67"/><line x1="7.33" y1="2" x2="7.33" y2="18"/><line x1="12.67" y1="2" x2="12.67" y2="18"/></svg></span>
+                        </button>
                     </div>
 
-                    <!-- 行数・文字数入力は非表示（機能は維持、テキストから自動計算） -->
-                    <div class="grid-inputs-container" style="display: none;">
-                        <div class="grid-input-group"><label>行数</label><input type="number" id="gridLinesInput" value="1" min="1"></div>
-                        <div class="grid-input-group"><label>文字数</label><input type="number" id="gridCharsInput" value="1" min="1"></div>
+                    <!-- セリフ見本用の入力エリア -->
+                    <div id="gridSettingsArea" class="disabled-lock" style="margin-top:10px; padding:8px; background:#f1f8e9; border:1px solid #c5e1a5; border-radius:4px;">
+                        <label style="font-size:11px; font-weight:bold; color:#2e7d32;">セリフ見本を入力</label>
+                        <textarea id="gridTextInput" placeholder="入力するとセリフ見本が使用可能になります。" style="font-size:11px; height:45px; margin-top:4px;"></textarea>
+                        <div style="display:flex; gap:6px; margin-top:4px;">
+                            <button id="btnHorizontalMode" type="button" style="font-size:10px; padding:2px 8px; border:1px solid #81c784; border-radius:4px; background:#fff; color:#2e7d32; cursor:pointer;">横方向</button>
+                            <button id="btnClearText" type="button" style="font-size:10px; padding:2px 8px; border:1px solid #e57373; border-radius:4px; background:#fff; color:#c62828; cursor:pointer;">削除</button>
+                        </div>
+
+                        <!-- 行数・文字数入力は非表示（機能は維持、テキストから自動計算） -->
+                        <div class="grid-inputs-container" style="display: none;">
+                            <div class="grid-input-group"><label>行数</label><input type="number" id="gridLinesInput" value="1" min="1"></div>
+                            <div class="grid-input-group"><label>文字数</label><input type="number" id="gridCharsInput" value="1" min="1"></div>
+                        </div>
+
+                        <!-- 余白設定（UIは非表示だが機能は維持） -->
+                        <select id="densitySelect" style="display: none;">
+                            <option value="loose">余白ゆったり</option>
+                            <option value="standard" selected>標準</option>
+                            <option value="tight">文字大きめ</option>
+                            <option value="none">余白なし</option>
+                        </select>
                     </div>
 
-                    <!-- 余白設定（UIは非表示だが機能は維持） -->
-                    <select id="densitySelect" style="display: none;">
-                        <option value="loose">余白ゆったり</option>
-                        <option value="standard" selected>標準</option>
-                        <option value="tight">文字大きめ</option>
-                        <option value="none">余白なし</option>
-                    </select>
-
-                    <!-- adjustMessage: グリッド調整時に表示 -->
+                    <!-- adjustMessage: グリッド調整時に表示（両モード共通） -->
                     <div id="adjustMessage">
                         <span class="adjust-label">サイズ</span>
                         <span class="adjust-value" id="monPt">-</span>
                         <span class="adjust-unit">pt</span>
                     </div>
-                </div>
 
-                <!-- 文字サイズUIは非表示、機能は維持 -->
-                <input type="number" id="sim-fontSizeInput" value="16" min="1" max="200" step="0.1" style="display:none;">
+                    <!-- 文字サイズUIは非表示、機能は維持 -->
+                    <input type="number" id="sim-fontSizeInput" value="16" min="1" max="200" step="0.1" style="display:none;">
+                </div>
 
             </div>
 
@@ -732,8 +717,6 @@
             <button id="bracketBtn" class="tool-btn-icon" title="全体移動"><span class="tool-icon">⊐</span></button>
             <button id="lineBtn" class="tool-btn-icon" title="直線"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="15" x2="15" y2="3"/></svg></span></button>
             <button id="lineAnnotatedBtn" class="tool-btn-icon tool-btn-annotated" title="直線+テキスト指示"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="15" x2="15" y2="3"/></svg></span><span class="annotated-badge">指</span></button>
-            <button id="arrowBtn" class="tool-btn-icon" title="矢印"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 9H3"/><path d="M7 5L3 9L7 13"/></svg></span></button>
-            <button id="doubleArrowBtn" class="tool-btn-icon" title="両矢印"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 9H3"/><path d="M7 5L3 9L7 13"/><path d="M11 5L15 9L11 13"/></svg></span></button>
             <button id="polylineBtn" class="tool-btn-icon" title="折れ線"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2 L4 9 L14 9"/><path d="M14 9 L4 16"/></svg></span></button>
             <button id="textBtn" class="tool-btn-icon" title="テキスト"><span class="tool-icon">Aa</span></button>
             <button id="imgInsertBtn" class="tool-btn-icon" title="画像"><span class="tool-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="14" height="12" rx="1"/><circle cx="6" cy="7" r="1.5"/><path d="M16 12l-4-4-6 6"/></svg></span></button>
@@ -814,8 +797,6 @@
                     <button id="kaigyouStampBtn" class="stamp-btn" title="改行スタンプ">改行</button>
                     <button id="tojiruStampBtn" class="stamp-btn" title="とじるスタンプ">とじる</button>
                     <button id="hirakuStampBtn" class="stamp-btn" title="ひらくスタンプ">ひらく</button>
-                    <button id="labeledRectBtn" class="stamp-btn" title="小文字指定">小文字<br>指定</button>
-                    <button id="doubleArrowAnnotatedBtn" class="stamp-btn" title="字間指示入れ">字間<br>指示</button>
                 </div>
             </div>
         </div>
@@ -826,12 +807,13 @@
                 <div class="instruction-stamp-buttons shashoku-stamp-buttons">
                     <button id="doneStampBtn" class="stamp-btn" title="済スタンプ">済</button>
                     <button id="rubyStampBtn" class="stamp-btn" title="ルビスタンプ">ルビ</button>
+                    <button id="questionStampBtn" class="stamp-btn" title="？スタンプ">？</button>
                 </div>
             </div>
         </div>
-        <!-- 校正記号ツールセクション -->
+        <!-- 校正記号スタンプセクション -->
         <div class="proofreading-section">
-            <div class="proofreading-section-label">校正記号ツール</div>
+            <div class="proofreading-section-label">校正記号スタンプ</div>
             <div class="proofreading-symbol-scroll">
                 <div class="proofreading-symbol-buttons">
                     <button id="rectSymbolStampBtn" class="symbol-btn" title="全角アキ"><span class="symbol-icon">□</span><span class="symbol-label">全角アキ</span></button>
@@ -839,8 +821,20 @@
                     <button id="chevronBtnSidebar" class="symbol-btn" title="アキ"><span class="symbol-icon">＜</span><span class="symbol-label">アキ</span></button>
                     <button id="lshapeBtnSidebar" class="symbol-btn" title="行移動"><span class="symbol-icon">∟</span><span class="symbol-label">行移動</span></button>
                     <button id="zshapeBtnSidebar" class="symbol-btn" title="改行"><span class="symbol-icon"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2 L4 9 L14 9 L14 16"/></svg></span><span class="symbol-label">改行</span></button>
-                    <button id="bracketBtnSidebar" class="symbol-btn" title="全体移動"><span class="symbol-icon">⊐</span><span class="symbol-label">全体移動</span></button>
-                    <button id="semicircleBtnSidebar" class="symbol-btn" title="半円"><span class="symbol-icon">◠</span><span class="symbol-label">半円</span></button>
+                </div>
+            </div>
+        </div>
+        <!-- 指定ツールセクション -->
+        <div class="proofreading-section">
+            <div class="proofreading-section-label">指定ツール</div>
+            <div class="instruction-stamp-scroll">
+                <div class="instruction-stamp-buttons">
+                    <button id="arrowBtnSidebar" class="stamp-btn stamp-btn-with-icon" title="矢印"><svg width="20" height="14" viewBox="0 0 22 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 8H3"/><path d="M8 3L3 8L8 13"/></svg><span class="stamp-btn-label">矢印</span></button>
+                    <button id="doubleArrowBtnSidebar" class="stamp-btn stamp-btn-with-icon" title="両矢印"><svg width="20" height="14" viewBox="0 0 22 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 8H3"/><path d="M8 3L3 8L8 13"/><path d="M14 3L19 8L14 13"/></svg><span class="stamp-btn-label">両矢印</span></button>
+                    <button id="bracketBtnSidebar" class="stamp-btn stamp-btn-with-icon" title="全体移動"><svg width="18" height="18" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3L5 1 M5 3L17 3 L17 19 L5 19 M5 19L5 21"/></svg><span class="stamp-btn-label">全体移動</span></button>
+                    <button id="semicircleBtnSidebar" class="stamp-btn stamp-btn-with-icon" title="半円"><svg width="20" height="14" viewBox="0 0 22 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13 A8 8 0 0 1 19 13"/></svg><span class="stamp-btn-label">半円</span></button>
+                    <button id="labeledRectBtn" class="stamp-btn stamp-btn-with-icon" title="小文字指定"><svg width="18" height="18" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="16" height="16"/><text x="11" y="15" text-anchor="middle" font-size="11" font-weight="bold" stroke="none" fill="currentColor">小</text></svg><span class="stamp-btn-label">小文字指定</span></button>
+                    <button id="doubleArrowAnnotatedBtn" class="stamp-btn stamp-btn-with-icon" title="字間指示入れ"><svg width="20" height="14" viewBox="0 0 22 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="8" x2="20" y2="8"/><line x1="8" y1="8" x2="3" y2="3"/><line x1="8" y1="8" x2="3" y2="13"/></svg><span class="stamp-btn-label">字間指示</span></button>
                 </div>
             </div>
         </div>
@@ -890,7 +884,6 @@
                     </button>
                 </div>
                 <input type="color" id="proofColorPicker" value="#ff0000" style="display:none;">
-                <div id="proofRainbowPicker" class="proofreading-rainbow-picker" title="クリックで色を選択"></div>
             </div>
             <!-- 線の太さ列 -->
             <div class="proofreading-linewidth-column">
@@ -905,8 +898,9 @@
         <!-- 済スタンプ・ルビスタンプセクション -->
         <div class="proofreading-stamp-section">
             <div class="proofreading-stamp-buttons">
-                <button id="proofDoneStampBtn" class="proofreading-stamp-btn" title="済スタンプ">済</button>
-                <button id="proofRubyStampBtn" class="proofreading-stamp-btn" title="ルビスタンプ">ルビ</button>
+                <button id="proofDoneStampBtn" class="proofreading-stamp-btn" title="済スタンプ">済スタンプ</button>
+                <button id="proofRubyStampBtn" class="proofreading-stamp-btn" title="ルビスタンプ">ルビスタンプ</button>
+                <button id="proofQuestionStampBtn" class="proofreading-stamp-btn" title="？スタンプ">？スタンプ</button>
             </div>
         </div>
 
@@ -1064,6 +1058,11 @@
     </script>
     <!-- Electron ブリッジ（最初に読み込み） -->
     <script src="js/electron-bridge.js" defer></script>
+    <!-- MojiQ 統一名前空間（最初に読み込み） -->
+    <script src="js/core/namespace.js" defer></script>
+    <!-- エラーハンドリング・バリデーション -->
+    <script src="js/core/error-handler.js" defer></script>
+    <script src="js/core/validators.js" defer></script>
     <!-- コア基盤モジュール（他のモジュールより先に読み込み） -->
     <script src="js/core/dom-cache.js" defer></script>
     <script src="js/core/clone.js" defer></script>

@@ -71,6 +71,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 終了確認用
   onCheckUnsavedChanges: (callback) => { ipcRenderer.removeAllListeners('check-unsaved-changes'); ipcRenderer.on('check-unsaved-changes', callback); },
   respondUnsavedChanges: (hasChanges) => ipcRenderer.send('respond-unsaved-changes', hasChanges),
+  onShowCloseConfirm: (callback) => { ipcRenderer.removeAllListeners('show-close-confirm'); ipcRenderer.on('show-close-confirm', callback); },
+  sendCloseAction: (action) => ipcRenderer.send('close-action', action),
+  onShowUpdateAvailable: (callback) => { ipcRenderer.removeAllListeners('show-update-available'); ipcRenderer.on('show-update-available', (event, data) => callback(data)); },
+  sendUpdateAction: (action) => ipcRenderer.send('update-action', action),
   onSaveAndQuit: (callback) => { ipcRenderer.removeAllListeners('save-and-quit'); ipcRenderer.on('save-and-quit', callback); },
   saveCompletedQuit: () => ipcRenderer.send('save-completed-quit'),
 
@@ -101,5 +105,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 校正チェックデータ読み込み
   getCalibrationBasePath: () => ipcRenderer.invoke('get-calibration-base-path'),
   listCalibrationDirectory: (dirPath) => ipcRenderer.invoke('list-calibration-directory', dirPath),
-  readCalibrationFile: (filePath) => ipcRenderer.invoke('read-calibration-file', filePath)
+  readCalibrationFile: (filePath) => ipcRenderer.invoke('read-calibration-file', filePath),
+
+  // ProGen連携: 校正データJSONパスを外部から受信
+  onCalibrationJsonReceived: (callback) => {
+    ipcRenderer.removeAllListeners('calibration-json-received');
+    ipcRenderer.on('calibration-json-received', (event, data) => callback(data));
+  }
 });

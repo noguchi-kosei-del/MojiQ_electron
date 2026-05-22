@@ -2,6 +2,24 @@
 /* MojiQ Simulator Specific Styles           */
 /* ========================================= */
 
+/* --- 写植シミュレーターセクション --- */
+.simulator-section {
+    margin-top: 12px;
+    padding: 10px;
+    background: var(--color-gray-0, #fafafa);
+    border: 1px solid var(--border-color-light, #e0e0e0);
+    border-radius: var(--radius-lg, 8px);
+}
+
+.simulator-section-label {
+    font-size: 11px;
+    font-weight: bold;
+    color: var(--text-secondary, #666);
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border-color-light, #e0e0e0);
+}
+
 /* --- キャリブレーションモード時のスタイル調整 --- */
 
 /* キャリブレーション時は背景色を変えてクロスヘアカーソルに */
@@ -106,6 +124,11 @@
     font-weight: bold;
     white-space: nowrap;
 }
+/* アイコンのみのボタン */
+.sidebar-tool-btn-icon {
+    min-height: 40px;
+    padding: 8px;
+}
 
 /* --- グリッド設定エリア (サイドバー内) --- */
 #gridSettingsArea {
@@ -143,10 +166,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    margin-top: 12px;
-    padding: 10px 12px;
-    border-radius: 8px;
+    gap: 4px;
+    margin-top: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
     background: #e0e0e0;
     border: 1px solid #bdbdbd;
     opacity: 0.5;
@@ -160,7 +183,7 @@
 }
 
 #adjustMessage .adjust-label {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: bold;
     color: #666;
 }
@@ -170,7 +193,7 @@
 }
 
 #adjustMessage .adjust-value {
-    font-size: 18px;
+    font-size: 14px;
     font-weight: bold;
     color: #999;
     font-family: "Noto Sans JP", sans-serif;
@@ -181,7 +204,7 @@
 }
 
 #adjustMessage .adjust-unit {
-    font-size: 11px;
+    font-size: 10px;
     color: #999;
 }
 
@@ -313,6 +336,12 @@ input:checked + .toggle-slider:before { transform: translateX(16px); }
 #gridSettingsArea.disabled-lock {
     background: #eceff1;
     border-color: #cfd8dc;
+}
+
+/* セリフ見本テキストエリア */
+#gridSettingsArea textarea {
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* 無効化された入力フィールド */

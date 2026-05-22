@@ -75,6 +75,61 @@ window.MojiQDrawingClipboard = (function() {
     }
 
     /**
+     * 選択中のオブジェクトをコピー（クリップボードにコピー、削除しない）
+     * @returns {boolean} コピーに成功したかどうか
+     */
+    function copySelected() {
+        if (!DrawingObjects) return false;
+
+        const pageNum = DrawingObjects.getCurrentPage();
+        const selectedIndices = DrawingObjects.getSelectedIndices(pageNum);
+
+        if (selectedIndices.length === 0) {
+            return false;
+        }
+
+        const objects = DrawingObjects.getPageObjects(pageNum);
+        clipboard.objects = [];
+        clipboard.isCut = false;
+        clipboard.sourcePageNum = pageNum;
+
+        // 選択されたオブジェクトのIDを収集
+        const selectedIds = new Set();
+        for (const idx of selectedIndices) {
+            if (objects[idx] && objects[idx].id) {
+                selectedIds.add(objects[idx].id);
+            }
+        }
+
+        // 選択されたオブジェクトに関連する消しゴムオブジェクトのインデックスを収集
+        const relatedEraserIndices = new Set();
+        objects.forEach((obj, idx) => {
+            if (obj.type === 'eraser' && obj.linkedObjectIds) {
+                const hasRelatedObject = obj.linkedObjectIds.some(id => selectedIds.has(id));
+                if (hasRelatedObject) {
+                    relatedEraserIndices.add(idx);
+                }
+            }
+        });
+
+        // インデックス順にコピー
+        const sortedIndices = [...selectedIndices].sort((a, b) => a - b);
+        const selectedIndicesSet = new Set(selectedIndices);
+        for (const idx of sortedIndices) {
+            clipboard.objects.push(MojiQClone.deep(objects[idx]));
+        }
+
+        // 関連する消しゴムオブジェクトもコピー
+        for (const idx of relatedEraserIndices) {
+            if (!selectedIndicesSet.has(idx)) {
+                clipboard.objects.push(MojiQClone.deep(objects[idx]));
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * 選択中のオブジェクトをカット（クリップボードにコピーして削除）
      * @returns {boolean} カットに成功したかどうか
      */
@@ -147,9 +202,11 @@ window.MojiQDrawingClipboard = (function() {
 
     /**
      * クリップボードの内容をペースト
+     * @param {object} [options] - オプション
+     * @param {boolean} [options.inPlace=false] - trueの場合、同じ位置にペースト（オフセットなし）
      * @returns {boolean} ペーストに成功したかどうか
      */
-    function pasteFromClipboard() {
+    function pasteFromClipboard(options = {}) {
         if (!DrawingObjects) return false;
 
         if (clipboard.objects.length === 0) {
@@ -161,8 +218,8 @@ window.MojiQDrawingClipboard = (function() {
         // 選択解除
         DrawingObjects.deselectObject(pageNum);
 
-        // ペースト位置のオフセット（同じ位置に重ならないよう少しずらす）
-        const offset = clipboard.isCut ? 0 : 20;
+        // ペースト位置のオフセット（同じ位置にペーストする場合は0）
+        const offset = (clipboard.isCut || options.inPlace) ? 0 : 20;
 
         const newIndices = [];
         // 元のIDと新しいIDのマッピング（消しゴムのlinkedObjectIds更新用）
@@ -177,6 +234,12 @@ window.MojiQDrawingClipboard = (function() {
 
             // 新しいIDを生成（重複を避けるため）
             delete newObj.id;
+
+            // PDF注釈由来テキストのペーストは通常テキストとして扱う
+            // （保存時にコメントテキスト非表示の対象外にするため）
+            if (newObj._pdfAnnotationSource) {
+                delete newObj._pdfAnnotationSource;
+            }
 
             // ペースト位置をオフセット（コピーの場合のみ）
             if (offset !== 0) {
@@ -238,6 +301,7 @@ window.MojiQDrawingClipboard = (function() {
     // --- 公開API ---
     return {
         init: init,
+        copySelected: copySelected,
         cutSelected: cutSelected,
         pasteFromClipboard: pasteFromClipboard,
         hasClipboard: hasClipboard,

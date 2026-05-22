@@ -22,6 +22,30 @@ window._MojiQPdfUtils = (function() {
     }
 
     /**
+     * Uint8ArrayをBase64文字列に変換（非同期版。定期的にUIへ制御を返しフリーズを防ぐ）
+     * 大きな Uint8Array で保存時の UI フリーズを防ぐ用途で使う。
+     * @param {Uint8Array} uint8Array - バイナリデータ
+     * @returns {Promise<string>} - Base64文字列
+     */
+    async function uint8ArrayToBase64Async(uint8Array) {
+        var chunkSize = 0x8000; // 32KB chunks
+        var yieldEvery = 32; // 約1MBごとにUIへ制御を返す
+        var chunks = [];
+        var counter = 0;
+        for (var i = 0; i < uint8Array.length; i += chunkSize) {
+            var chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+            chunks.push(String.fromCharCode.apply(null, chunk));
+            counter++;
+            if (counter % yieldEvery === 0) {
+                await new Promise(function(resolve) { setTimeout(resolve, 0); });
+            }
+        }
+        // btoa 前にもう一度yield（文字列結合も重い可能性）
+        await new Promise(function(resolve) { setTimeout(resolve, 0); });
+        return btoa(chunks.join(''));
+    }
+
+    /**
      * 次のフレームまで待機（UIをブロックしないため）
      * requestAnimationFrameを2回呼ぶことで、確実にブラウザの描画サイクルを待つ
      * @returns {Promise<void>}
@@ -47,6 +71,7 @@ window._MojiQPdfUtils = (function() {
 
     return {
         uint8ArrayToBase64: uint8ArrayToBase64,
+        uint8ArrayToBase64Async: uint8ArrayToBase64Async,
         nextFrame: nextFrame,
         updateProgressOverlayText: updateProgressOverlayText
     };

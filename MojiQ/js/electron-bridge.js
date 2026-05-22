@@ -184,6 +184,186 @@ window.MojiQElectron = (function() {
     }
   }
 
+  // ========================================
+  // ProGen連携: 校正データJSON受信
+  // ========================================
+  // ProGen から --calibration-json で渡された JSON ファイルパスを保持。
+  // PDF未読込時はダイアログ表示のみ行い、PDF読込完了後に自動でパネルへロード。
+  let pendingCalibrationPath = null;
+  let pendingCalibrationPollTimer = null;
+
+  function isPdfLoaded() {
+    return !!(window.MojiQGlobal && window.MojiQGlobal.pdfLoaded);
+  }
+
+  function showAlertSafe(message, title) {
+    if (window.MojiQModal && typeof window.MojiQModal.showAlert === 'function') {
+      try {
+        window.MojiQModal.showAlert(message, title || 'MojiQ');
+        return;
+      } catch (e) {
+        console.warn('[MojiQ Bridge] MojiQModal.showAlert failed:', e);
+      }
+    }
+    alert((title ? title + ': ' : '') + message);
+  }
+
+  async function loadCalibrationIntoPanel(filePath) {
+    if (!filePath) {
+      console.warn('[MojiQ Bridge] loadCalibrationIntoPanel called with empty path');
+      return;
+    }
+    console.log('[MojiQ Bridge] loadCalibrationIntoPanel start:', filePath);
+
+    // 1. ファイル読み込み
+    if (!window.electronAPI || typeof window.electronAPI.readCalibrationFile !== 'function') {
+      console.error('[MojiQ Bridge] electronAPI.readCalibrationFile is unavailable');
+      showAlertSafe('readCalibrationFile が利用できません（preload未公開）', '校正データ読込エラー');
+      return;
+    }
+
+    let result;
+    try {
+      result = await window.electronAPI.readCalibrationFile(filePath);
+    } catch (e) {
+      console.error('[MojiQ Bridge] readCalibrationFile threw:', e);
+      showAlertSafe('読込中に例外: ' + (e && e.message ? e.message : String(e)), '校正データ読込エラー');
+      return;
+    }
+
+    if (!result || !result.success) {
+      const errMsg = (result && result.error) ? result.error : 'unknown';
+      console.error('[MojiQ Bridge] readCalibrationFile failed:', errMsg, 'path:', filePath);
+      showAlertSafe('読込失敗: ' + errMsg + '\nパス: ' + filePath, '校正データ読込エラー');
+      return;
+    }
+
+    const data = result.data;
+    console.log('[MojiQ Bridge] readCalibrationFile success, data keys:', Object.keys(data || {}));
+
+    // 2. フォーマット検証
+    if (window.ProofreadingPanel && typeof window.ProofreadingPanel.isValidProofreadingJson === 'function') {
+      if (!window.ProofreadingPanel.isValidProofreadingJson(data)) {
+        console.error('[MojiQ Bridge] invalid proofreading json:', data);
+        showAlertSafe('この形式のJSONは読み込めません。校正チェックデータのJSONを読み込んでください。', 'エラー');
+        return;
+      }
+    }
+
+    // 3. タイトル生成
+    const fileName = filePath.replace(/\\/g, '/').split('/').pop().replace(/\.json$/i, '');
+    const workName = data.work || '';
+    const title = workName ? workName + ' ' + fileName : fileName;
+    const jsonData = { title: title, checks: data.checks };
+
+    // 4. Store保存（校正モード有効化）
+    if (window.MojiQStore) {
+      try {
+        window.MojiQStore.set('proofreadingMode.currentData', jsonData);
+        window.MojiQStore.set('proofreadingMode.jsonLoaded', true);
+        window.MojiQStore.set('proofreadingMode.currentFilePath', filePath);
+      } catch (e) {
+        console.warn('[MojiQ Bridge] MojiQStore.set failed:', e);
+      }
+    }
+
+    // 5. CalibrationPanelの校正モードメニュー有効化（あれば）
+    if (window.CalibrationPanel && typeof window.CalibrationPanel.closeModal === 'function') {
+      try { window.CalibrationPanel.closeModal(); } catch (_) {}
+    }
+
+    // 6. ProofreadingPanelへ描画
+    if (window.ProofreadingPanel && typeof window.ProofreadingPanel.renderCheckData === 'function') {
+      try {
+        window.ProofreadingPanel.renderCheckData(jsonData);
+        console.log('[MojiQ Bridge] ProofreadingPanel.renderCheckData done');
+      } catch (e) {
+        console.error('[MojiQ Bridge] renderCheckData failed:', e);
+        showAlertSafe('パネル描画失敗: ' + (e && e.message ? e.message : String(e)), '校正データ読込エラー');
+        return;
+      }
+    } else {
+      console.warn('[MojiQ Bridge] ProofreadingPanel.renderCheckData unavailable');
+    }
+
+    // 7. 成功通知
+    const itemCount =
+      (data.checks && data.checks.variation && Array.isArray(data.checks.variation.items) ? data.checks.variation.items.length : 0) +
+      (data.checks && data.checks.simple && Array.isArray(data.checks.simple.items) ? data.checks.simple.items.length : 0);
+    showAlertSafe('校正情報を読み込みました（' + itemCount + '件）', '読み込み完了');
+  }
+
+  // PDF読込完了を最大10分間ポーリングで待ち、検出したら校正JSONを適用する。
+  // onFileOpenedPath ハンドラ経由（ファイル関連付け起動）でも、
+  // ユーザーがメニュー/ボタンから手動でPDFを開いた場合でもカバーする。
+  function startPendingCalibrationPolling() {
+    if (pendingCalibrationPollTimer) return;
+    const startedAt = Date.now();
+    pendingCalibrationPollTimer = setInterval(() => {
+      if (!pendingCalibrationPath) {
+        clearInterval(pendingCalibrationPollTimer);
+        pendingCalibrationPollTimer = null;
+        return;
+      }
+      if (isPdfLoaded()) {
+        const path = pendingCalibrationPath;
+        pendingCalibrationPath = null;
+        clearInterval(pendingCalibrationPollTimer);
+        pendingCalibrationPollTimer = null;
+        setTimeout(() => loadCalibrationIntoPanel(path), 300);
+        return;
+      }
+      // 10分でタイムアウト
+      if (Date.now() - startedAt > 10 * 60 * 1000) {
+        clearInterval(pendingCalibrationPollTimer);
+        pendingCalibrationPollTimer = null;
+      }
+    }, 500);
+  }
+
+  // 同一パスの IPC 重複（main.js の 250ms 再送）を吸収する。
+  let lastHandledCalibrationPath = null;
+  let lastHandledAt = 0;
+  function handleCalibrationJsonReceived(filePath) {
+    if (!filePath) return;
+    const now = Date.now();
+    if (filePath === lastHandledCalibrationPath && (now - lastHandledAt) < 2000) {
+      console.log('[MojiQ Bridge] dedup duplicate calibration-json-received:', filePath);
+      return;
+    }
+    lastHandledCalibrationPath = filePath;
+    lastHandledAt = now;
+
+    console.log('[MojiQ Bridge] calibration-json-received:', filePath);
+    if (isPdfLoaded()) {
+      // PDF読込済 → 即座に校正チェックパネルへロード
+      loadCalibrationIntoPanel(filePath);
+    } else {
+      // PDF未読込 → 保留し、ユーザーへPDF読込を促すダイアログを表示
+      pendingCalibrationPath = filePath;
+      startPendingCalibrationPolling();
+      const message = '校正情報を受け取りました。pdfを読み込んで下さい';
+      if (window.MojiQModal && typeof window.MojiQModal.showAlert === 'function') {
+        window.MojiQModal.showAlert(message, '校正データ受信');
+      } else {
+        alert(message);
+      }
+    }
+  }
+
+  // ファイル関連付け起動経由でPDFが読み込まれた直後のフック
+  function flushPendingCalibrationJson() {
+    if (!pendingCalibrationPath) return;
+    if (!isPdfLoaded()) return;
+    const path = pendingCalibrationPath;
+    pendingCalibrationPath = null;
+    if (pendingCalibrationPollTimer) {
+      clearInterval(pendingCalibrationPollTimer);
+      pendingCalibrationPollTimer = null;
+    }
+    setTimeout(() => loadCalibrationIntoPanel(path), 300);
+  }
+
   /**
    * メニューイベントのリスナーを設定
    */
@@ -220,7 +400,16 @@ window.MojiQElectron = (function() {
       if (window.MojiQPdfManager && typeof window.MojiQPdfManager.loadPdfFromPath === 'function') {
         await window.MojiQPdfManager.loadPdfFromPath(data.path, data.name, data.initialPage);
       }
+      // ProGen連携: PDF読込後に保留中の校正JSONがあれば自動ロード
+      flushPendingCalibrationJson();
     });
+
+    // ProGen連携: 校正データJSONパスを外部から受信
+    if (typeof window.electronAPI.onCalibrationJsonReceived === 'function') {
+      window.electronAPI.onCalibrationJsonReceived((data) => {
+        handleCalibrationJsonReceived(data && data.path);
+      });
+    }
 
     // 画像ファイルを開く（ファイルパス経由・単一ファイル）
     // アプリアイコンへのドラッグ＆ドロップ、ファイル関連付けからの起動時に使用

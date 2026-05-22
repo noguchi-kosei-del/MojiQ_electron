@@ -113,7 +113,7 @@ window.SimulatorGridDrawing = (function() {
 
             gridLinesInput.value = pendingGridState.lines;
             gridCharsInput.value = pendingGridState.chars;
-            fontSizeInput.value = pendingGridState.ptSize;
+            fontSizeInput.value = Math.round(pendingGridState.ptSize * 10) / 10;
             if (pendingGridState.textData) gridTextInput.value = pendingGridState.textData;
 
             const snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -141,7 +141,7 @@ window.SimulatorGridDrawing = (function() {
 
             const currentMode = State.get('currentMode');
             // 統合モード: currentModeで判定
-            if (currentMode === 'grid') {
+            if (currentMode === 'grid' || currentMode === 'sampleGrid') {
                 canvas.style.cursor = 'crosshair';
             } else {
                 canvas.style.cursor = 'default';
@@ -223,8 +223,8 @@ window.SimulatorGridDrawing = (function() {
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // テキスト描画
-        if (state.textData && state.textData.trim().length > 0) {
+        // テキスト描画（showTextがfalseの場合は描画しない）
+        if (state.showText !== false && state.textData && state.textData.trim().length > 0) {
             ctx.save();
             const textLines = state.textData.split(/\r\n|\n/);
             const fontSize = cellSize * 0.85;
@@ -353,30 +353,7 @@ window.SimulatorGridDrawing = (function() {
             ctx.restore();
         }
 
-        // 角のリサイズハンドル描画（調整中かつ非ロック時のみ）
-        // ハンドルは枠線の外側に配置
-        if (isAdjusting && !state.isLocked) {
-            ctx.save();
-            const handleSize = 8;
-            const handleOffset = handleSize; // ハンドルの中心を枠線の外側に配置
-            ctx.fillStyle = "#fff";
-            ctx.strokeStyle = "#00bcd4";
-            ctx.lineWidth = 1.5;
-
-            // 4つの角にハンドルを描画（外側に配置）
-            const corners = [
-                { x: startPos.x - handleOffset, y: startPos.y - handleOffset },                    // 左上
-                { x: startPos.x + width + handleOffset, y: startPos.y - handleOffset },            // 右上
-                { x: startPos.x - handleOffset, y: startPos.y + height + handleOffset },           // 左下
-                { x: startPos.x + width + handleOffset, y: startPos.y + height + handleOffset }    // 右下
-            ];
-
-            for (const corner of corners) {
-                ctx.fillRect(corner.x - handleSize / 2, corner.y - handleSize / 2, handleSize, handleSize);
-                ctx.strokeRect(corner.x - handleSize / 2, corner.y - handleSize / 2, handleSize, handleSize);
-            }
-            ctx.restore();
-        }
+        // リサイズハンドルは削除（マウスホイールでサイズ変更）
 
         // バブルUI描画
         if (isAdjusting) {
@@ -418,11 +395,12 @@ window.SimulatorGridDrawing = (function() {
         const safeW = rectW * (1 - marginRatio);
         const safeH = rectH * (1 - marginRatio);
 
-        // テキストから行数・文字数を計算
+        // テキストから行数・文字数を計算（セリフ見本モードの場合のみ）
         let lines = 1;
         let chars = 1;
         const text = pendingGridState.textData;
-        if (text && text.trim().length > 0) {
+        // showTextがfalse（一文字グリッドモード）の場合は1x1固定
+        if (pendingGridState.showText !== false && text && text.trim().length > 0) {
             const halfWidthSymbols = ['!', '?', '？', '！'];
             const textLines = text.split(/\r\n|\n/);
             lines = textLines.length;

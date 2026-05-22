@@ -159,6 +159,16 @@
  */
 
 /**
+ * ？スタンプオブジェクト
+ * @typedef {Object} QuestionStampObject
+ * @property {'questionStamp'} type - タイプ
+ * @property {string} id - オブジェクトID
+ * @property {Point} startPos - 位置
+ * @property {string} color - 色
+ * @property {number} size - サイズ
+ */
+
+/**
  * フォントラベルオブジェクト
  * @typedef {Object} FontLabelObject
  * @property {'fontLabel'} type - タイプ

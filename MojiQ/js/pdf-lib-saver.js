@@ -20,6 +20,175 @@ window.MojiQPdfLibSaver = (function() {
     const { PDFDocument, rgb } = PDFLib;
 
     /**
+     * MojiQテキスト情報を収集してJSON文字列を生成
+     * @param {number} totalPages - 総ページ数
+     * @param {Array} pageMapping - ページマッピング
+     * @returns {string|null} - JSON文字列（Base64エンコード済み）またはnull
+     */
+    function collectMojiQTextData(totalPages, pageMapping) {
+        // 確認済みコメント情報を取得（済スタンプ付きテキストは除外するため）
+        let checkedSignatures = [];
+        // 以前のメタデータから読み込んだ確認済み情報
+        if (window.MojiQPdfManager && window.MojiQPdfManager.getLoadedCheckedComments) {
+            const loaded = window.MojiQPdfManager.getLoadedCheckedComments();
+            if (loaded) checkedSignatures = checkedSignatures.concat(loaded);
+        }
+        // 現在のセッションでチェックした情報
+        if (window.ProofreadingPanel && window.ProofreadingPanel.getCheckedCommentSignatures) {
+            const current = window.ProofreadingPanel.getCheckedCommentSignatures();
+            if (current) checkedSignatures = checkedSignatures.concat(current);
+        }
+
+        // 確認済みかどうかをチェックするヘルパー関数
+        function isChecked(pageNum, text) {
+            for (const checked of checkedSignatures) {
+                if (checked.pdfPage !== pageNum) continue;
+                if (text === checked.contents) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        const textData = [];
+        const addedKeys = new Set(); // 重複防止用
+
+        // 1. DrawingObjectsからMojiQテキストを収集
+        if (window.MojiQDrawingObjects && window.MojiQDrawingObjects.getPageObjects) {
+            for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+                const objects = window.MojiQDrawingObjects.getPageObjects(pageNum);
+                if (!objects || objects.length === 0) continue;
+
+                const mapItem = pageMapping && pageMapping[pageNum - 1];
+                const displayWidth = mapItem?.displayWidth || mapItem?.width || 595;
+                const displayHeight = mapItem?.displayHeight || mapItem?.height || 842;
+
+                for (const obj of objects) {
+                    let text = null;
+                    let x = 0;
+                    let y = 0;
+
+                    // テキストオブジェクト（PDF注釈由来でないもの）
+                    if (obj.type === 'text' && !obj._pdfAnnotationSource && obj.text && obj.text.trim()) {
+                        text = obj.text;
+                        x = obj.startPos?.x || 0;
+                        y = obj.startPos?.y || 0;
+                    }
+                    // 図形+テキスト（annotation付き）
+                    else if ((obj.type === 'rect' || obj.type === 'ellipse' || obj.type === 'line') &&
+                             obj.annotation && obj.annotation.text && obj.annotation.text.trim()) {
+                        text = obj.annotation.text;
+                        x = obj.annotation.x || 0;
+                        y = obj.annotation.y || 0;
+                    }
+
+                    // 確認済み（済スタンプ付き）のテキストは保存しない
+                    if (text && !isChecked(pageNum, text)) {
+                        const key = `${pageNum}:${text}`;
+                        if (!addedKeys.has(key)) {
+                            addedKeys.add(key);
+                            textData.push({
+                                p: pageNum,
+                                t: text,
+                                x: Math.round(x),
+                                y: Math.round(y),
+                                w: displayWidth,
+                                h: displayHeight
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. 以前のメタデータから読み込んだMojiQテキストも保持
+        // （MojiQ保存済みPDFを再読み込みした場合、DrawingObjectsにはテキストがないため）
+        if (window.MojiQPdfManager && window.MojiQPdfManager.getLoadedMojiQTexts) {
+            const loadedTexts = window.MojiQPdfManager.getLoadedMojiQTexts();
+            if (loadedTexts && loadedTexts.length > 0) {
+                for (const item of loadedTexts) {
+                    // 確認済みテキストは除外
+                    if (!isChecked(item.pdfPage, item.contents)) {
+                        const key = `${item.pdfPage}:${item.contents}`;
+                        if (!addedKeys.has(key)) {
+                            addedKeys.add(key);
+                            textData.push({
+                                p: item.pdfPage,
+                                t: item.contents,
+                                x: item.canvasRect ? Math.round(item.canvasRect.x) : 0,
+                                y: item.canvasRect ? Math.round(item.canvasRect.y) : 0,
+                                w: item.displayWidth || 595,
+                                h: item.displayHeight || 842
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        if (textData.length === 0) return null;
+
+        // JSON文字列をBase64エンコード
+        const jsonStr = JSON.stringify(textData);
+        return btoa(unescape(encodeURIComponent(jsonStr)));
+    }
+
+    /**
+     * 確認済みコメントの識別情報を収集してJSON文字列を生成
+     * 以前のメタデータから読み込んだ確認済み情報と現在のチェック済み情報をマージ
+     * @returns {string|null} - JSON文字列（Base64エンコード済み）またはnull
+     */
+    function collectCheckedCommentsData() {
+        const compactData = [];
+        const addedKeys = new Set(); // 重複防止用
+
+        // 以前のメタデータから読み込んだ確認済みコメント情報を追加
+        if (window.MojiQPdfManager && window.MojiQPdfManager.getLoadedCheckedComments) {
+            const loadedChecked = window.MojiQPdfManager.getLoadedCheckedComments();
+            if (loadedChecked && loadedChecked.length > 0) {
+                for (const item of loadedChecked) {
+                    const key = `${item.pdfPage}:${item.contents}`;
+                    if (!addedKeys.has(key)) {
+                        addedKeys.add(key);
+                        compactData.push({
+                            p: item.pdfPage,
+                            c: item.contents,
+                            x: item.canvasRect ? Math.round(item.canvasRect.x) : null,
+                            y: item.canvasRect ? Math.round(item.canvasRect.y) : null
+                        });
+                    }
+                }
+            }
+        }
+
+        // 現在のセッションでチェックしたコメント情報を追加
+        if (window.ProofreadingPanel && window.ProofreadingPanel.getCheckedCommentSignatures) {
+            const signatures = window.ProofreadingPanel.getCheckedCommentSignatures();
+            if (signatures && signatures.length > 0) {
+                for (const sig of signatures) {
+                    const key = `${sig.pdfPage}:${sig.contents}`;
+                    if (!addedKeys.has(key)) {
+                        addedKeys.add(key);
+                        compactData.push({
+                            p: sig.pdfPage,
+                            c: sig.contents,
+                            x: sig.canvasRect ? Math.round(sig.canvasRect.x) : null,
+                            y: sig.canvasRect ? Math.round(sig.canvasRect.y) : null
+                        });
+                    }
+                }
+            }
+        }
+
+        if (compactData.length === 0) {
+            return null;
+        }
+
+        const jsonStr = JSON.stringify(compactData);
+        return btoa(unescape(encodeURIComponent(jsonStr)));
+    }
+
+    /**
      * CanvasをPNG Blobに変換（タイムアウト・エラーハンドリング付き）
      * @param {HTMLCanvasElement} canvas - 変換するCanvas
      * @param {number} timeout - タイムアウト時間（ミリ秒、デフォルト30秒）
@@ -502,6 +671,13 @@ window.MojiQPdfLibSaver = (function() {
         // タイムアウトしたページを追跡
         const timedOutPages = [];
 
+        // PDF注釈由来テキストを一時的に非表示にする（保存時は常に非表示）
+        const TextLayerManager = window.MojiQTextLayerManager;
+
+        if (TextLayerManager) {
+            TextLayerManager.setIsHiddenInternal(true);
+        }
+
         try {
             // 新しいPDFドキュメントを作成
             const pdfDoc = await PDFDocument.create();
@@ -737,9 +913,23 @@ window.MojiQPdfLibSaver = (function() {
             pdfDoc.setCreator('MojiQ');
             pdfDoc.setProducer('MojiQ PDF-Lib Saver');
 
-            // コメントテキスト非表示状態をSubjectに保存
-            const textLayerHidden = window.MojiQTextLayerManager && window.MojiQTextLayerManager.isHidden();
-            pdfDoc.setSubject(textLayerHidden ? 'MojiQ:commentTextHidden=true' : 'MojiQ:commentTextHidden=false');
+            // コメントテキスト非表示状態とMojiQテキストデータをSubjectに保存
+            // 保存時は常にコメントテキストを非表示にするため、常にtrue
+            const mojiQTextData = collectMojiQTextData(state.totalPages, state.pageMapping);
+            let subjectData = 'MojiQ:commentTextHidden=true';
+            if (mojiQTextData) {
+                subjectData += ';MojiQText:' + mojiQTextData;
+            }
+            // 確認済みコメント情報を追加
+            const checkedCommentsData = collectCheckedCommentsData();
+            if (checkedCommentsData) {
+                subjectData += ';MojiQChecked:' + checkedCommentsData;
+            }
+            // メタデータサイズが大きすぎる場合は警告（PDFビューアの互換性のため）
+            if (subjectData.length > 100000) {
+                console.warn(`[MojiQ] メタデータが大きいです（${Math.round(subjectData.length / 1024)}KB）。テキストオブジェクトが多い場合、再読み込み時にメタデータが失われる可能性があります。`);
+            }
+            pdfDoc.setSubject(subjectData);
 
             // 90%完了を報告（PDF出力処理開始）
             onProgress(90);
@@ -747,6 +937,11 @@ window.MojiQPdfLibSaver = (function() {
 
             // PDFを保存（useObjectStreams: falseで高速化）
             const pdfBytes = await pdfDoc.save({ useObjectStreams: false });
+
+            // 保存結果の検証（破損データ防止）
+            if (!pdfBytes || !(pdfBytes instanceof Uint8Array) || pdfBytes.length === 0) {
+                throw new Error('PDF生成に失敗しました（出力データが空です）');
+            }
 
             // 100%完了を報告
             onProgress(100);
@@ -761,6 +956,11 @@ window.MojiQPdfLibSaver = (function() {
         } catch (error) {
             console.error('PDF保存エラー:', error);
             return { success: false, error: error.message };
+        } finally {
+            // PDF注釈由来テキストを非表示状態のままボタンにも反映
+            if (TextLayerManager) {
+                TextLayerManager.setIsHidden(true);
+            }
         }
     }
 
@@ -782,11 +982,19 @@ window.MojiQPdfLibSaver = (function() {
         const spreadCssPageWidth = options.spreadCssPageWidth || null;
         const spreadCssPageHeight = options.spreadCssPageHeight || null;
 
+        // PDF注釈由来テキストを一時的に非表示にする（保存時は常に非表示）
+        const TextLayerManager = window.MojiQTextLayerManager;
+
+        if (TextLayerManager) {
+            TextLayerManager.setIsHiddenInternal(true);
+        }
+
         try {
             onProgress(5);
 
             // ステップ1: 高品質でまずサイズを確認
-            let pdfBytes = await createCompressedPdf(state, fileName, {
+            let totalSkippedPages = 0;
+            let compressResult = await createCompressedPdf(state, fileName, {
                 quality: COMPRESS_SETTINGS.INITIAL_QUALITY,
                 scale: COMPRESS_SETTINGS.INITIAL_SCALE,
                 imagePageData,
@@ -797,17 +1005,27 @@ window.MojiQPdfLibSaver = (function() {
                 onProgress: (p) => onProgress(5 + p * 0.2)
             });
 
-            if (!pdfBytes) {
+            if (!compressResult) {
                 return { success: false, error: '圧縮PDF生成に失敗しました' };
             }
+            // createCompressedPdfの戻り値: { pdfBytes, skippedPages } または Uint8Array(従来互換)
+            let pdfBytes = compressResult.pdfBytes || compressResult;
+            if (compressResult.skippedPages) totalSkippedPages = compressResult.skippedPages;
 
             let currentSizeMB = pdfBytes.length / (1024 * 1024);
             console.log(`初期サイズ: ${currentSizeMB.toFixed(2)}MB (quality=${COMPRESS_SETTINGS.INITIAL_QUALITY}, scale=${COMPRESS_SETTINGS.INITIAL_SCALE})`);
 
+            // skippedPages警告生成用ヘルパー
+            const buildSkipWarning = () => totalSkippedPages > 0
+                ? `${totalSkippedPages}ページのJPEG変換に失敗し、PDFに含まれていません。`
+                : undefined;
+
             // すでにターゲット以下なら完了
             if (pdfBytes.length <= targetSizeBytes) {
                 onProgress(100);
-                return { success: true, data: pdfBytes, compressed: true };
+                const result = { success: true, data: pdfBytes, compressed: true };
+                if (buildSkipWarning()) result.compressWarning = buildSkipWarning();
+                return result;
             }
 
             // ステップ2: 必要な圧縮率を計算して最適なパラメータを推定
@@ -830,7 +1048,7 @@ window.MojiQPdfLibSaver = (function() {
 
             // ステップ3: 推定パラメータで生成
             onProgress(30);
-            pdfBytes = await createCompressedPdf(state, fileName, {
+            compressResult = await createCompressedPdf(state, fileName, {
                 quality: estimatedQuality,
                 scale,
                 imagePageData,
@@ -841,9 +1059,11 @@ window.MojiQPdfLibSaver = (function() {
                 onProgress: (p) => onProgress(30 + p * 0.3)
             });
 
-            if (!pdfBytes) {
+            if (!compressResult) {
                 return { success: false, error: '圧縮PDF生成に失敗しました' };
             }
+            pdfBytes = compressResult.pdfBytes || compressResult;
+            if (compressResult.skippedPages) totalSkippedPages = compressResult.skippedPages;
 
             currentSizeMB = pdfBytes.length / (1024 * 1024);
             console.log(`推定後サイズ: ${currentSizeMB.toFixed(2)}MB`);
@@ -851,7 +1071,9 @@ window.MojiQPdfLibSaver = (function() {
             // ターゲット以下なら完了
             if (pdfBytes.length <= targetSizeBytes) {
                 onProgress(100);
-                return { success: true, data: pdfBytes, compressed: true };
+                const result = { success: true, data: pdfBytes, compressed: true };
+                if (buildSkipWarning()) result.compressWarning = buildSkipWarning();
+                return result;
             }
 
             // ステップ4: まだ大きい場合は段階的に品質を下げる
@@ -885,7 +1107,7 @@ window.MojiQPdfLibSaver = (function() {
 
                 onProgress(60 + attempts * 4);
 
-                pdfBytes = await createCompressedPdf(state, fileName, {
+                compressResult = await createCompressedPdf(state, fileName, {
                     quality,
                     scale,
                     imagePageData,
@@ -896,7 +1118,9 @@ window.MojiQPdfLibSaver = (function() {
                     onProgress: () => {}
                 });
 
-                if (!pdfBytes) continue;
+                if (!compressResult) continue;
+                pdfBytes = compressResult.pdfBytes || compressResult;
+                if (compressResult.skippedPages) totalSkippedPages = compressResult.skippedPages;
 
                 currentSizeMB = pdfBytes.length / (1024 * 1024);
                 console.log(`調整 ${attempts}: quality=${quality.toFixed(2)}, scale=${scale.toFixed(2)}, size=${currentSizeMB.toFixed(2)}MB`);
@@ -905,23 +1129,32 @@ window.MojiQPdfLibSaver = (function() {
 
                 if (pdfBytes.length <= targetSizeBytes) {
                     onProgress(100);
-                    return { success: true, data: pdfBytes, compressed: true };
+                    const result = { success: true, data: pdfBytes, compressed: true };
+                    if (buildSkipWarning()) result.compressWarning = buildSkipWarning();
+                    return result;
                 }
             }
 
             // ターゲット未達でも最小サイズ版を返す
             onProgress(100);
             const finalSizeMB = bestBytes.length / (1024 * 1024);
+            let warning = `圧縮後のファイルサイズは ${finalSizeMB.toFixed(1)}MB です。25MB以下にできませんでした。`;
+            if (buildSkipWarning()) warning += '\n' + buildSkipWarning();
             return {
                 success: true,
                 data: bestBytes,
                 compressed: true,
-                compressWarning: `圧縮後のファイルサイズは ${finalSizeMB.toFixed(1)}MB です。25MB以下にできませんでした。`
+                compressWarning: warning
             };
 
         } catch (error) {
             console.error('圧縮保存エラー:', error);
             return { success: false, error: error.message };
+        } finally {
+            // PDF注釈由来テキストを非表示状態のままボタンにも反映
+            if (TextLayerManager) {
+                TextLayerManager.setIsHidden(true);
+            }
         }
     }
 
@@ -932,6 +1165,92 @@ window.MojiQPdfLibSaver = (function() {
      * @param {object} options - オプション
      * @returns {Promise<Uint8Array|null>}
      */
+    /**
+     * 見開き圧縮保存用：個別ページをキャンバスの指定位置に描画
+     * @param {CanvasRenderingContext2D} ctx - 描画先コンテキスト
+     * @param {object} state - 状態
+     * @param {object} mapItem - ページマッピング
+     * @param {object} imagePageData - 画像ページデータ
+     * @param {number} pageWidth - ページ幅（PDF座標系）
+     * @param {number} pageHeight - ページ高さ（PDF座標系）
+     * @param {number} scale - 圧縮スケール
+     * @param {number} xOffset - X方向オフセット（キャンバス座標系、scale適用済み）
+     */
+    async function _renderPageToCompressCanvas(ctx, state, mapItem, imagePageData, pageWidth, pageHeight, scale, xOffset) {
+        if (mapItem.docIndex === -2) {
+            // 画像ページ
+            const imgData = imagePageData[mapItem.imageIndex];
+            if (!imgData || !imgData.data) return;
+
+            const img = new Image();
+            let blobUrl = null;
+            await new Promise((resolve, reject) => {
+                img.onload = () => {
+                    if (blobUrl) URL.revokeObjectURL(blobUrl);
+                    resolve();
+                };
+                img.onerror = (e) => {
+                    if (blobUrl) URL.revokeObjectURL(blobUrl);
+                    reject(e);
+                };
+                if (typeof imgData.data === 'string') {
+                    img.src = imgData.data;
+                } else {
+                    const blob = new Blob([imgData.data], { type: imgData.type === 'png' ? 'image/png' : 'image/jpeg' });
+                    blobUrl = URL.createObjectURL(blob);
+                    img.src = blobUrl;
+                }
+            });
+
+            // アスペクト比を保持してスケーリング
+            const imgAspect = imgData.width / imgData.height;
+            const pageAspect = pageWidth / pageHeight;
+            let drawWidth, drawHeight, drawX, drawY;
+
+            if (imgAspect > pageAspect) {
+                drawWidth = pageWidth * scale;
+                drawHeight = (pageWidth / imgAspect) * scale;
+                drawX = xOffset;
+                drawY = (pageHeight * scale - drawHeight) / 2;
+            } else {
+                drawHeight = pageHeight * scale;
+                drawWidth = (pageHeight * imgAspect) * scale;
+                drawX = xOffset + (pageWidth * scale - drawWidth) / 2;
+                drawY = 0;
+            }
+
+            ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+
+        } else if (mapItem.docIndex === -1) {
+            // 白紙ページ（背景は既に白で塗られているので何もしない）
+
+        } else {
+            // PDFページ
+            const targetDoc = state.pdfDocs[mapItem.docIndex];
+            const pdfPage = await targetDoc.getPage(mapItem.pageNum);
+            const viewport = pdfPage.getViewport({ scale: scale });
+
+            // 一時キャンバスにレンダリング
+            const tmpCanvas = document.createElement('canvas');
+            tmpCanvas.width = viewport.width;
+            tmpCanvas.height = viewport.height;
+            const tmpCtx = tmpCanvas.getContext('2d');
+            tmpCtx.fillStyle = '#ffffff';
+            tmpCtx.fillRect(0, 0, tmpCanvas.width, tmpCanvas.height);
+
+            await pdfPage.render({
+                canvasContext: tmpCtx,
+                viewport: viewport,
+                annotationMode: 1  // ENABLE: PDF注釈（FreeText等）の見た目をJPEGに焼き込む
+            }).promise;
+
+            // 見開きキャンバスの指定位置に描画
+            ctx.drawImage(tmpCanvas, xOffset, 0, pageWidth * scale, pageHeight * scale);
+            tmpCanvas.width = 0;
+            tmpCanvas.height = 0;
+        }
+    }
+
     async function createCompressedPdf(state, fileName, options = {}) {
         const quality = options.quality || COMPRESS_SETTINGS.INITIAL_QUALITY;
         const scale = options.scale || COMPRESS_SETTINGS.INITIAL_SCALE;
@@ -942,200 +1261,246 @@ window.MojiQPdfLibSaver = (function() {
         const spreadMapping = options.spreadMapping || [];
         const spreadCssPageWidth = options.spreadCssPageWidth || null;
         const spreadCssPageHeight = options.spreadCssPageHeight || null;
+        // PDF注釈由来テキストの非表示判定用
+        const TextLayerManager = window.MojiQTextLayerManager;
 
         try {
             const pdfDoc = await PDFDocument.create();
+            let skippedPages = 0;
 
-            for (let i = 0; i < state.totalPages; i++) {
-                const mapItem = state.pageMapping[i];
-                if (!mapItem) continue;
+            const originalPdfBytesArray = state.originalPdfBytesArray || [];
+            const srcPdfCacheForAnnots = {};
 
-                const pageNum = i + 1;
-                onProgress(Math.round((pageNum / state.totalPages) * 90));
+            // 見開きモードの場合は見開き単位で処理
+            console.log(`[MojiQ] createCompressedPdf: spreadMode=${spreadMode}, spreadMapping.length=${spreadMapping.length}, totalPages=${state.totalPages}`);
+            if (spreadMode && spreadMapping.length > 0) {
+                for (let spreadIdx = 0; spreadIdx < spreadMapping.length; spreadIdx++) {
+                    const spread = spreadMapping[spreadIdx];
 
-                // UIをブロックしないため次フレームまで待機
-                await new Promise(resolve => setTimeout(resolve, 0));
+                    onProgress(Math.round(((spreadIdx + 1) / spreadMapping.length) * 90));
+                    await new Promise(resolve => setTimeout(resolve, 0));
 
-                let pageWidth, pageHeight;
-                let canvas, ctx;
+                    const leftMapItem = spread.leftPage ? state.pageMapping[spread.leftPage - 1] : null;
+                    const rightMapItem = spread.rightPage ? state.pageMapping[spread.rightPage - 1] : null;
 
-                if (mapItem.docIndex === -2) {
-                    // 画像ページ
-                    const imgData = imagePageData[mapItem.imageIndex];
-                    if (!imgData || !imgData.data) continue;
+                    // 基準となるページサイズを取得
+                    let pageWidth = 595;
+                    let pageHeight = 842;
 
-                    pageWidth = imgData.width;
-                    pageHeight = imgData.height;
+                    if (leftMapItem) {
+                        pageWidth = leftMapItem.width || leftMapItem.displayWidth || 595;
+                        pageHeight = leftMapItem.height || leftMapItem.displayHeight || 842;
+                    } else if (rightMapItem) {
+                        pageWidth = rightMapItem.width || rightMapItem.displayWidth || 595;
+                        pageHeight = rightMapItem.height || rightMapItem.displayHeight || 842;
+                    }
 
-                    // 画像をCanvasに描画してJPEG化
-                    canvas = document.createElement('canvas');
-                    canvas.width = pageWidth * scale;
-                    canvas.height = pageHeight * scale;
-                    ctx = canvas.getContext('2d');
+                    const spreadWidth = pageWidth * 2;
+                    const spreadHeight = pageHeight;
+
+                    // 見開き全体のキャンバスを作成
+                    const canvas = document.createElement('canvas');
+                    canvas.width = spreadWidth * scale;
+                    canvas.height = spreadHeight * scale;
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        console.error(`[MojiQ] 見開きキャンバスのgetContext('2d')がnullを返しました（見開き: ${spreadIdx + 1}, サイズ: ${canvas.width}x${canvas.height}）`);
+                        skippedPages++;
+                        canvas.width = 0;
+                        canvas.height = 0;
+                        continue;
+                    }
                     ctx.fillStyle = '#ffffff';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                    // 画像データをImageに変換
-                    // BUG修正: Blob URL のメモリリークを防止
-                    const img = new Image();
-                    let blobUrl = null;
-                    await new Promise((resolve, reject) => {
-                        img.onload = () => {
-                            // Blob URL を解放
-                            if (blobUrl) {
-                                URL.revokeObjectURL(blobUrl);
+                    // 左ページを描画
+                    if (spread.leftPage && leftMapItem) {
+                        await _renderPageToCompressCanvas(ctx, state, leftMapItem, imagePageData, pageWidth, pageHeight, scale, 0);
+                    }
+
+                    // 右ページを描画
+                    if (spread.rightPage && rightMapItem) {
+                        await _renderPageToCompressCanvas(ctx, state, rightMapItem, imagePageData, pageWidth, pageHeight, scale, pageWidth * scale);
+                    }
+
+                    // 見開き描画オブジェクトを重ねる
+                    if (window.MojiQDrawingObjects && window.MojiQDrawingRenderer) {
+                        const displayPageWidth = leftMapItem?.displayWidth || rightMapItem?.displayWidth || pageWidth;
+                        const displayPageHeight = leftMapItem?.displayHeight || rightMapItem?.displayHeight || pageHeight;
+                        const spreadCssWidth = spreadCssPageWidth ? spreadCssPageWidth * 2 : (displayPageWidth * 2);
+                        const actualSpreadCssHeight = spreadCssPageHeight || displayPageHeight;
+
+                        const spreadKey = window.MojiQDrawingObjects.getSpreadPageKey(spreadIdx);
+                        const spreadObjects = window.MojiQDrawingObjects.getPageObjects(spreadKey);
+
+                        if (spreadObjects && spreadObjects.length > 0) {
+                            // 見開きCSS座標系 → キャンバス座標系のスケール
+                            const scaleX = (spreadWidth * scale) / spreadCssWidth;
+                            const scaleY = (spreadHeight * scale) / actualSpreadCssHeight;
+
+                            ctx.save();
+                            ctx.scale(scaleX, scaleY);
+                            for (const obj of spreadObjects) {
+                                if (TextLayerManager && !TextLayerManager.shouldRenderObject(obj)) {
+                                    continue;
+                                }
+                                window.MojiQDrawingRenderer.renderObject(ctx, obj);
                             }
-                            resolve();
-                        };
-                        img.onerror = (e) => {
-                            // エラー時も Blob URL を解放
-                            if (blobUrl) {
-                                URL.revokeObjectURL(blobUrl);
-                            }
-                            reject(e);
-                        };
-                        if (typeof imgData.data === 'string') {
-                            img.src = imgData.data;
+                            ctx.restore();
                         } else {
-                            const blob = new Blob([imgData.data], { type: imgData.type === 'png' ? 'image/png' : 'image/jpeg' });
-                            blobUrl = URL.createObjectURL(blob);
-                            img.src = blobUrl;
-                        }
-                    });
+                            // 見開きキーにオブジェクトがない場合は左右ページから個別に取得
+                            const leftObjects = spread.leftPage ? window.MojiQDrawingObjects.getPageObjects(spread.leftPage) : [];
+                            const rightObjects = spread.rightPage ? window.MojiQDrawingObjects.getPageObjects(spread.rightPage) : [];
 
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-                } else if (mapItem.docIndex === -1) {
-                    // 白紙ページ
-                    pageWidth = mapItem.width || 595;
-                    pageHeight = mapItem.height || 842;
-
-                    canvas = document.createElement('canvas');
-                    canvas.width = pageWidth * scale;
-                    canvas.height = pageHeight * scale;
-                    ctx = canvas.getContext('2d');
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                } else {
-                    // PDFページ
-                    const targetDoc = state.pdfDocs[mapItem.docIndex];
-                    const pdfPage = await targetDoc.getPage(mapItem.pageNum);
-                    const viewport = pdfPage.getViewport({ scale: 1 });
-                    pageWidth = viewport.width;
-                    pageHeight = viewport.height;
-
-                    canvas = document.createElement('canvas');
-                    canvas.width = pageWidth * scale;
-                    canvas.height = pageHeight * scale;
-                    ctx = canvas.getContext('2d');
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                    const scaledViewport = pdfPage.getViewport({ scale: scale });
-                    await pdfPage.render({
-                        canvasContext: ctx,
-                        viewport: scaledViewport
-                    }).promise;
-                }
-
-                // 描画オブジェクトを重ねる
-                const displayWidth = mapItem.displayWidth || pageWidth;
-                const displayHeight = mapItem.displayHeight || pageHeight;
-
-                if (window.MojiQDrawingObjects && window.MojiQDrawingRenderer) {
-                    // 見開きモードの場合は見開きキーからオブジェクトを取得して座標変換
-                    if (spreadMode && spreadMapping.length > 0 && spreadCssPageWidth && spreadCssPageHeight) {
-                        // このページがどの見開きに属するか検索
-                        let spreadIndex = -1;
-                        let isLeftPage = false;
-                        let isRightPage = false;
-                        for (let si = 0; si < spreadMapping.length; si++) {
-                            const spread = spreadMapping[si];
-                            if (spread.leftPage === pageNum) {
-                                spreadIndex = si;
-                                isLeftPage = true;
-                                break;
-                            }
-                            if (spread.rightPage === pageNum) {
-                                spreadIndex = si;
-                                isRightPage = true;
-                                break;
-                            }
-                        }
-
-                        if (spreadIndex >= 0) {
-                            const spreadKey = window.MojiQDrawingObjects.getSpreadPageKey(spreadIndex);
-                            const spreadObjects = window.MojiQDrawingObjects.getPageObjects(spreadKey);
-                            if (spreadObjects && spreadObjects.length > 0) {
-                                // 見開き座標系 → 単ページ座標系のスケール
-                                const scaleFromSpreadX = displayWidth / spreadCssPageWidth;
-                                const scaleFromSpreadY = displayHeight / spreadCssPageHeight;
-                                // 単ページ座標系 → キャンバス座標系のスケール
-                                const scaleToCanvasX = (pageWidth * scale) / displayWidth;
-                                const scaleToCanvasY = (pageHeight * scale) / displayHeight;
-
+                            if (leftObjects && leftObjects.length > 0) {
+                                const scaleX = (pageWidth * scale) / displayPageWidth;
+                                const scaleY = (spreadHeight * scale) / displayPageHeight;
                                 ctx.save();
-                                for (const obj of spreadObjects) {
-                                    // オブジェクトのバウンディングボックスを計算してこのページに属するか判定
-                                    let objMinX = Infinity, objMaxX = -Infinity;
-                                    if (obj.points) {
-                                        for (const p of obj.points) {
-                                            if (p.x < objMinX) objMinX = p.x;
-                                            if (p.x > objMaxX) objMaxX = p.x;
-                                        }
-                                    } else if (obj.x !== undefined && obj.width !== undefined) {
-                                        objMinX = obj.x;
-                                        objMaxX = obj.x + obj.width;
-                                    } else if (obj.x !== undefined) {
-                                        objMinX = obj.x;
-                                        objMaxX = obj.x;
-                                    }
+                                ctx.scale(scaleX, scaleY);
+                                for (const obj of leftObjects) {
+                                    if (TextLayerManager && !TextLayerManager.shouldRenderObject(obj)) continue;
+                                    window.MojiQDrawingRenderer.renderObject(ctx, obj);
+                                }
+                                ctx.restore();
+                            }
 
-                                    // このページに属するか判定
-                                    const pageStartX = isLeftPage ? 0 : spreadCssPageWidth;
-                                    const pageEndX = isLeftPage ? spreadCssPageWidth : spreadCssPageWidth * 2;
-                                    // オブジェクトがこのページ範囲内にあるか（一部でも含まれていれば描画）
-                                    if (objMaxX < pageStartX || objMinX >= pageEndX) {
-                                        continue; // このページには属さない
-                                    }
-
-                                    // ディープコピーして座標変換
-                                    const transformedObj = JSON.parse(JSON.stringify(obj));
-                                    const offsetX = isRightPage ? spreadCssPageWidth : 0;
-
-                                    // X座標をオフセット
-                                    if (transformedObj.points) {
-                                        for (const p of transformedObj.points) {
-                                            p.x = (p.x - offsetX) * scaleFromSpreadX * scaleToCanvasX;
-                                            p.y = p.y * scaleFromSpreadY * scaleToCanvasY;
-                                        }
-                                    }
-                                    if (transformedObj.x !== undefined) {
-                                        transformedObj.x = (transformedObj.x - offsetX) * scaleFromSpreadX * scaleToCanvasX;
-                                    }
-                                    if (transformedObj.y !== undefined) {
-                                        transformedObj.y = transformedObj.y * scaleFromSpreadY * scaleToCanvasY;
-                                    }
-                                    if (transformedObj.width !== undefined) {
-                                        transformedObj.width = transformedObj.width * scaleFromSpreadX * scaleToCanvasX;
-                                    }
-                                    if (transformedObj.height !== undefined) {
-                                        transformedObj.height = transformedObj.height * scaleFromSpreadY * scaleToCanvasY;
-                                    }
-                                    if (transformedObj.lineWidth !== undefined) {
-                                        transformedObj.lineWidth = transformedObj.lineWidth * scaleFromSpreadX * scaleToCanvasX;
-                                    }
-                                    if (transformedObj.fontSize !== undefined) {
-                                        transformedObj.fontSize = transformedObj.fontSize * scaleFromSpreadY * scaleToCanvasY;
-                                    }
-
-                                    window.MojiQDrawingRenderer.renderObject(ctx, transformedObj);
+                            if (rightObjects && rightObjects.length > 0) {
+                                const scaleX = (pageWidth * scale) / displayPageWidth;
+                                const scaleY = (spreadHeight * scale) / displayPageHeight;
+                                ctx.save();
+                                ctx.translate(pageWidth * scale, 0);
+                                ctx.scale(scaleX, scaleY);
+                                for (const obj of rightObjects) {
+                                    if (TextLayerManager && !TextLayerManager.shouldRenderObject(obj)) continue;
+                                    window.MojiQDrawingRenderer.renderObject(ctx, obj);
                                 }
                                 ctx.restore();
                             }
                         }
+                    }
+
+                    // CanvasをJPEGに変換
+                    const jpegResult = await canvasToJpegWithTimeout(canvas, quality);
+                    canvas.width = 0;
+                    canvas.height = 0;
+
+                    if (!jpegResult || !jpegResult.data) {
+                        console.error('JPEG変換に失敗しました（見開き:', spreadIdx + 1, '）');
+                        skippedPages++;
+                        continue;
+                    }
+
+                    // PDFに見開きページとして追加
+                    const page = pdfDoc.addPage([spreadWidth, spreadHeight]);
+                    const jpgImage = await pdfDoc.embedJpg(jpegResult.data);
+                    page.drawImage(jpgImage, {
+                        x: 0,
+                        y: 0,
+                        width: spreadWidth,
+                        height: spreadHeight,
+                    });
+                }
+            } else {
+                // 通常モード（単ページ）
+                for (let i = 0; i < state.totalPages; i++) {
+                    const mapItem = state.pageMapping[i];
+                    if (!mapItem) continue;
+
+                    const pageNum = i + 1;
+                    onProgress(Math.round((pageNum / state.totalPages) * 90));
+
+                    // UIをブロックしないため次フレームまで待機
+                    await new Promise(resolve => setTimeout(resolve, 0));
+
+                    let pageWidth, pageHeight;
+                    let canvas, ctx;
+
+                    if (mapItem.docIndex === -2) {
+                        // 画像ページ
+                        const imgData = imagePageData[mapItem.imageIndex];
+                        if (!imgData || !imgData.data) continue;
+
+                        pageWidth = imgData.width;
+                        pageHeight = imgData.height;
+
+                        // 画像をCanvasに描画してJPEG化
+                        canvas = document.createElement('canvas');
+                        canvas.width = pageWidth * scale;
+                        canvas.height = pageHeight * scale;
+                        ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                        // 画像データをImageに変換
+                        // BUG修正: Blob URL のメモリリークを防止
+                        const img = new Image();
+                        let blobUrl = null;
+                        await new Promise((resolve, reject) => {
+                            img.onload = () => {
+                                // Blob URL を解放
+                                if (blobUrl) {
+                                    URL.revokeObjectURL(blobUrl);
+                                }
+                                resolve();
+                            };
+                            img.onerror = (e) => {
+                                // エラー時も Blob URL を解放
+                                if (blobUrl) {
+                                    URL.revokeObjectURL(blobUrl);
+                                }
+                                reject(e);
+                            };
+                            if (typeof imgData.data === 'string') {
+                                img.src = imgData.data;
+                            } else {
+                                const blob = new Blob([imgData.data], { type: imgData.type === 'png' ? 'image/png' : 'image/jpeg' });
+                                blobUrl = URL.createObjectURL(blob);
+                                img.src = blobUrl;
+                            }
+                        });
+
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                    } else if (mapItem.docIndex === -1) {
+                        // 白紙ページ
+                        pageWidth = mapItem.width || 595;
+                        pageHeight = mapItem.height || 842;
+
+                        canvas = document.createElement('canvas');
+                        canvas.width = pageWidth * scale;
+                        canvas.height = pageHeight * scale;
+                        ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
                     } else {
+                        // PDFページ
+                        const targetDoc = state.pdfDocs[mapItem.docIndex];
+                        const pdfPage = await targetDoc.getPage(mapItem.pageNum);
+                        const viewport = pdfPage.getViewport({ scale: 1 });
+                        pageWidth = viewport.width;
+                        pageHeight = viewport.height;
+
+                        canvas = document.createElement('canvas');
+                        canvas.width = pageWidth * scale;
+                        canvas.height = pageHeight * scale;
+                        ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                        const scaledViewport = pdfPage.getViewport({ scale: scale });
+                        await pdfPage.render({
+                            canvasContext: ctx,
+                            viewport: scaledViewport,
+                            annotationMode: 1  // ENABLE: PDF注釈（FreeText等）の見た目をJPEGに焼き込む
+                        }).promise;
+                    }
+
+                    // 描画オブジェクトを重ねる
+                    const displayWidth = mapItem.displayWidth || pageWidth;
+                    const displayHeight = mapItem.displayHeight || pageHeight;
+
+                    if (window.MojiQDrawingObjects && window.MojiQDrawingRenderer) {
                         // 通常モード（単ページ）
                         const pageObjects = window.MojiQDrawingObjects.getPageObjects(pageNum);
                         if (pageObjects && pageObjects.length > 0) {
@@ -1145,32 +1510,129 @@ window.MojiQPdfLibSaver = (function() {
                             ctx.save();
                             ctx.scale(scaleX, scaleY);
                             for (const obj of pageObjects) {
+                                // PDF注釈由来テキストの非表示状態をチェック
+                                if (TextLayerManager && !TextLayerManager.shouldRenderObject(obj)) {
+                                    continue;
+                                }
                                 window.MojiQDrawingRenderer.renderObject(ctx, obj);
                             }
                             ctx.restore();
                         }
                     }
+
+                    // CanvasをJPEGに変換
+                    const jpegResult = await canvasToJpegWithTimeout(canvas, quality);
+                    canvas.width = 0;
+                    canvas.height = 0;
+
+                    if (!jpegResult || !jpegResult.data) {
+                        console.error('JPEG変換に失敗しました（ページ:', pageNum, '）');
+                        skippedPages++;
+                        continue;
+                    }
+
+                    // PDFにJPEG画像として追加（空ページ＋JPEG、リソース最小）
+                    const jpgImage = await pdfDoc.embedJpg(jpegResult.data);
+                    const page = pdfDoc.addPage([pageWidth, pageHeight]);
+
+                    // 元PDFのアノテーション（Acrobatコメント）をデータのみ再構築
+                    // copyPages()は使わない（元ページのリソースがコピーされファイルが肥大化するため）
+                    if (mapItem.docIndex >= 0) {
+                        try {
+                            const originalBytes = originalPdfBytesArray[mapItem.docIndex];
+                            if (originalBytes) {
+                                if (!srcPdfCacheForAnnots[mapItem.docIndex]) {
+                                    srcPdfCacheForAnnots[mapItem.docIndex] = await PDFDocument.load(originalBytes, {
+                                        ignoreEncryption: true
+                                    });
+                                }
+                                const srcPdf = srcPdfCacheForAnnots[mapItem.docIndex];
+                                if (srcPdf && mapItem.pageNum <= srcPdf.getPageCount()) {
+                                    const { PDFName, PDFString, PDFHexString } = PDFLib;
+                                    const srcPage = srcPdf.getPage(mapItem.pageNum - 1);
+                                    const srcAnnots = srcPage.node.lookup(PDFName.of('Annots'));
+
+                                    if (srcAnnots && typeof srcAnnots.size === 'function') {
+                                        const newAnnotsArr = pdfDoc.context.obj([]);
+
+                                        for (let ai = 0; ai < srcAnnots.size(); ai++) {
+                                            const srcAnnot = srcAnnots.lookup(ai);
+                                            if (!srcAnnot || typeof srcAnnot.get !== 'function') continue;
+
+                                            // Popup型・FreeText型はスキップ
+                                            // FreeText: MojiQテキストオブジェクトに変換済み＆MojiQTextメタデータで管理
+                                            // /AP なしで再構築すると枠付きテキストとして表示されてしまうため除外
+                                            const subtype = srcAnnot.lookup(PDFName.of('Subtype'));
+                                            if (subtype && (subtype.encodedName === '/Popup' || subtype.encodedName === '/FreeText')) continue;
+
+                                            // 必要なフィールドだけで新規アノテーション辞書を構築
+                                            const newAnnot = pdfDoc.context.obj({});
+                                            newAnnot.set(PDFName.of('Type'), PDFName.of('Annot'));
+
+                                            // 単純コピー可能なフィールド（PDFName, PDFNumber等）
+                                            const nameFields = ['Subtype', 'Name'];
+                                            for (const f of nameFields) {
+                                                const v = srcAnnot.get(PDFName.of(f));
+                                                if (v) newAnnot.set(PDFName.of(f), v);
+                                            }
+
+                                            // Rect（座標配列）をコピー
+                                            const srcRect = srcAnnot.lookup(PDFName.of('Rect'));
+                                            if (srcRect && typeof srcRect.asRectangle === 'function') {
+                                                const r = srcRect.asRectangle();
+                                                newAnnot.set(PDFName.of('Rect'), pdfDoc.context.obj([r.x, r.y, r.x + r.width, r.y + r.height]));
+                                            }
+
+                                            // 文字列フィールド（Contents, T=著者, M=日付等）
+                                            const strFields = ['Contents', 'T', 'M', 'CreationDate', 'NM', 'Subj'];
+                                            for (const f of strFields) {
+                                                const v = srcAnnot.get(PDFName.of(f));
+                                                if (!v) continue;
+                                                if (typeof v.decodeText === 'function') {
+                                                    newAnnot.set(PDFName.of(f), PDFHexString.fromText(v.decodeText()));
+                                                } else if (typeof v.asString === 'function') {
+                                                    newAnnot.set(PDFName.of(f), PDFHexString.fromText(v.asString()));
+                                                }
+                                            }
+
+                                            // C（色配列）をコピー
+                                            const srcC = srcAnnot.lookup(PDFName.of('C'));
+                                            if (srcC && typeof srcC.asArray === 'function') {
+                                                newAnnot.set(PDFName.of('C'), pdfDoc.context.obj(srcC.asArray().map(n => typeof n.numberValue === 'function' ? n.numberValue() : n.value())));
+                                            }
+
+                                            // F（フラグ）
+                                            const srcF = srcAnnot.get(PDFName.of('F'));
+                                            if (srcF) newAnnot.set(PDFName.of('F'), srcF);
+
+                                            // CA（透明度）
+                                            const srcCA = srcAnnot.get(PDFName.of('CA'));
+                                            if (srcCA) newAnnot.set(PDFName.of('CA'), srcCA);
+
+                                            // /AP は意図的にコピーしない（アイコン非表示）
+
+                                            const ref = pdfDoc.context.register(newAnnot);
+                                            newAnnotsArr.push(ref);
+                                        }
+
+                                        if (newAnnotsArr.size() > 0) {
+                                            page.node.set(PDFName.of('Annots'), newAnnotsArr);
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (annotErr) {
+                            console.warn('[MojiQ] アノテーション再構築に失敗:', annotErr.message);
+                        }
+                    }
+
+                    page.drawImage(jpgImage, {
+                        x: 0,
+                        y: 0,
+                        width: pageWidth,
+                        height: pageHeight,
+                    });
                 }
-
-                // CanvasをJPEGに変換
-                const jpegResult = await canvasToJpegWithTimeout(canvas, quality);
-                canvas.width = 0;
-                canvas.height = 0;
-
-                if (!jpegResult || !jpegResult.data) {
-                    console.error('JPEG変換に失敗しました（ページ:', pageNum, '）');
-                    continue;
-                }
-
-                // PDFにJPEG画像として追加
-                const page = pdfDoc.addPage([pageWidth, pageHeight]);
-                const jpgImage = await pdfDoc.embedJpg(jpegResult.data);
-                page.drawImage(jpgImage, {
-                    x: 0,
-                    y: 0,
-                    width: pageWidth,
-                    height: pageHeight,
-                });
             }
 
             // メタデータを設定
@@ -1178,11 +1640,37 @@ window.MojiQPdfLibSaver = (function() {
             pdfDoc.setCreator('MojiQ');
             pdfDoc.setProducer('MojiQ PDF-Lib Saver (Compressed)');
 
+            // コメントテキスト非表示状態とMojiQテキストデータをSubjectに保存
+            // 保存時は常にコメントテキ���トを非表示にするため、常にtrue
+            const mojiQTextData = collectMojiQTextData(state.totalPages, state.pageMapping);
+            let subjectData = 'MojiQ:commentTextHidden=true';
+            if (mojiQTextData) {
+                subjectData += ';MojiQText:' + mojiQTextData;
+            }
+            // 確認済みコメント情報を追加
+            const checkedCommentsData = collectCheckedCommentsData();
+            if (checkedCommentsData) {
+                subjectData += ';MojiQChecked:' + checkedCommentsData;
+            }
+            if (subjectData.length > 100000) {
+                console.warn(`[MojiQ] メタデータが大きいです（${Math.round(subjectData.length / 1024)}KB）。`);
+            }
+            pdfDoc.setSubject(subjectData);
+
             onProgress(95);
             const pdfBytes = await pdfDoc.save({ useObjectStreams: false });
+
+            // 保存結果の検証（破損データ防止）
+            if (!pdfBytes || !(pdfBytes instanceof Uint8Array) || pdfBytes.length === 0) {
+                throw new Error('圧縮PDF生成に失敗しました（出力データが空です）');
+            }
+
             onProgress(100);
 
-            return pdfBytes;
+            if (skippedPages > 0) {
+                console.warn(`[MojiQ] 圧縮保存: ${skippedPages}ページのJPEG変換に失敗しました`);
+            }
+            return { pdfBytes, skippedPages };
 
         } catch (error) {
             console.error('圧縮PDF生成エラー:', error);
@@ -1210,6 +1698,13 @@ window.MojiQPdfLibSaver = (function() {
         const PAGE_PROGRESS_RATIO = 0.9;
         // タイムアウトした見開きを追跡
         const timedOutSpreads = [];
+
+        // PDF注釈由来テキストを一時的に非表示にする（保存時は常に非表示）
+        const TextLayerManager = window.MojiQTextLayerManager;
+
+        if (TextLayerManager) {
+            TextLayerManager.setIsHiddenInternal(true);
+        }
 
         try {
             const pdfDoc = await PDFDocument.create();
@@ -1324,15 +1819,33 @@ window.MojiQPdfLibSaver = (function() {
             pdfDoc.setCreator('MojiQ');
             pdfDoc.setProducer('MojiQ PDF-Lib Saver (Spread)');
 
-            // コメントテキスト非表示状態をSubjectに保存
-            const textLayerHidden = window.MojiQTextLayerManager && window.MojiQTextLayerManager.isHidden();
-            pdfDoc.setSubject(textLayerHidden ? 'MojiQ:commentTextHidden=true' : 'MojiQ:commentTextHidden=false');
+            // コメントテキスト非表示状態とMojiQテキストデータをSubjectに保存
+            {
+                const mojiQTextData = collectMojiQTextData(state.totalPages, state.pageMapping);
+                let subjectData = 'MojiQ:commentTextHidden=true';
+                if (mojiQTextData) {
+                    subjectData += ';MojiQText:' + mojiQTextData;
+                }
+                const checkedCommentsData = collectCheckedCommentsData();
+                if (checkedCommentsData) {
+                    subjectData += ';MojiQChecked:' + checkedCommentsData;
+                }
+                if (subjectData.length > 100000) {
+                    console.warn(`[MojiQ] メタデータが大きいです（${Math.round(subjectData.length / 1024)}KB）。`);
+                }
+                pdfDoc.setSubject(subjectData);
+            }
 
             // 90%完了を報告（PDF出力処理開始）
             onProgress(90);
             await new Promise(resolve => setTimeout(resolve, 0));
 
             const pdfBytes = await pdfDoc.save({ useObjectStreams: false });
+
+            // 保存結果の検証（破損データ防止）
+            if (!pdfBytes || !(pdfBytes instanceof Uint8Array) || pdfBytes.length === 0) {
+                throw new Error('PDF生成に失敗しました（出力データが空です）');
+            }
 
             // 100%完了を報告
             onProgress(100);
@@ -1347,6 +1860,11 @@ window.MojiQPdfLibSaver = (function() {
         } catch (error) {
             console.error('見開きPDF保存エラー:', error);
             return { success: false, error: error.message };
+        } finally {
+            // PDF注釈由来テキストを非表示状態のままボタンにも反映
+            if (TextLayerManager) {
+                TextLayerManager.setIsHidden(true);
+            }
         }
     }
 
@@ -1544,6 +2062,13 @@ window.MojiQPdfLibSaver = (function() {
         // ページ処理を90%、pdfDoc.save()を10%として扱う
         const PAGE_PROGRESS_RATIO = 0.9;
 
+        // PDF注釈由来テキストを一時的に非表示にする（保存時は常に非表示）
+        const TextLayerManager = window.MojiQTextLayerManager;
+
+        if (TextLayerManager) {
+            TextLayerManager.setIsHiddenInternal(true);
+        }
+
         try {
             const pdfDoc = await PDFDocument.create();
 
@@ -1664,15 +2189,33 @@ window.MojiQPdfLibSaver = (function() {
             pdfDoc.setCreator('MojiQ');
             pdfDoc.setProducer('MojiQ PDF-Lib Saver (Spread Transparent)');
 
-            // コメントテキスト非表示状態をSubjectに保存
-            const textLayerHidden = window.MojiQTextLayerManager && window.MojiQTextLayerManager.isHidden();
-            pdfDoc.setSubject(textLayerHidden ? 'MojiQ:commentTextHidden=true' : 'MojiQ:commentTextHidden=false');
+            // コメントテキスト非表示状態とMojiQテキストデータをSubjectに保存
+            {
+                const mojiQTextData = collectMojiQTextData(state.totalPages, state.pageMapping);
+                let subjectData = 'MojiQ:commentTextHidden=true';
+                if (mojiQTextData) {
+                    subjectData += ';MojiQText:' + mojiQTextData;
+                }
+                const checkedCommentsData = collectCheckedCommentsData();
+                if (checkedCommentsData) {
+                    subjectData += ';MojiQChecked:' + checkedCommentsData;
+                }
+                if (subjectData.length > 100000) {
+                    console.warn(`[MojiQ] メタデータが大きいです（${Math.round(subjectData.length / 1024)}KB）。`);
+                }
+                pdfDoc.setSubject(subjectData);
+            }
 
             // 90%完了を報告（PDF出力処理開始）
             onProgress(90);
             await new Promise(resolve => setTimeout(resolve, 0));
 
             const pdfBytes = await pdfDoc.save({ useObjectStreams: false });
+
+            // 保存結果の検証（破損データ防止）
+            if (!pdfBytes || !(pdfBytes instanceof Uint8Array) || pdfBytes.length === 0) {
+                throw new Error('PDF生成に失敗しました（出力データが空です）');
+            }
 
             // 100%完了を報告
             onProgress(100);
@@ -1687,6 +2230,11 @@ window.MojiQPdfLibSaver = (function() {
         } catch (error) {
             console.error('見開き透過PDF保存エラー:', error);
             return { success: false, error: error.message };
+        } finally {
+            // PDF注釈由来テキストを非表示状態のままボタンにも反映
+            if (TextLayerManager) {
+                TextLayerManager.setIsHidden(true);
+            }
         }
     }
 
@@ -1974,6 +2522,13 @@ window.MojiQPdfLibSaver = (function() {
             return await saveTransparentSpread(state, fileName, options, imagePageData, spreadMapping, bgOpacity);
         }
 
+        // PDF注釈由来テキストを一時的に非表示にする（保存時は常に非表示）
+        const TextLayerManager = window.MojiQTextLayerManager;
+
+        if (TextLayerManager) {
+            TextLayerManager.setIsHiddenInternal(true);
+        }
+
         try {
             // 新しいPDFドキュメントを作成
             const pdfDoc = await PDFDocument.create();
@@ -2143,9 +2698,22 @@ window.MojiQPdfLibSaver = (function() {
             pdfDoc.setCreator('MojiQ');
             pdfDoc.setProducer('MojiQ PDF-Lib Saver (Transparent)');
 
-            // コメントテキスト非表示状態をSubjectに保存
-            const textLayerHidden = window.MojiQTextLayerManager && window.MojiQTextLayerManager.isHidden();
-            pdfDoc.setSubject(textLayerHidden ? 'MojiQ:commentTextHidden=true' : 'MojiQ:commentTextHidden=false');
+            // コメントテキスト非表示状態とMojiQテキストデータをSubjectに保存
+            {
+                const mojiQTextData = collectMojiQTextData(state.totalPages, state.pageMapping);
+                let subjectData = 'MojiQ:commentTextHidden=true';
+                if (mojiQTextData) {
+                    subjectData += ';MojiQText:' + mojiQTextData;
+                }
+                const checkedCommentsData = collectCheckedCommentsData();
+                if (checkedCommentsData) {
+                    subjectData += ';MojiQChecked:' + checkedCommentsData;
+                }
+                if (subjectData.length > 100000) {
+                    console.warn(`[MojiQ] メタデータが大きいです（${Math.round(subjectData.length / 1024)}KB）。`);
+                }
+                pdfDoc.setSubject(subjectData);
+            }
 
             // 90%完了を報告（PDF出力処理開始）
             onProgress(90);
@@ -2153,6 +2721,11 @@ window.MojiQPdfLibSaver = (function() {
 
             // PDFを保存（useObjectStreams: falseで高速化）
             const pdfBytes = await pdfDoc.save({ useObjectStreams: false });
+
+            // 保存結果の検証（破損データ防止）
+            if (!pdfBytes || !(pdfBytes instanceof Uint8Array) || pdfBytes.length === 0) {
+                throw new Error('PDF生成に失敗しました（出力データが空です）');
+            }
 
             // 100%完了を報告
             onProgress(100);
@@ -2167,6 +2740,11 @@ window.MojiQPdfLibSaver = (function() {
         } catch (error) {
             console.error('透過PDF保存エラー:', error);
             return { success: false, error: error.message };
+        } finally {
+            // PDF注釈由来テキストを非表示状態のままボタンにも反映
+            if (TextLayerManager) {
+                TextLayerManager.setIsHidden(true);
+            }
         }
     }
 

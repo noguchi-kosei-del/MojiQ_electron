@@ -139,7 +139,6 @@ body.proofreading-mode #bracketBtn,
 body.proofreading-mode #arrowBtn,
 body.proofreading-mode #doubleArrowBtn,
 body.proofreading-mode #polylineBtn,
-body.proofreading-mode #imgInsertBtn,
 body.proofreading-mode #eyedropperBtn {
     display: none;
 }
@@ -546,18 +545,6 @@ body.proofreading-mode #proofEyedropperBtn svg {
     stroke: #0d47a1 !important;
 }
 
-.proofreading-rainbow-picker {
-    width: 100%;
-    height: 18px;
-    border-radius: 4px;
-    cursor: crosshair;
-    background: linear-gradient(to right,
-        #ff0000, #ff8000, #ffff00, #80ff00,
-        #00ff00, #00ff80, #00ffff, #0080ff,
-        #0000ff, #8000ff, #ff00ff, #ff0080, #ff0000);
-    border: 1px solid #ccc;
-}
-
 .proofreading-line-width {
     display: flex;
     flex-direction: column;
@@ -758,10 +745,7 @@ body.proofreading-mode #proofEyedropperBtn svg {
 }
 
 /* 確認済み状態 */
-/* 確認済み時に内容を薄くする（「確認済み」テキストは除外） */
-.proofreading-comment-item.checked .proofreading-comment-checkbox-icon,
-.proofreading-comment-item.checked .proofreading-comment-done,
-.proofreading-comment-item.checked .proofreading-comment-page,
+/* 確認済み時に内容を薄くする */
 .proofreading-comment-item.checked .proofreading-comment-type,
 .proofreading-comment-item.checked .proofreading-comment-content {
     opacity: 0.5;
@@ -817,31 +801,6 @@ body.proofreading-mode #proofEyedropperBtn svg {
     flex: 1;
     min-width: 0;
     cursor: pointer;
-}
-
-/* 済スタンプ - 通常時は非表示 */
-.proofreading-comment-done {
-    display: none;
-    font-size: 10px;
-    font-weight: 700;
-    color: #fff;
-    background: #4caf50;
-    padding: 1px 6px;
-    border-radius: 8px;
-}
-
-/* 確認済み時に済スタンプを表示 */
-.proofreading-comment-item.checked .proofreading-comment-done {
-    display: inline-block;
-}
-
-/* 確認済み時に「確認済み」テキストを表示 */
-.proofreading-comment-item.checked .proofreading-comment-header::after {
-    content: '確認済み';
-    margin-left: auto;
-    font-size: 10px;
-    font-weight: 500;
-    color: #1976d2;
 }
 
 .proofreading-comment-item:hover {
@@ -904,6 +863,14 @@ body.proofreading-mode #proofEyedropperBtn svg {
     color: var(--color-proofreading-800);
 }
 
+.proofreading-comment-type.type-mojiq,
+.proofreading-comment-type.type-rect,
+.proofreading-comment-type.type-ellipse,
+.proofreading-comment-type.type-line {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
 .proofreading-comment-content {
     font-size: 12px;
     color: var(--text-primary);
@@ -962,6 +929,14 @@ body.proofreading-mode #proofEyedropperBtn svg {
     flex-shrink: 0;
 }
 
+/* 無効状態（テキストオブジェクトがない場合） */
+.proofreading-icon-btn:disabled,
+.proofreading-icon-btn.no-annotation-text {
+    color: #ccc;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 /* ページバーボタンのアイコン切り替え */
 .proofreading-icon-btn .proof-nav-hide {
     display: none;
@@ -1007,6 +982,14 @@ body.dark-mode .proofreading-icon-btn.active {
 body.dark-mode .proofreading-icon-btn.active:hover {
     color: #f44336;
     background: transparent;
+}
+
+/* 無効状態（テキストオブジェクトがない場合） - ダークモード */
+body.dark-mode .proofreading-icon-btn:disabled,
+body.dark-mode .proofreading-icon-btn.no-annotation-text {
+    color: #555;
+    cursor: not-allowed;
+    pointer-events: none;
 }
 
 .proofreading-check-empty {
@@ -1093,6 +1076,22 @@ body.dark-mode .proofreading-icon-btn.active:hover {
     width: 24px;
     padding: 6px 4px 6px 8px;
     vertical-align: middle;
+    position: relative;
+}
+
+/* チェックボックスとテキストボタンの区切り線（上下に余白あり） */
+.proofreading-table .cal-checkbox::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 1px;
+    background-color: #ddd;
+}
+
+body.dark-mode .proofreading-table .cal-checkbox::after {
+    background-color: #444;
 }
 
 /* 項目チェックボックス */
@@ -1139,13 +1138,6 @@ body.dark-mode .proofreading-icon-btn.active:hover {
 }
 
 /* 項目確認済み時のスタイル（opacityではなく色変更で薄さを表現） */
-.proofreading-item.checked .proofreading-item-checkbox-icon {
-    opacity: 0.5;
-}
-
-.proofreading-item.checked .cal-page {
-    color: #90caf9;
-}
 
 .proofreading-item.checked .cal-excerpt {
     color: #bbb;
@@ -1155,21 +1147,14 @@ body.dark-mode .proofreading-icon-btn.active:hover {
     color: #999;
 }
 
-/* 項目確認済み時に「確認済み」テキストを表示 */
-.proofreading-item.checked .cal-content::after {
-    content: '確認済み';
-    margin-left: 8px;
-    font-size: 10px;
-    font-weight: 500;
-    color: #1976d2;
-}
-
 .proofreading-table .cal-page {
     width: 40px;
     color: #1976d2;
     font-weight: 500;
     cursor: pointer;
     white-space: nowrap;
+    vertical-align: middle;
+    padding-right: 4px;
 }
 
 .proofreading-table .cal-page:hover {
@@ -1181,11 +1166,15 @@ body.dark-mode .proofreading-icon-btn.active:hover {
     color: #666;
     font-size: 11px;
     word-break: break-all;
+    vertical-align: middle;
+    padding-left: 4px;
 }
 
 .proofreading-table .cal-content {
     color: #333;
     word-break: break-word;
+    vertical-align: middle;
+    padding-left: 4px;
 }
 
 .proofreading-table .cal-copy {
@@ -1273,7 +1262,6 @@ body.dark-mode .proofreading-icon-btn.active:hover {
 }
 
 /* 確認済みカテゴリのスタイル */
-.proofreading-category.checked .proofreading-category-checkbox,
 .proofreading-category.checked .proofreading-category-toggle,
 .proofreading-category.checked .proofreading-category-name,
 .proofreading-category.checked .proofreading-category-count {
@@ -1284,16 +1272,26 @@ body.dark-mode .proofreading-icon-btn.active:hover {
     text-decoration: line-through;
 }
 
-.proofreading-category.checked .proofreading-category-header::after {
-    content: '確認済み';
-    margin-left: auto;
-    font-size: 10px;
-    font-weight: 500;
-    color: #1976d2;
+/* カテゴリ確認済み時：項目の抜粋と内容のみ薄くする（チェックボックス、テキストボタン、ハイパーリンクは除外） */
+.proofreading-category.checked .cal-excerpt {
+    color: #ccc;
 }
 
-.proofreading-category.checked .proofreading-category-body {
-    opacity: 0.4;
+.proofreading-category.checked .cal-content {
+    color: #bbb;
+}
+
+/* ダークモード */
+body.dark-mode .proofreading-category.checked .cal-excerpt {
+    color: #666;
+}
+
+body.dark-mode .proofreading-category.checked .cal-content {
+    color: #777;
+}
+
+body.dark-mode .proofreading-category.checked .proofreading-item.checked .cal-content::after {
+    color: #66bb6a;
 }
 
 /* ダークモード */
@@ -1312,7 +1310,7 @@ body.dark-mode .proofreading-category-checkbox input[type="checkbox"]:checked + 
 }
 
 body.dark-mode .proofreading-category.checked .proofreading-category-header::after {
-    color: #64b5f6;
+    color: #66bb6a;
 }
 
 /* =====================================================
@@ -1713,6 +1711,14 @@ body.dark-mode .proofreading-comment-type.type-strikeout {
     color: #ef9a9a;
 }
 
+body.dark-mode .proofreading-comment-type.type-mojiq,
+body.dark-mode .proofreading-comment-type.type-rect,
+body.dark-mode .proofreading-comment-type.type-ellipse,
+body.dark-mode .proofreading-comment-type.type-line {
+    background: #1b5e20;
+    color: #a5d6a7;
+}
+
 /* コメントチェックボックス（ダークモード） */
 body.dark-mode .proofreading-comment-checkbox-icon {
     background: #2a2a2a;
@@ -1726,16 +1732,6 @@ body.dark-mode .proofreading-comment-checkbox:hover .proofreading-comment-checkb
 body.dark-mode .proofreading-comment-checkbox input[type="checkbox"]:checked + .proofreading-comment-checkbox-icon {
     background: #66bb6a;
     border-color: #66bb6a;
-}
-
-/* 済スタンプ（ダークモード） */
-body.dark-mode .proofreading-comment-done {
-    background: #66bb6a;
-}
-
-/* 確認済みテキスト（ダークモード） */
-body.dark-mode .proofreading-comment-item.checked .proofreading-comment-header::after {
-    color: #64b5f6;
 }
 
 /* 校正モード時のツールバーボーダー（ダークモード） */
@@ -1795,10 +1791,6 @@ body.dark-mode .proofreading-item-checkbox input[type="checkbox"]:checked + .pro
 }
 
 /* 項目確認済み時の薄い色（ダークモード） */
-body.dark-mode .proofreading-item.checked .cal-page {
-    color: #5c99c9;
-}
-
 body.dark-mode .proofreading-item.checked .cal-excerpt {
     color: #666;
 }
@@ -1809,7 +1801,7 @@ body.dark-mode .proofreading-item.checked .cal-content {
 
 /* 項目確認済みテキスト（ダークモード） */
 body.dark-mode .proofreading-item.checked .cal-content::after {
-    color: #64b5f6;
+    color: #66bb6a;
 }
 
 body.dark-mode .proofreading-check-empty {
@@ -1834,12 +1826,7 @@ body.dark-mode .proofreading-tab-content::-webkit-scrollbar-thumb:hover {
    ===================================================== */
 
 .proofreading-item {
-    cursor: pointer;
     transition: background-color 0.15s ease;
-}
-
-.proofreading-item:hover {
-    background-color: rgba(255, 140, 0, 0.1);
 }
 
 .proofreading-item.selected {
@@ -1849,12 +1836,82 @@ body.dark-mode .proofreading-tab-content::-webkit-scrollbar-thumb:hover {
 }
 
 /* ダークモード対応 */
-body.dark-mode .proofreading-item:hover {
-    background-color: rgba(255, 140, 0, 0.15);
-}
-
 body.dark-mode .proofreading-item.selected {
     background-color: rgba(255, 140, 0, 0.3);
+}
+
+/* テキスト入力ボタン列 */
+.proofreading-table .cal-text-btn {
+    width: 28px;
+    padding: 4px;
+    text-align: center;
+    vertical-align: middle;
+    cursor: pointer;
+    position: relative;
+}
+
+/* テキストボタンの右側の区切り線（上下に余白あり） */
+.proofreading-table .cal-text-btn::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 1px;
+    background-color: #ddd;
+}
+
+body.dark-mode .proofreading-table .cal-text-btn::after {
+    background-color: #444;
+}
+
+.proofreading-table .cal-text-btn:hover {
+    background-color: rgba(255, 140, 0, 0.2);
+}
+
+.proofreading-table .cal-text-btn:active {
+    background-color: rgba(255, 140, 0, 0.4);
+}
+
+.cal-text-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    color: #666;
+    transition: color 0.15s ease, transform 0.1s ease;
+    user-select: none;
+}
+
+.cal-text-icon svg {
+    display: block;
+}
+
+.proofreading-table .cal-text-btn:hover .cal-text-icon {
+    color: #ff8c00;
+    transform: scale(1.1);
+}
+
+/* 選択中の行のテキストアイコン */
+.proofreading-item.selected .cal-text-icon {
+    color: #ff8c00;
+}
+
+/* ダークモード対応 */
+body.dark-mode .cal-text-icon {
+    color: #999;
+}
+
+body.dark-mode .proofreading-table .cal-text-btn:hover {
+    background-color: rgba(255, 140, 0, 0.25);
+}
+
+body.dark-mode .proofreading-table .cal-text-btn:hover .cal-text-icon {
+    color: #ffab40;
+}
+
+body.dark-mode .proofreading-item.selected .cal-text-icon {
+    color: #ffab40;
 }
 
 /* =====================================================

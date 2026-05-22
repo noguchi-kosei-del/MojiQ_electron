@@ -17,6 +17,9 @@ window.MojiQZoom = (function() {
         zoomShortcutHandler: null
     };
 
+    // overscroll margin 再計算用 ResizeObserver（cleanup用）
+    let canvasResizeObserver = null;
+
     /**
      * 初期化
      * @param {object} elements - DOM要素
@@ -32,6 +35,60 @@ window.MojiQZoom = (function() {
 
         setupEventListeners();
         setupShortcutListeners();
+        setupResizeObserver();
+    }
+
+    /**
+     * .shared-canvas-area のサイズ変化（ウィンドウリサイズ等）に追従して
+     * overscroll margin を再計算する。
+     */
+    function setupResizeObserver() {
+        if (!canvasArea || typeof ResizeObserver === 'undefined') return;
+        try {
+            canvasResizeObserver = new ResizeObserver(() => {
+                applyOverscrollMargin();
+            });
+            canvasResizeObserver.observe(canvasArea);
+        } catch (e) {
+            // ResizeObserver 非対応環境では window resize でフォールバック
+            canvasResizeObserver = null;
+        }
+    }
+
+    /**
+     * ズーム時に画像/PDF がビューポートを溢れた場合、canvas-wrapper に
+     * 動的なマージン（overscroll margin）を付与してスクロール可動範囲を
+     * 拡張する。PsDesign の applyOverscrollMargin() と同じ思想。
+     * @returns {{padX: number, padY: number}}
+     */
+    function applyOverscrollMargin() {
+        if (!canvasWrapper || !canvasArea || !state) {
+            return { padX: 0, padY: 0 };
+        }
+
+        const fraction = window.MojiQConstants?.ZOOM?.OVERSCROLL_FRACTION ?? 0.85;
+
+        const baseW = state.baseCSSExtent?.width || 0;
+        const baseH = state.baseCSSExtent?.height || 0;
+        const visualW = baseW * state.currentZoom;
+        const visualH = baseH * state.currentZoom;
+
+        // .shared-canvas-area のクライアント領域（既存 padding 20px 込み）
+        const availW = canvasArea.clientWidth;
+        const availH = canvasArea.clientHeight;
+
+        const overflowsX = visualW > availW;
+        const overflowsY = visualH > availH;
+        const padX = overflowsX ? Math.round(availW * fraction) : 0;
+        const padY = overflowsY ? Math.round(availH * fraction) : 0;
+
+        if (padX > 0 || padY > 0) {
+            canvasWrapper.style.margin = `${padY}px ${padX}px`;
+        } else {
+            canvasWrapper.style.margin = '';
+        }
+
+        return { padX, padY };
     }
 
     /**
@@ -55,6 +112,9 @@ window.MojiQZoom = (function() {
             canvasWrapper.style.width = w;
             canvasWrapper.style.height = h;
         }
+
+        // ズーム後の視覚サイズに合わせて overscroll マージンを再計算
+        applyOverscrollMargin();
     }
 
     /**
@@ -76,12 +136,20 @@ window.MojiQZoom = (function() {
         const scrollLeft = canvasArea.scrollLeft;
         const scrollTop = canvasArea.scrollTop;
 
+        // overscroll margin の付与/剥離でビューポート中心が画像内のずれた点を
+        // 指さないよう、ズーム前後のマージン値を比較して補正する
+        const prevPadX = parseFloat(canvasWrapper.style.marginLeft) || 0;
+        const prevPadY = parseFloat(canvasWrapper.style.marginTop) || 0;
+
         state.currentZoom = nextZoom;
         updateZoomDisplay();
 
+        const newPadX = parseFloat(canvasWrapper.style.marginLeft) || 0;
+        const newPadY = parseFloat(canvasWrapper.style.marginTop) || 0;
+
         const ratio = state.currentZoom / oldZoom;
-        canvasArea.scrollLeft = (scrollLeft + offsetX) * ratio - offsetX;
-        canvasArea.scrollTop = (scrollTop + offsetY) * ratio - offsetY;
+        canvasArea.scrollLeft = (scrollLeft + offsetX - prevPadX) * ratio - offsetX + newPadX;
+        canvasArea.scrollTop = (scrollTop + offsetY - prevPadY) * ratio - offsetY + newPadY;
     }
 
     /**
@@ -105,12 +173,19 @@ window.MojiQZoom = (function() {
         const scrollLeft = canvasArea.scrollLeft;
         const scrollTop = canvasArea.scrollTop;
 
+        // overscroll margin の付与/剥離をスクロール位置に反映するための補正値
+        const prevPadX = parseFloat(canvasWrapper.style.marginLeft) || 0;
+        const prevPadY = parseFloat(canvasWrapper.style.marginTop) || 0;
+
         state.currentZoom = nextZoom;
         updateZoomDisplay();
 
+        const newPadX = parseFloat(canvasWrapper.style.marginLeft) || 0;
+        const newPadY = parseFloat(canvasWrapper.style.marginTop) || 0;
+
         const ratio = state.currentZoom / oldZoom;
-        canvasArea.scrollLeft = (scrollLeft + offsetX) * ratio - offsetX;
-        canvasArea.scrollTop = (scrollTop + offsetY) * ratio - offsetY;
+        canvasArea.scrollLeft = (scrollLeft + offsetX - prevPadX) * ratio - offsetX + newPadX;
+        canvasArea.scrollTop = (scrollTop + offsetY - prevPadY) * ratio - offsetY + newPadY;
     }
 
     /**
@@ -196,6 +271,11 @@ window.MojiQZoom = (function() {
         document.removeEventListener('gesturestart', boundHandlers.gestureHandler);
         document.removeEventListener('gesturechange', boundHandlers.gestureHandler);
         document.removeEventListener('gestureend', boundHandlers.gestureHandler);
+
+        if (canvasResizeObserver) {
+            canvasResizeObserver.disconnect();
+            canvasResizeObserver = null;
+        }
 
         // 参照をクリア
         for (const key in boundHandlers) {

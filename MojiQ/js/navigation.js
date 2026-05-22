@@ -204,6 +204,8 @@ window.MojiQNavigation = (function() {
             sliderBubble.classList.remove('dragging');
             updateSliderBubblePosition(pageSlider.value);
             sliderBubble.classList.add('visible');
+            // フォーカスを外す（方向キーでの誤操作防止）
+            pageSlider.blur();
         }
     }
 
@@ -249,6 +251,9 @@ window.MojiQNavigation = (function() {
      * @param {number} targetValue - スライダーの値（ページ番号または見開きインデックス）
      */
     async function navigateToPage(targetValue) {
+        // モーダル表示中はページ移動をブロック
+        if (window.MojiQUtils && MojiQUtils.isModalOpen()) return;
+
         const PdfManager = window.MojiQPdfManager;
         if (PdfManager && PdfManager.isSpreadViewMode()) {
             // 見開きモード時はスプレッドインデックスとして扱う
@@ -276,11 +281,23 @@ window.MojiQNavigation = (function() {
 
         // キャンバスエリア上でのホイールスクロールでページ移動
         boundHandlers.canvasAreaWheel = async (e) => {
+            // モーダル表示中はページ移動をブロック
+            if (window.MojiQUtils && MojiQUtils.isModalOpen()) return;
+
             // PDFまたは画像が読み込まれていない場合は何もしない
             if (state.pdfDocs.length === 0) return;
 
             // ビューワーモード中はviewer-mode.jsで処理するため無視
             if (window.MojiQViewerMode && window.MojiQViewerMode.isActive()) return;
+
+            // シミュレーターでグリッド調整中は無視（グリッドのサイズ変更をSimulatorEventHandlersで処理するため）
+            if (window.SimulatorState) {
+                const simMode = window.SimulatorState.get('currentMode');
+                const isAdjusting = window.SimulatorState.get('isGridAdjusting');
+                if ((simMode === 'grid' || simMode === 'sampleGrid') && isAdjusting) {
+                    return;
+                }
+            }
 
             // Alt+ホイール、Ctrl/Cmd+ホイールはズーム処理のため無視
             if (e.altKey || e.ctrlKey || e.metaKey) return;
@@ -400,6 +417,8 @@ window.MojiQNavigation = (function() {
         // ページめくりボタン (右開き仕様)
         // 左(◀ Prev)ボタンを押すと「次へ進む (+1)」
         boundHandlers.prevBtnClick = async () => {
+            // モーダル表示中はページ移動をブロック
+            if (window.MojiQUtils && MojiQUtils.isModalOpen()) return;
             const PdfManager = window.MojiQPdfManager;
             if (PdfManager && PdfManager.isSpreadViewMode()) {
                 // 見開きモード時
@@ -413,6 +432,8 @@ window.MojiQNavigation = (function() {
         };
         // 右(▶ Next)ボタンを押すと「前へ戻る (-1)」
         boundHandlers.nextBtnClick = async () => {
+            // モーダル表示中はページ移動をブロック
+            if (window.MojiQUtils && MojiQUtils.isModalOpen()) return;
             const PdfManager = window.MojiQPdfManager;
             if (PdfManager && PdfManager.isSpreadViewMode()) {
                 // 見開きモード時
@@ -431,6 +452,9 @@ window.MojiQNavigation = (function() {
         boundHandlers.navBarWheel = async (e) => {
             e.preventDefault();
             e.stopPropagation();
+
+            // モーダル表示中はページ移動をブロック
+            if (window.MojiQUtils && MojiQUtils.isModalOpen()) return;
 
             if (state.pdfDocs.length === 0) return;
 

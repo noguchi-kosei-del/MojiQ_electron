@@ -172,6 +172,14 @@
     color: #c62828;
 }
 
+/* 無効状態（テキストオブジェクトがない場合） */
+.sidebar-bottom-btn:disabled,
+.sidebar-bottom-btn.no-annotation-text {
+    color: #ccc;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 /* サイドバー折り畳み時は非表示 */
 .sidebar.collapsed .sidebar-bottom-actions {
     display: none;
@@ -695,5 +703,23 @@ input[type="range"]#pageSlider::-webkit-slider-thumb {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* グレーアウト状態（横長画像時） */
+.spread-binding-dropdown .page-edit-dropdown-item:disabled,
+.spread-binding-dropdown .page-edit-dropdown-item.disabled {
+    color: #aaa;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.spread-binding-dropdown .page-edit-dropdown-item:disabled .dropdown-icon svg,
+.spread-binding-dropdown .page-edit-dropdown-item.disabled .dropdown-icon svg {
+    stroke: #aaa;
+}
+
+.spread-binding-dropdown .page-edit-dropdown-item:disabled .binding-check,
+.spread-binding-dropdown .page-edit-dropdown-item.disabled .binding-check {
+    display: none;
 }
 

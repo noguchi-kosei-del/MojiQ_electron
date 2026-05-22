@@ -45,6 +45,7 @@ window.MojiQHistoryPanel = (function() {
         'kaigyouStamp': '改行スタンプ',
         'doneStamp': '済スタンプ',
         'rubyStamp': 'ルビスタンプ',
+        'questionStamp': '？スタンプ',
         'rectSymbol': '□記号',
         'triangleSymbol': '△記号',
         'fontLabel': '文字サイズ指定',

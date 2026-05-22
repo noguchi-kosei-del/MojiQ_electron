@@ -135,6 +135,13 @@ window.MojiQPdfAnnotationLoader = (function() {
 
         const rect = annot.rect;  // [x1, y1, x2, y2]
 
+        // rectの検証（不正なPDFデータ対策）
+        if (!Array.isArray(rect) || rect.length < 4 ||
+            !Number.isFinite(rect[0]) || !Number.isFinite(rect[3])) {
+            console.warn('[MojiQ] 不正な注釈rect、スキップ:', rect);
+            return null;
+        }
+
         // 注釈の左上位置をMojiQ座標に変換
         const pos = pdfToMojiQCoordinates(rect[0], rect[3], pdfHeight, scaleX, scaleY);
 
@@ -177,6 +184,12 @@ window.MojiQPdfAnnotationLoader = (function() {
         const annotations = await page.getAnnotations();
         const viewport = page.getViewport({ scale: 1 });
 
+        // ゼロ除算防止
+        if (!viewport.width || !viewport.height || viewport.width <= 0 || viewport.height <= 0) {
+            console.warn('[MojiQ] 無効なviewportサイズ、注釈スキップ:', viewport.width, viewport.height);
+            return [];
+        }
+
         const scaleX = displayWidth / viewport.width;
         const scaleY = displayHeight / viewport.height;
 
@@ -200,6 +213,80 @@ window.MojiQPdfAnnotationLoader = (function() {
     }
 
     /**
+     * 注釈が確認済みリストに含まれるかチェック
+     * @param {Object} obj - MojiQテキストオブジェクト
+     * @param {number} pageNum - ページ番号
+     * @param {Array} checkedComments - 確認済みコメントリスト
+     * @returns {boolean} 確認済みの場合true
+     */
+    function isCheckedAnnotation(obj, pageNum, checkedComments) {
+        for (const checked of checkedComments) {
+            if (checked.pdfPage !== pageNum) continue;
+            // テキスト内容が一致
+            if (obj.text === checked.contents) {
+                return true;
+            }
+            // 座標で判定（テキストが編集されている可能性を考慮）
+            if (checked.canvasRect && obj.startPos) {
+                const dx = Math.abs(obj.startPos.x - checked.canvasRect.x);
+                const dy = Math.abs(obj.startPos.y - checked.canvasRect.y);
+                if (dx < 30 && dy < 30) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 注釈がMojiQで既に処理済み（ラスタライズ済み）かチェック
+     * MojiQTextsメタデータに含まれている注釈はスキップすべき
+     *
+     * ※ 同じ「内容」かつ同じ「位置」の両方が揃ったときだけ「再投入」とみなしてスキップする。
+     *   どちらか片方（=OR）で判定すると、Acrobatで新規追加した注釈が過去の
+     *   MojiQテキストと内容（例: 「修正」「OK」「!?」など短くてよく出るフレーズ）が
+     *   一致した瞬間に位置に関係なく除外されてしまう、または逆に内容無関係で
+     *   30px以内にたまたま入っただけで除外されてしまうため不適切。
+     *
+     * @param {Object} obj - MojiQテキストオブジェクト
+     * @param {number} pageNum - ページ番号
+     * @param {Array} mojiQTexts - MojiQテキストリスト（メタデータから読み込み）
+     * @param {number} displayWidth - 現在の表示幅
+     * @param {number} displayHeight - 現在の表示高さ
+     * @returns {boolean} 既に処理済みの場合true
+     */
+    function isMojiQProcessedAnnotation(obj, pageNum, mojiQTexts, displayWidth, displayHeight) {
+        if (!mojiQTexts || mojiQTexts.length === 0) return false;
+        if (!obj || !obj.startPos) return false;
+
+        const POS_TOLERANCE_PX = 30;
+
+        for (const mojiQ of mojiQTexts) {
+            if (mojiQ.pdfPage !== pageNum) continue;
+
+            // 内容と位置の「両方」が一致するときだけスキップ
+            const contentsMatch = obj.text === mojiQ.contents;
+            if (!contentsMatch) continue;
+            if (!mojiQ.canvasRect) continue;
+
+            // 保存時の座標を現在の表示サイズに変換
+            const savedWidth = mojiQ.displayWidth || displayWidth;
+            const savedHeight = mojiQ.displayHeight || displayHeight;
+            const scaleX = savedWidth > 0 ? (displayWidth / savedWidth) : 1;
+            const scaleY = savedHeight > 0 ? (displayHeight / savedHeight) : 1;
+            const scaledX = mojiQ.canvasRect.x * scaleX;
+            const scaledY = mojiQ.canvasRect.y * scaleY;
+
+            const dx = Math.abs(obj.startPos.x - scaledX);
+            const dy = Math.abs(obj.startPos.y - scaledY);
+            if (dx < POS_TOLERANCE_PX && dy < POS_TOLERANCE_PX) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * 全ページのPDF注釈を読み込んでMojiQオブジェクトとして追加
      * @param {PDFDocumentProxy} pdf - PDFドキュメント
      * @param {number} containerWidth - コンテナ幅
@@ -212,6 +299,18 @@ window.MojiQPdfAnnotationLoader = (function() {
 
         // pageMappingから表示サイズを取得するための参照
         const PdfManager = window.MojiQPdfManager;
+
+        // 確認済みコメント情報を取得（済スタンプ付きコメントはスキップ）
+        let checkedComments = null;
+        if (PdfManager && PdfManager.getLoadedCheckedComments) {
+            checkedComments = PdfManager.getLoadedCheckedComments();
+        }
+
+        // MojiQテキスト情報を取得（既にラスタライズ済みの注釈はスキップ）
+        let mojiQTexts = null;
+        if (PdfManager && PdfManager.getLoadedMojiQTexts) {
+            mojiQTexts = PdfManager.getLoadedMojiQTexts();
+        }
 
         let totalAnnotations = 0;
 
@@ -239,6 +338,15 @@ window.MojiQPdfAnnotationLoader = (function() {
                 const objects = await extractPdfAnnotations(page, displayWidth, displayHeight);
 
                 for (const obj of objects) {
+                    // 確認済みコメントに該当する場合はスキップ（ラスタライズ済みのため）
+                    if (checkedComments && isCheckedAnnotation(obj, pageNum, checkedComments)) {
+                        continue;
+                    }
+                    // MojiQで既に処理済みの注釈はスキップ（ラスタライズ済みのため）
+                    // ただし、Acrobatで新しく追加された注釈はオブジェクト化する
+                    if (mojiQTexts && isMojiQProcessedAnnotation(obj, pageNum, mojiQTexts, displayWidth, displayHeight)) {
+                        continue;
+                    }
                     window.MojiQDrawingObjects.addObject(pageNum, obj);
                 }
 
@@ -248,6 +356,11 @@ window.MojiQPdfAnnotationLoader = (function() {
             } catch (e) {
                 console.warn('[MojiQ PdfAnnotationLoader] ページ ' + pageNum + ' の注釈読み込みに失敗:', e);
             }
+        }
+
+        // コメントテキスト非表示ボタンの有効/無効状態を更新
+        if (window.MojiQTextLayerManager && window.MojiQTextLayerManager.updateButtonAvailability) {
+            window.MojiQTextLayerManager.updateButtonAvailability();
         }
     }
 

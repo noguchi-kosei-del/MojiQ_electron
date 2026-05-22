@@ -9,6 +9,27 @@ window.MojiQDrawingSelect = (function() {
     let DrawingObjects = null;
     let DrawingRenderer = null;
 
+    // バリデータへの参照（遅延取得）
+    const getValidators = () => window.MojiQValidators || window.MojiQ?.Validators;
+
+    /**
+     * 有効な位置オブジェクトかどうかを検証（共通ヘルパー）
+     * @param {*} pos - 検証するオブジェクト
+     * @returns {boolean}
+     */
+    function isValidPosition(pos) {
+        const V = getValidators();
+        if (V) return V.isValidPosition(pos);
+        // フォールバック（Validatorsが未ロードの場合）
+        return pos !== null &&
+               pos !== undefined &&
+               typeof pos === 'object' &&
+               typeof pos.x === 'number' &&
+               typeof pos.y === 'number' &&
+               Number.isFinite(pos.x) &&
+               Number.isFinite(pos.y);
+    }
+
     // 状態変数
     let state = {
         isSelecting: false,
@@ -511,7 +532,7 @@ window.MojiQDrawingSelect = (function() {
             const isSpreadMode = PdfManager && PdfManager.isSpreadViewMode();
             const startPos = (isSpreadMode && state.dragStartPosCanvas) ? state.dragStartPosCanvas : state.dragStartPos;
             // 座標の有効性チェック
-            if (!startPos || typeof startPos.x !== 'number' || typeof startPos.y !== 'number') {
+            if (!isValidPosition(startPos)) {
                 return false;
             }
             const dx = pos.x - startPos.x;
@@ -532,7 +553,7 @@ window.MojiQDrawingSelect = (function() {
             const isSpreadMode = PdfManager && PdfManager.isSpreadViewMode();
             const startPos = (isSpreadMode && state.dragStartPosCanvas) ? state.dragStartPosCanvas : state.dragStartPos;
             // 座標の有効性チェック
-            if (!startPos || typeof startPos.x !== 'number' || typeof startPos.y !== 'number') {
+            if (!isValidPosition(startPos)) {
                 return false;
             }
             const dx = pos.x - startPos.x;
@@ -552,7 +573,7 @@ window.MojiQDrawingSelect = (function() {
             const PdfManager = window.MojiQPdfManager;
             const isSpreadMode = PdfManager && PdfManager.isSpreadViewMode();
             const startPos = (isSpreadMode && state.dragStartPosCanvas) ? state.dragStartPosCanvas : state.dragStartPos;
-            if (!startPos || typeof startPos.x !== 'number' || typeof startPos.y !== 'number') {
+            if (!isValidPosition(startPos)) {
                 return false;
             }
             const dx = pos.x - startPos.x;
@@ -572,7 +593,7 @@ window.MojiQDrawingSelect = (function() {
             const PdfManager = window.MojiQPdfManager;
             const isSpreadMode = PdfManager && PdfManager.isSpreadViewMode();
             const startPos = (isSpreadMode && state.dragStartPosCanvas) ? state.dragStartPosCanvas : state.dragStartPos;
-            if (!startPos || typeof startPos.x !== 'number' || typeof startPos.y !== 'number') {
+            if (!isValidPosition(startPos)) {
                 return false;
             }
             const dx = pos.x - startPos.x;
@@ -592,7 +613,7 @@ window.MojiQDrawingSelect = (function() {
             const PdfManager = window.MojiQPdfManager;
             const isSpreadMode = PdfManager && PdfManager.isSpreadViewMode();
             const startPos = (isSpreadMode && state.dragStartPosCanvas) ? state.dragStartPosCanvas : state.dragStartPos;
-            if (!startPos || typeof startPos.x !== 'number' || typeof startPos.y !== 'number') {
+            if (!isValidPosition(startPos)) {
                 return false;
             }
             const dx = pos.x - startPos.x;
@@ -639,7 +660,7 @@ window.MojiQDrawingSelect = (function() {
             const PdfManager = window.MojiQPdfManager;
             const isSpreadMode = PdfManager && PdfManager.isSpreadViewMode();
             const startPos = (isSpreadMode && state.dragStartPosCanvas) ? state.dragStartPosCanvas : state.dragStartPos;
-            if (!startPos || typeof startPos.x !== 'number' || typeof startPos.y !== 'number') {
+            if (!isValidPosition(startPos)) {
                 return false;
             }
             const dx = pos.x - startPos.x;
@@ -705,6 +726,8 @@ window.MojiQDrawingSelect = (function() {
 
                 for (let i = 0; i < objects.length; i++) {
                     const obj = objects[i];
+                    // コメントタブから配置された済スタンプは選択不可
+                    if (obj.type === 'doneStamp' && obj.commentIndex !== undefined) continue;
                     const bounds = DrawingRenderer.getBounds(obj);
 
                     // バウンディングボックスがマーキー矩形と交差するかチェック
@@ -862,7 +885,7 @@ window.MojiQDrawingSelect = (function() {
             const PdfManager = window.MojiQPdfManager;
             const isSpreadMode = PdfManager && PdfManager.isSpreadViewMode();
             const startPos = (isSpreadMode && state.dragStartPosCanvas) ? state.dragStartPosCanvas : state.dragStartPos;
-            if (!startPos || typeof startPos.x !== 'number' || typeof startPos.y !== 'number') {
+            if (!isValidPosition(startPos)) {
                 resetState();
                 return false;
             }
@@ -1821,6 +1844,15 @@ window.MojiQDrawingSelect = (function() {
                 obj.size = (orig.size || 28) * Math.min(scaleX, scaleY);
                 break;
 
+            case 'questionStamp':
+                // ？スタンプは中心位置とサイズでリサイズ
+                obj.startPos = {
+                    x: newX + (orig.startPos.x - origBounds.x) * scaleX,
+                    y: newY + (orig.startPos.y - origBounds.y) * scaleY
+                };
+                obj.size = (orig.size || 16) * Math.min(scaleX, scaleY);
+                break;
+
             case 'rubyStamp':
                 // ルビスタンプは中心位置とサイズでリサイズ
                 obj.startPos = {
@@ -2371,11 +2403,14 @@ window.MojiQDrawingSelect = (function() {
         handleAnnotationWheelResize: handleAnnotationWheelResize,
         endAnnotationFontResize: endAnnotationFontResize,
         // クリップボード操作はMojiQDrawingClipboardに委譲
+        copySelected: function() {
+            return window.MojiQDrawingClipboard ? window.MojiQDrawingClipboard.copySelected() : false;
+        },
         cutSelected: function() {
             return window.MojiQDrawingClipboard ? window.MojiQDrawingClipboard.cutSelected() : false;
         },
-        pasteFromClipboard: function() {
-            return window.MojiQDrawingClipboard ? window.MojiQDrawingClipboard.pasteFromClipboard() : false;
+        pasteFromClipboard: function(options) {
+            return window.MojiQDrawingClipboard ? window.MojiQDrawingClipboard.pasteFromClipboard(options) : false;
         },
         hasClipboard: function() {
             return window.MojiQDrawingClipboard ? window.MojiQDrawingClipboard.hasClipboard() : false;

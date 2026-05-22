@@ -172,10 +172,8 @@ window.MojiQPageManager = (function() {
         } finally {
             // タイムアウトタイマーを確実にクリア
             if (timeoutId) clearTimeout(timeoutId);
-            // 現在の操作が最新の場合のみフラグをリセット（競合防止）
-            if (currentOperationId === undoRedoOperationId) {
-                isUndoRedoInProgress = false;
-            }
+            // フラグを無条件にリセット（デッドロック防止）
+            isUndoRedoInProgress = false;
         }
         updatePageControls();
     }
@@ -275,10 +273,8 @@ window.MojiQPageManager = (function() {
         } finally {
             // タイムアウトタイマーを確実にクリア
             if (timeoutId) clearTimeout(timeoutId);
-            // 現在の操作が最新の場合のみフラグをリセット（競合防止）
-            if (currentOperationId === undoRedoOperationId) {
-                isUndoRedoInProgress = false;
-            }
+            // フラグを無条件にリセット（デッドロック防止）
+            isUndoRedoInProgress = false;
         }
 
         updatePageControls();
@@ -651,6 +647,14 @@ window.MojiQPageManager = (function() {
             }
         });
 
+        // コピー (Ctrl+C)
+        addWindowListener('mojiq:copy', (e) => {
+            const DrawingSelect = window.MojiQDrawingSelect;
+            if (DrawingSelect && DrawingSelect.hasSelection()) {
+                DrawingSelect.copySelected();
+            }
+        });
+
         // カット (Ctrl+X)
         addWindowListener('mojiq:cut', (e) => {
             const DrawingSelect = window.MojiQDrawingSelect;
@@ -659,11 +663,12 @@ window.MojiQPageManager = (function() {
             }
         });
 
-        // ペースト (Ctrl+V)
+        // ペースト (Ctrl+V / Ctrl+Shift+V)
         addWindowListener('mojiq:paste', (e) => {
             const DrawingSelect = window.MojiQDrawingSelect;
             if (DrawingSelect && DrawingSelect.hasClipboard()) {
-                DrawingSelect.pasteFromClipboard();
+                const inPlace = e.detail && e.detail.inPlace;
+                DrawingSelect.pasteFromClipboard(inPlace ? { inPlace: true } : undefined);
             }
         });
 

@@ -17,6 +17,7 @@ let splashWindow;
 let forceQuit = false;
 let filesToOpen = []; // 起動時に開くファイルのパス（複数対応）
 let initialPageNumber = null; // 起動時に開くページ番号（検版ビューワー連携用）
+let pendingCalibrationJson = null; // ProGen連携: 起動時に受け取った校正データJSONファイルパス
 
 // シングルインスタンスロック（複数起動を防止し、second-instanceイベントを有効にする）
 const gotTheLock = app.requestSingleInstanceLock();
@@ -252,19 +253,25 @@ async function checkForUpdates() {
   if (latestInstaller) {
     console.log('[MojiQ] 新バージョンが見つかりました:', latestVersion, latestInstaller);
     const installerPath = path.join(UPDATE_FOLDER, latestInstaller);
+    pendingUpdate = { currentVersion, latestVersion, installerPath };
+    trySendUpdate();
+  } else {
+    console.log('[MojiQ] 更新はありません（最新バージョンです）');
+  }
+}
 
-    const result = await dialog.showMessageBox({
-      type: 'info',
-      title: 'アップデートのお知らせ',
-      message: '新しいバージョンが見つかりました',
-      detail: `現在のバージョン: v${currentVersion}\n最新バージョン: v${latestVersion}\n\nアップデートを開始しますか？`,
-      buttons: ['今すぐ更新', '後で'],
-      defaultId: 0,
-      cancelId: 1
-    });
-
-    if (result.response === 0) {
-      // インストーラーを起動してアプリ終了
+// 更新通知をレンダラーのカスタムモーダルに送る
+// メインウィンドウが表示されるまで保留する
+let pendingUpdate = null;
+function trySendUpdate() {
+  if (!pendingUpdate) return;
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (!mainWindow.isVisible()) return; // show()まで待つ
+  const { currentVersion, latestVersion, installerPath } = pendingUpdate;
+  pendingUpdate = null;
+  ipcMain.removeAllListeners('update-action');
+  ipcMain.once('update-action', (event, action) => {
+    if (action === 'update') {
       const child = spawn(installerPath, [], {
         detached: true,
         stdio: 'ignore'
@@ -272,9 +279,8 @@ async function checkForUpdates() {
       child.unref();
       app.quit();
     }
-  } else {
-    console.log('[MojiQ] 更新はありません（最新バージョンです）');
-  }
+  });
+  mainWindow.webContents.send('show-update-available', { currentVersion, latestVersion });
 }
 
 // スプラッシュウィンドウを作成
@@ -509,6 +515,12 @@ ipcMain.handle('read-file', async (event, filePath) => {
     if (!isPathSafe(filePath)) {
       return { success: false, error: '不正なファイルパスです' };
     }
+    // ファイルサイズチェック（OOM防止: IPC経由のBase64変換は100MBまで）
+    const stats = await fs.promises.stat(filePath);
+    const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+    if (stats.size > MAX_FILE_SIZE) {
+      return { success: false, error: `ファイルサイズが大きすぎます（${Math.round(stats.size / 1024 / 1024)}MB）。100MB以下のファイルを選択してください。` };
+    }
     const data = await fs.promises.readFile(filePath);
     // JSONファイルの場合はテキストとして返す
     if (filePath.toLowerCase().endsWith('.json')) {
@@ -524,15 +536,47 @@ ipcMain.handle('read-file', async (event, filePath) => {
 // ファイル保存（アトミック書き込み: 一時ファイルに書いてからリネーム）
 // QA対策 #10: 読み取り専用ファイル判定
 // BUG修正: 同期ファイル操作を非同期に変更（メインプロセスブロック防止）
+// BUG修正: Windowsでのファイルロック検出を改善
 ipcMain.handle('save-file', async (event, filePath, base64Data) => {
   if (!isPathSafe(filePath)) {
     return { success: false, error: '不正なファイルパスです', errorCode: 'INVALID_PATH' };
   }
 
+  // ファイルが読み取り専用属性かどうかをチェック（Windows）
+  const isFileReadOnly = async (fPath) => {
+    try {
+      const stats = await fs.promises.stat(fPath);
+      // Windowsでは読み取り専用ファイルのmodeは0o444（読み取り専用）
+      // 書き込み権限ビットがない場合は読み取り専用
+      return (stats.mode & 0o200) === 0;
+    } catch (e) {
+      return false; // ファイルが存在しない場合は読み取り専用ではない
+    }
+  };
+
+  // ファイルが他のプロセスでロックされているかチェック（Windows対策）
+  const isFileLocked = async (fPath) => {
+    try {
+      await fs.promises.access(fPath, fs.constants.F_OK);
+      // ファイルを追記モードで開いてすぐ閉じる（ロック検出）
+      const fd = await fs.promises.open(fPath, 'r+');
+      await fd.close();
+      return false; // ロックされていない
+    } catch (e) {
+      if (e.code === 'ENOENT') return false; // ファイルが存在しない
+      if (e.code === 'EBUSY' || e.code === 'EACCES' || e.code === 'EPERM') {
+        return true; // ロックされている可能性
+      }
+      return false;
+    }
+  };
+
   // 書き込み権限チェック（QA対策 #10）
+  let fileExists = false;
   try {
     try {
       await fs.promises.access(filePath, fs.constants.F_OK);
+      fileExists = true;
       // ファイルが存在する場合、書き込み権限をチェック
       await fs.promises.access(filePath, fs.constants.W_OK);
     } catch (e) {
@@ -543,10 +587,28 @@ ipcMain.handle('save-file', async (event, filePath, base64Data) => {
     await fs.promises.access(dirPath, fs.constants.W_OK);
   } catch (accessError) {
     if (accessError.code === 'EACCES' || accessError.code === 'EPERM') {
+      // ファイルが存在する場合、ロックか読み取り専用かを判別
+      if (fileExists) {
+        const readOnly = await isFileReadOnly(filePath);
+        if (readOnly) {
+          return {
+            success: false,
+            error: 'ファイルが読み取り専用です。ファイルのプロパティを確認するか、別の場所に保存してください。',
+            errorCode: 'READONLY'
+          };
+        }
+        // 読み取り専用属性がないのにアクセスできない場合はロックの可能性
+        return {
+          success: false,
+          error: 'ファイルが他のアプリケーションで開かれています。PDFビューア等を閉じてから再度保存してください。',
+          errorCode: 'FILE_LOCKED'
+        };
+      }
+      // ディレクトリへの書き込み権限がない
       return {
         success: false,
-        error: 'ファイルが読み取り専用です。別の場所に保存してください。',
-        errorCode: 'READONLY'
+        error: '保存先フォルダへの書き込み権限がありません。別の場所に保存してください。',
+        errorCode: 'NO_WRITE_PERMISSION'
       };
     }
     if (accessError.code === 'ENOENT') {
@@ -554,6 +616,18 @@ ipcMain.handle('save-file', async (event, filePath, base64Data) => {
         success: false,
         error: '保存先のフォルダが存在しません。',
         errorCode: 'NO_DIRECTORY'
+      };
+    }
+  }
+
+  // 既存ファイルがロックされているかの追加チェック（Windows対策）
+  if (fileExists) {
+    const locked = await isFileLocked(filePath);
+    if (locked) {
+      return {
+        success: false,
+        error: 'ファイルが他のアプリケーションで開かれています。PDFビューア等を閉じてから再度保存してください。',
+        errorCode: 'FILE_LOCKED'
       };
     }
   }
@@ -581,15 +655,16 @@ ipcMain.handle('save-file', async (event, filePath, base64Data) => {
     switch (error.code) {
       case 'EACCES':
       case 'EPERM':
-        errorMessage = 'ファイルが読み取り専用です。別の場所に保存してください。';
-        errorCode = 'READONLY';
+        // リネーム時のエラーの場合、ファイルロックの可能性が高い
+        errorMessage = 'ファイルの保存に失敗しました。ファイルが他のアプリケーションで開かれている可能性があります。';
+        errorCode = 'FILE_LOCKED';
         break;
       case 'ENOSPC':
         errorMessage = 'ディスク容量が不足しています。';
         errorCode = 'NO_SPACE';
         break;
       case 'EBUSY':
-        errorMessage = 'ファイルが他のアプリケーションで使用中です。';
+        errorMessage = 'ファイルが他のアプリケーションで使用中です。PDFビューア等を閉じてから再度保存してください。';
         errorCode = 'FILE_BUSY';
         break;
     }
@@ -731,10 +806,26 @@ ipcMain.handle('print-pdf-direct', async (event, options) => {
     const { spawn } = require('child_process');
 
     return new Promise((resolve) => {
+      let resolved = false;
+      const safeResolve = (value) => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(processTimeout);
+          resolve(value);
+        }
+      };
+
       const proc = spawn(sumatraPath, args, {
         windowsHide: true,
         stdio: 'ignore'
       });
+
+      // 60秒タイムアウト（プロセスハング防止）
+      const processTimeout = setTimeout(() => {
+        console.warn('print-pdf-direct: プロセスタイムアウト（60秒）');
+        try { proc.kill(); } catch (e) { /* ignore */ }
+        safeResolve({ success: false, error: '印刷プロセスがタイムアウトしました' });
+      }, 60000);
 
       proc.on('close', (code) => {
         // 30秒後に一時ファイル削除（非同期）
@@ -748,15 +839,15 @@ ipcMain.handle('print-pdf-direct', async (event, options) => {
         }, 30000);
 
         if (code === 0 || code === null) {
-          resolve({ success: true });
+          safeResolve({ success: true });
         } else {
-          resolve({ success: false, error: `印刷プロセスがコード ${code} で終了しました` });
+          safeResolve({ success: false, error: `印刷プロセスがコード ${code} で終了しました` });
         }
       });
 
       proc.on('error', (err) => {
         console.error('print-pdf-direct spawn error:', err);
-        resolve({ success: false, error: err.message });
+        safeResolve({ success: false, error: err.message });
       });
     });
   } catch (error) {
@@ -791,10 +882,26 @@ ipcMain.handle('print-pdf-with-dialog', async (event, pdfBase64Data) => {
     const { spawn } = require('child_process');
 
     return new Promise((resolve) => {
+      let resolved = false;
+      const safeResolve = (value) => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(processTimeout);
+          resolve(value);
+        }
+      };
+
       const proc = spawn(sumatraPath, args, {
         windowsHide: false,  // ダイアログを表示するため
         stdio: 'ignore'
       });
+
+      // 5分タイムアウト（ダイアログ操作待ちのため長め）
+      const processTimeout = setTimeout(() => {
+        console.warn('print-pdf-with-dialog: プロセスタイムアウト（5分）');
+        try { proc.kill(); } catch (e) { /* ignore */ }
+        safeResolve({ success: false, error: '印刷プロセスがタイムアウトしました' });
+      }, 300000);
 
       proc.on('close', (code) => {
         // 60秒後に一時ファイル削除（非同期）
@@ -808,12 +915,12 @@ ipcMain.handle('print-pdf-with-dialog', async (event, pdfBase64Data) => {
         }, 60000);
 
         // SumatraPDFはダイアログ終了後にプロセスが終了する
-        resolve({ success: true });
+        safeResolve({ success: true });
       });
 
       proc.on('error', (err) => {
         console.error('print-pdf-with-dialog spawn error:', err);
-        resolve({ success: false, error: err.message });
+        safeResolve({ success: false, error: err.message });
       });
     });
   } catch (error) {
@@ -906,6 +1013,12 @@ ipcMain.handle('read-file-binary', async (event, filePath) => {
     // BUG-011修正: パストラバーサル対策 - パスの安全性チェック
     if (!isPathSafe(filePath)) {
       return { success: false, error: '不正なファイルパスです' };
+    }
+    // ファイルサイズチェック（OOM防止）
+    const stats = await fs.promises.stat(filePath);
+    const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB（バイナリはBase64変換なしのため大きめ）
+    if (stats.size > MAX_FILE_SIZE) {
+      return { success: false, error: `ファイルサイズが大きすぎます（${Math.round(stats.size / 1024 / 1024)}MB）。500MB以下のファイルを選択してください。` };
     }
     const data = await fs.promises.readFile(filePath);
     // BufferをUint8Arrayとして返す（IPCで直接転送可能）
@@ -1018,41 +1131,36 @@ ipcMain.handle('window-is-maximized', () => {
 });
 
 // レンダラーからの未保存確認応答を受け取る
-let isCloseDialogShowing = false;
+// 終了確認ダイアログはレンダラー側のカスタムモーダルで表示
 ipcMain.on('respond-unsaved-changes', async (event, hasChanges) => {
-  // 競合防止: ダイアログ表示中は無視
-  if (isCloseDialogShowing) return;
-
   if (hasChanges) {
-    isCloseDialogShowing = true;
-    try {
-      if (!mainWindow || mainWindow.isDestroyed()) return;
-      const result = await dialog.showMessageBox(mainWindow, {
-        type: 'question',
-        buttons: ['保存して終了する', '終了する', 'キャンセル'],
-        defaultId: 0,
-        cancelId: 2,
-        title: '終了確認',
-        message: '描画内容が保存されていません。保存しますか？'
-      });
-      if (!mainWindow || mainWindow.isDestroyed()) return;
-      if (result.response === 0) {
-        // 「保存する」が選択された場合、保存処理を実行してから終了
-        mainWindow.webContents.send('save-and-quit');
-      } else if (result.response === 1) {
-        // 「終了する」が選択された場合、保存せずに終了
-        forceQuit = true;
-        mainWindow.close();
-      }
-      // result.response === 2 は「キャンセル」なので何もしない
-    } finally {
-      isCloseDialogShowing = false;
+    // レンダラー側でカスタムモーダルを表示させる
+    // ユーザーの選択結果は 'close-action' チャネルで受け取る
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('show-close-confirm');
     }
   } else {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     forceQuit = true;
     mainWindow.close();
   }
+});
+
+// レンダラーからの終了アクション（カスタムモーダルの結果）
+ipcMain.on('close-action', (event, action) => {
+  if (action === 'save-and-quit') {
+    // 「保存して終了する」: レンダラーに保存を指示
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('save-and-quit');
+    }
+  } else if (action === 'quit-without-saving') {
+    // 「終了する」: 保存せずに終了
+    forceQuit = true;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.close();
+    }
+  }
+  // 'cancel' の場合は何もしない
 });
 
 // 保存完了後に終了
@@ -1075,25 +1183,51 @@ function isImageFile(filePath) {
 
 // コマンドライン引数からファイルパスとページ番号を取得（Windows用・複数ファイル対応）
 // 検版ビューワー連携: --page オプションで初期ページ番号を指定可能
+// ProGen連携: --calibration-json <path> で校正データJSONファイルパスを受け取り
+// 注: second-instance commandLine では args[0] が exe パスでない場合があるため
+//     i=0 から走査する。exe パスは isSupportedFile で .pdf/.jpg/.jpeg のみ通すため
+//     誤検出されない。
 function getFilesFromArgs(args) {
   const files = [];
   let pageNum = null;
   let hasPageFlag = false;
+  let calibrationJson = null;
 
-  // 最初の引数はアプリ自体のパス、2番目以降がファイルパス
-  for (let i = 1; i < args.length; i++) {
+  for (let i = 0; i < args.length; i++) {
     const arg = args[i];
+    if (typeof arg !== 'string') continue;
+
+    // --calibration-json <path>
+    // 次の引数を取るが、second-instance では Electron/Chromium が我々のフラグ直後に
+    // --allow-file-access-from-files 等の内部フラグを注入することがあるため、
+    // `--` で始まる引数はスキップして実際のパス値を探す。
+    if (arg === '--calibration-json') {
+      let j = i + 1;
+      while (j < args.length && typeof args[j] === 'string' && args[j].startsWith('--')) {
+        j++;
+      }
+      if (j < args.length) {
+        calibrationJson = args[j];
+        i = j;
+      }
+      continue;
+    }
+
+    // --calibration-json=<path>（= 区切り形式: 単一 argv 要素なのでフラグ注入の影響を受けない）
+    if (arg.startsWith('--calibration-json=')) {
+      calibrationJson = arg.slice('--calibration-json='.length);
+      continue;
+    }
 
     // --page オプションの検出
     if (arg === '--page') {
       hasPageFlag = true;
-      // 次の引数が数値ならページ番号として取得
       if (i + 1 < args.length) {
         const nextArg = args[i + 1];
         const parsed = parseInt(nextArg, 10);
         if (!isNaN(parsed) && parsed > 0) {
           pageNum = parsed;
-          i++; // 次の引数をスキップ
+          i++;
         }
       }
       continue;
@@ -1117,7 +1251,7 @@ function getFilesFromArgs(args) {
     }
   }
 
-  return { files, pageNum };
+  return { files, pageNum, calibrationJson };
 }
 
 // ファイルを開く処理（複数ファイル対応）
@@ -1164,6 +1298,7 @@ function openFilesInApp(filePaths, pageNum = null) {
 const argsResult = getFilesFromArgs(process.argv);
 filesToOpen = argsResult.files;
 initialPageNumber = argsResult.pageNum;
+pendingCalibrationJson = argsResult.calibrationJson;
 
 // アプリの準備ができたらウィンドウを作成
 app.whenReady().then(async () => {
@@ -1203,26 +1338,57 @@ app.whenReady().then(async () => {
     }
     mainWindow.show();
 
+    // 起動時のアップデート通知（保留中なら表示）
+    trySendUpdate();
+
     // ファイルが指定されていれば開く（検版ビューワー連携: 初期ページ番号も渡す）
     if (filesToOpen && filesToOpen.length > 0) {
       openFilesInApp(filesToOpen, initialPageNumber);
       filesToOpen = [];
       initialPageNumber = null;
     }
+
+    // ProGen連携: 校正JSONがあれば renderer に通知
+    if (pendingCalibrationJson && mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('calibration-json-received', { path: pendingCalibrationJson });
+      pendingCalibrationJson = null;
+    }
   });
 });
 
 // Windows: 2回目以降の起動で別のファイルを開こうとした場合
 app.on('second-instance', (event, commandLine, workingDirectory) => {
+  console.log('[MojiQ second-instance] commandLine:', JSON.stringify(commandLine));
   const result = getFilesFromArgs(commandLine);
+  console.log('[MojiQ second-instance] parsed:', JSON.stringify(result));
+
+  // ウィンドウを先に前面化（renderer が見えていないとユーザーは気づかない）
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    if (!mainWindow.isVisible()) mainWindow.show();
+    mainWindow.focus();
+  }
+
   if (result.files.length > 0) {
     openFilesInApp(result.files, result.pageNum);
   }
 
-  // ウィンドウを前面に出す
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
+  // ProGen連携: 校正JSONが渡されていれば renderer に通知
+  // renderer が IPC を確実に受け取れるよう、即時送信 + 短い遅延後にも送る。
+  // 受信側は冪等（同じ path に対して何度も処理してOK）。
+  if (result.calibrationJson && mainWindow && mainWindow.webContents) {
+    const send = () => {
+      try {
+        if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
+          mainWindow.webContents.send('calibration-json-received', { path: result.calibrationJson });
+          console.log('[MojiQ second-instance] sent calibration-json-received');
+        }
+      } catch (e) {
+        console.error('[MojiQ second-instance] send failed:', e);
+      }
+    };
+    send();
+    setTimeout(send, 250);
   }
 });
 

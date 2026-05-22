@@ -8,6 +8,19 @@ window.SimulatorTools = (function() {
     const State = window.SimulatorState;
     const DOM = window.SimulatorDOM;
 
+    // すべてのシミュレーターツールボタンを非アクティブにする
+    function deactivateAllTools() {
+        const calibrateBtn = DOM.get('calibrateBtn');
+        const gridBtn = DOM.get('gridBtn');
+        const sampleGridBtn = document.getElementById('sampleGridBtn');
+
+        if (calibrateBtn) calibrateBtn.classList.remove('active');
+        if (gridBtn) gridBtn.classList.remove('active');
+        if (sampleGridBtn) sampleGridBtn.classList.remove('active');
+
+        State.set('currentMode', null);
+    }
+
     // 縮尺合わせモード解除
     function exitCalibrationMode() {
         const calibrateBtn = DOM.get('calibrateBtn');
@@ -58,7 +71,7 @@ window.SimulatorTools = (function() {
         adjustMessage.classList.remove('active');
         sizeTooltip.style.display = 'none';
         canvas.style.cursor = 'default';
-        if (currentMode === 'grid') {
+        if (currentMode === 'grid' || currentMode === 'sampleGrid') {
             canvas.style.cursor = 'crosshair';
         }
 
@@ -99,7 +112,7 @@ window.SimulatorTools = (function() {
 
         if (window.SimulatorUI) window.SimulatorUI.updateDashboardValues();
 
-        if (currentMode === 'grid') {
+        if (currentMode === 'grid' || currentMode === 'sampleGrid') {
             canvas.style.cursor = 'crosshair';
         } else {
             canvas.style.cursor = 'default';
@@ -148,7 +161,7 @@ window.SimulatorTools = (function() {
 
         if (window.SimulatorUI) window.SimulatorUI.updateDashboardValues();
 
-        if (currentMode === 'grid') {
+        if (currentMode === 'grid' || currentMode === 'sampleGrid') {
             canvas.style.cursor = 'crosshair';
         } else {
             canvas.style.cursor = 'default';
@@ -181,32 +194,58 @@ window.SimulatorTools = (function() {
         }
     }
 
+    // セリフ見本ボタンの状態を更新（セリフサンプルの入力状態に連動）
+    function updateSampleGridButtonState() {
+        const isCalibrated = State.get('isCalibrated');
+        const sampleGridBtn = document.getElementById('sampleGridBtn');
+        const gridTextInput = DOM.get('gridTextInput');
+
+        if (!sampleGridBtn) return;
+
+        const hasText = gridTextInput && gridTextInput.value && gridTextInput.value.trim().length > 0;
+        const canUse = isCalibrated && hasText;
+
+        sampleGridBtn.disabled = !canUse;
+        if (!isCalibrated) {
+            sampleGridBtn.title = '先に「縮尺合わせ」を行ってください';
+        } else if (!hasText) {
+            sampleGridBtn.title = 'セリフサンプルに文字を入力してください';
+        } else {
+            sampleGridBtn.title = 'セリフ見本';
+        }
+    }
+
     // 縮尺設定前のUIロック状態を更新
     function updateCalibrationLockState() {
         const isCalibrated = State.get('isCalibrated');
+        const currentMode = State.get('currentMode');
         const gridBtn = DOM.get('gridBtn');
         const fontSizeInput = DOM.get('fontSizeInput');
         const gridTextInput = DOM.get('gridTextInput');
         const gridLinesInput = DOM.get('gridLinesInput');
         const gridCharsInput = DOM.get('gridCharsInput');
 
-        // グリッドボタン
+        // 一文字グリッドボタン
         if (gridBtn) {
             gridBtn.disabled = !isCalibrated;
-            gridBtn.title = isCalibrated ? '写植グリッド' : '先に「縮尺合わせ」を行ってください';
+            gridBtn.title = isCalibrated ? '一文字グリッド' : '先に「縮尺合わせ」を行ってください';
         }
 
-        // 写植グリッド設定エリア
+        // セリフ見本ボタン（セリフサンプルの入力状態も考慮）
+        updateSampleGridButtonState();
+
+        // セリフ見本入力欄のグレーアウト制御
+        // 縮尺合わせ完了後はグレーアウト解除（テキスト入力を可能にする）
         const gridSettingsArea = document.getElementById('gridSettingsArea');
         if (gridSettingsArea) {
-            if (isCalibrated) {
-                gridSettingsArea.classList.remove('disabled-lock');
-            } else {
+            if (!isCalibrated) {
                 gridSettingsArea.classList.add('disabled-lock');
+            } else {
+                gridSettingsArea.classList.remove('disabled-lock');
             }
         }
 
-        // 個別入力のdisabled状態
+        // 個別入力のdisabled状態（セリフ見本設定エリア内）
         if (gridTextInput) gridTextInput.disabled = !isCalibrated;
         if (gridLinesInput) gridLinesInput.disabled = !isCalibrated;
         if (gridCharsInput) gridCharsInput.disabled = !isCalibrated;
@@ -228,6 +267,25 @@ window.SimulatorTools = (function() {
         const canvas = DOM.getCanvas();
         const canvasArea = DOM.get('canvasArea');
         const calibrationGuide = DOM.get('calibrationGuide');
+        const sampleGridBtn = document.getElementById('sampleGridBtn');
+
+        // 描画ツールボタンの選択解除
+        function deactivateDrawingTools() {
+            // ツールバーのボタンを非選択に
+            const toolBarVertical = document.getElementById('toolBarVertical');
+            if (toolBarVertical) {
+                toolBarVertical.querySelectorAll('.tool-btn-icon.active').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+            }
+            // 指示ツールのドロップダウンを閉じる
+            if (window.MojiQStamps && window.MojiQStamps.forceCloseAllDropdowns) {
+                window.MojiQStamps.forceCloseAllDropdowns();
+            }
+            if (window.MojiQProofreadingSymbol && window.MojiQProofreadingSymbol.closeDropdown) {
+                window.MojiQProofreadingSymbol.closeDropdown();
+            }
+        }
 
         // 縮尺合わせボタン
         if (calibrateBtn) {
@@ -248,7 +306,11 @@ window.SimulatorTools = (function() {
                 State.set('restorableGridState', null);
                 if (State.get('isGridAdjusting')) confirmGrid();
 
+                // 描画ツールの選択解除
+                deactivateDrawingTools();
+
                 if (gridBtn) gridBtn.classList.remove('active');
+                if (sampleGridBtn) sampleGridBtn.classList.remove('active');
                 calibrateBtn.classList.add('active');
 
                 State.set('currentMode', 'calibration');
@@ -264,7 +326,8 @@ window.SimulatorTools = (function() {
             });
         }
 
-        // グリッドボタン
+        // 一文字グリッドボタン
+
         if (gridBtn) {
             gridBtn.addEventListener('click', () => {
                 State.set('restorableGridState', null);
@@ -275,9 +338,41 @@ window.SimulatorTools = (function() {
                 State.set('isSimPanning', false);
                 State.set('isShiftPressed', false);
 
+                // 描画ツールの選択解除
+                deactivateDrawingTools();
+
                 gridBtn.classList.add('active');
+                if (sampleGridBtn) sampleGridBtn.classList.remove('active');
 
                 State.set('currentMode', 'grid');
+                canvas.style.cursor = 'crosshair';
+            });
+        }
+
+        // セリフ見本ボタン
+        if (sampleGridBtn) {
+            sampleGridBtn.addEventListener('click', () => {
+                // セリフサンプルが空の場合は何もしない
+                const gridTextInput = DOM.get('gridTextInput');
+                if (!gridTextInput || !gridTextInput.value || gridTextInput.value.trim().length === 0) {
+                    return;
+                }
+
+                State.set('restorableGridState', null);
+                if (State.get('isGridAdjusting')) confirmGrid();
+                exitCalibrationMode();
+
+                // パン状態を強制リセット
+                State.set('isSimPanning', false);
+                State.set('isShiftPressed', false);
+
+                // 描画ツールの選択解除
+                deactivateDrawingTools();
+
+                sampleGridBtn.classList.add('active');
+                if (gridBtn) gridBtn.classList.remove('active');
+
+                State.set('currentMode', 'sampleGrid');
                 canvas.style.cursor = 'crosshair';
             });
         }
@@ -340,12 +435,14 @@ window.SimulatorTools = (function() {
     return {
         init: init,
         exitCalibrationMode: exitCalibrationMode,
+        deactivateAllTools: deactivateAllTools,
         confirmGrid: confirmGrid,
         clearSimulatorGrid: clearSimulatorGrid,
         clearSimulatorGridWithoutUndo: clearSimulatorGridWithoutUndo,
         deleteSelectedGrid: deleteSelectedGrid,
         deselectCurrentGrid: deselectCurrentGrid,
         updateDeleteButtonState: updateDeleteButtonState,
-        updateCalibrationLockState: updateCalibrationLockState
+        updateCalibrationLockState: updateCalibrationLockState,
+        updateSampleGridButtonState: updateSampleGridButtonState
     };
 })();

@@ -654,31 +654,36 @@ body.dark-mode .stamp-toggle-btn .selected-stamp-display {
 }
 
 body.dark-mode .stamp-section,
-body.dark-mode .font-section {
+body.dark-mode .font-section,
+body.dark-mode .sizeadjust-section {
     background: #2a2a2a;
     border-color: #444;
 }
 
 /* スタンプセクション・フォントセクションのスクロールバー（ダークモード） */
 body.dark-mode .stamp-section::-webkit-scrollbar,
-body.dark-mode .font-section::-webkit-scrollbar {
+body.dark-mode .font-section::-webkit-scrollbar,
+body.dark-mode .sizeadjust-section::-webkit-scrollbar {
     width: 6px;
 }
 
 body.dark-mode .stamp-section::-webkit-scrollbar-track,
-body.dark-mode .font-section::-webkit-scrollbar-track {
+body.dark-mode .font-section::-webkit-scrollbar-track,
+body.dark-mode .sizeadjust-section::-webkit-scrollbar-track {
     background: #333;
     border-radius: 3px;
 }
 
 body.dark-mode .stamp-section::-webkit-scrollbar-thumb,
-body.dark-mode .font-section::-webkit-scrollbar-thumb {
+body.dark-mode .font-section::-webkit-scrollbar-thumb,
+body.dark-mode .sizeadjust-section::-webkit-scrollbar-thumb {
     background: #666;
     border-radius: 3px;
 }
 
 body.dark-mode .stamp-section::-webkit-scrollbar-thumb:hover,
-body.dark-mode .font-section::-webkit-scrollbar-thumb:hover {
+body.dark-mode .font-section::-webkit-scrollbar-thumb:hover,
+body.dark-mode .sizeadjust-section::-webkit-scrollbar-thumb:hover {
     background: #888;
 }
 
@@ -698,22 +703,56 @@ body.dark-mode .stamp-palette .stamp-btn.active {
     color: #90caf9;
 }
 
-/* セクションボタン */
-body.dark-mode .section-add-btn,
-body.dark-mode .section-edit-btn,
-body.dark-mode .section-delete-btn {
-    background-color: #333;
-    border-color: #444;
-    color: #ddd;
-}
-
-body.dark-mode .section-delete-btn:hover {
+/* 文字サイズ（アップ・ダウン）: アップ＝赤基調 / ダウン＝青基調（ダークモード） */
+body.dark-mode .sizeadjust-section .stamp-btn[data-direction="up"] {
     background-color: #3a2020;
     border-color: #c62828;
     color: #ef9a9a;
 }
 
-body.dark-mode .section-edit-btn:hover {
+body.dark-mode .sizeadjust-section .stamp-btn[data-direction="up"]:hover {
+    background-color: #4a2626;
+}
+
+body.dark-mode .sizeadjust-section .stamp-btn[data-direction="up"].active {
+    background-color: #4a2626;
+    border-color: #ef5350;
+    color: #ef9a9a;
+}
+
+body.dark-mode .sizeadjust-section .stamp-btn[data-direction="down"] {
+    background-color: #1a3a5c;
+    border-color: #1565c0;
+    color: #90caf9;
+}
+
+body.dark-mode .sizeadjust-section .stamp-btn[data-direction="down"]:hover {
+    background-color: #1f4670;
+}
+
+body.dark-mode .sizeadjust-section .stamp-btn[data-direction="down"].active {
+    background-color: #1f4670;
+    border-color: #42a5f5;
+    color: #90caf9;
+}
+
+/* セクションボタン */
+body.dark-mode .section-add-btn,
+body.dark-mode .section-edit-btn,
+body.dark-mode .section-delete-btn,
+body.dark-mode .section-delete-all-btn {
+    background-color: #333;
+    border-color: #444;
+    color: #ddd;
+}
+
+body.dark-mode .section-delete-btn:hover:not(:disabled) {
+    background-color: #3a2020;
+    border-color: #c62828;
+    color: #ef9a9a;
+}
+
+body.dark-mode .section-edit-btn:hover:not(:disabled) {
     background-color: #3a3520;
     border-color: #fbc02d;
     color: #ffd54f;
@@ -731,11 +770,19 @@ body.dark-mode .section-edit-btn.active-edit {
     border-color: #fbc02d;
 }
 
-body.dark-mode .section-edit-btn:disabled {
+body.dark-mode .section-edit-btn:disabled,
+body.dark-mode .section-delete-btn:disabled,
+body.dark-mode .section-delete-all-btn:disabled {
     opacity: 0.5;
     background-color: #2a2a2a;
     border-color: #444;
     color: #666;
+}
+
+body.dark-mode .section-delete-all-btn:hover:not(:disabled) {
+    background-color: #2d2035;
+    border-color: #9c27b0;
+    color: #ce93d8;
 }
 
 body.dark-mode .section-action-row {
@@ -794,6 +841,17 @@ body.dark-mode .page-edit-dropdown-item.danger {
 
 body.dark-mode .page-edit-dropdown-item.danger:hover {
     background-color: rgba(239, 83, 80, 0.15);
+}
+
+/* ページ編集ドロップダウン - グレーアウト状態（ダークモード） */
+body.dark-mode .spread-binding-dropdown .page-edit-dropdown-item:disabled,
+body.dark-mode .spread-binding-dropdown .page-edit-dropdown-item.disabled {
+    color: #666;
+}
+
+body.dark-mode .spread-binding-dropdown .page-edit-dropdown-item:disabled .dropdown-icon svg,
+body.dark-mode .spread-binding-dropdown .page-edit-dropdown-item.disabled .dropdown-icon svg {
+    stroke: #555;
 }
 
 /* PDF保存ドロップダウン - グレーアウト状態（ダークモード） */
@@ -1143,6 +1201,17 @@ body.dark-mode .dashboard-container .spec-badge {
 /* 初期メッセージ */
 body.dark-mode #initialMessage {
     color: white;
+}
+
+/* 写植シミュレーターセクション */
+body.dark-mode .simulator-section {
+    background: #1e1e1e;
+    border-color: #3a3a3a;
+}
+
+body.dark-mode .simulator-section-label {
+    color: #aaa;
+    border-bottom-color: #3a3a3a;
 }
 
 /* キャリブレーションガイド */
@@ -1656,6 +1725,14 @@ body.dark-mode .sidebar-bottom-btn.hidden-state {
 
 body.dark-mode .sidebar-bottom-btn.hidden-state:hover {
     color: #f44336;
+}
+
+/* 無効状態（テキストオブジェクトがない場合） */
+body.dark-mode .sidebar-bottom-btn:disabled,
+body.dark-mode .sidebar-bottom-btn.no-annotation-text {
+    color: #555;
+    cursor: not-allowed;
+    pointer-events: none;
 }
 
 /* テキスト入力モーダル (Sim) */

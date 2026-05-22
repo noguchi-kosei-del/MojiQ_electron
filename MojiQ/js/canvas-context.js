@@ -28,7 +28,7 @@ window.MojiQCanvasContext = (function() {
         colorPicker.value = "#ff0000";
         initContext();
         setupColorPaletteEvents();
-        setupRainbowPicker();
+        setupCustomColorSwatch();
         setupEyedropper();
         updateLineWidthDisplay();
 
@@ -300,33 +300,30 @@ window.MojiQCanvasContext = (function() {
     }
 
     /**
-     * 虹色バーのセットアップ
+     * カスタムカラースウォッチのセットアップ
      */
-    function setupRainbowPicker() {
-        const rainbowPicker = document.getElementById('rainbowPicker');
-        const rainbowSwatch = document.getElementById('rainbowColorSwatch');
-        if (rainbowPicker) {
-            rainbowPicker.addEventListener('click', function(e) {
-                const rect = this.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const ratio = Math.max(0, Math.min(1, x / rect.width));
+    function setupCustomColorSwatch() {
+        const customSwatch = document.getElementById('rainbowColorSwatch');
 
-                // 虹色グラデーションの色を計算（HSLを使用）
-                const hue = ratio * 360;
-                const color = MojiQUtils.hslToHex(hue, 100, 50);
+        // カスタムカラースウォッチをクリックしたときにカラーピッカーを開く
+        if (customSwatch && colorPicker) {
+            customSwatch.addEventListener('click', function() {
+                colorPicker.click();
+            });
+        }
 
-                colorPicker.value = color;
-                initContext();
-
-                // rainbowColorSwatchの色を更新し、実線に変更
-                if (rainbowSwatch) {
-                    rainbowSwatch.style.backgroundColor = color;
-                    rainbowSwatch.style.border = '2px solid #ccc';
-                    rainbowSwatch.setAttribute('data-color', color);
+        // カラーピッカーで色が選択されたとき
+        if (colorPicker) {
+            colorPicker.addEventListener('change', function() {
+                const color = colorPicker.value;
+                // カスタムカラースウォッチに反映
+                if (customSwatch) {
+                    customSwatch.style.backgroundColor = color;
+                    customSwatch.style.border = '2px solid #ccc';
+                    customSwatch.setAttribute('data-color', color);
                 }
-
+                initContext();
                 updateColorUI();
-                // 選択中のオブジェクトがあればその色を変更
                 applyColorToSelectedObject(color);
             });
         }

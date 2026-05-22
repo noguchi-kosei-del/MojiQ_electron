@@ -110,7 +110,7 @@ window.SimulatorEventHandlers = (function() {
 
             gridLinesInput.value = pendingGridState.lines;
             gridCharsInput.value = pendingGridState.chars;
-            fontSizeInput.value = pendingGridState.ptSize;
+            fontSizeInput.value = Math.round(pendingGridState.ptSize * 10) / 10;
             if (pendingGridState.textData) gridTextInput.value = pendingGridState.textData;
 
             const snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -137,12 +137,12 @@ window.SimulatorEventHandlers = (function() {
     function startDraw(e) {
         if (e.type === 'touchstart') e.preventDefault();
 
-        // 統合モード: currentModeがcalibrationまたはgridの場合のみ動作
+        // 統合モード: currentModeがcalibration, grid, sampleGridの場合のみ動作
         const currentMode = State.get('currentMode');
-        if (currentMode !== 'calibration' && currentMode !== 'grid') return;
+        if (currentMode !== 'calibration' && currentMode !== 'grid' && currentMode !== 'sampleGrid') return;
 
         const isCalibrated = State.get('isCalibrated');
-        if (!isCalibrated && currentMode === 'grid') return;
+        if (!isCalibrated && (currentMode === 'grid' || currentMode === 'sampleGrid')) return;
 
         const pos = getPos(e);
         const isGridAdjusting = State.get('isGridAdjusting');
@@ -201,13 +201,7 @@ window.SimulatorEventHandlers = (function() {
 
         // グリッド調整中の操作
         if (isGridAdjusting) {
-            const handle = window.SimulatorGridDrawing.checkHandleHit(pos, pendingGridState);
-            // ロック状態でなければリサイズ開始
-            if ((State.get('isResizing') || handle) && !pendingGridState.isLocked) {
-                State.set('isResizing', true);
-                State.set('activeHandle', handle);
-                return;
-            }
+            // ハンドルリサイズは削除（マウスホイールでサイズ変更）
 
             const pixelsPerMm = State.get('pixelsPerMm');
             const cellSize = pendingGridState.ptSize * State.MM_PER_PT * pixelsPerMm;
@@ -216,6 +210,9 @@ window.SimulatorEventHandlers = (function() {
             const h = (isHorizontal ? pendingGridState.lines : pendingGridState.chars) * cellSize;
 
             if (window.SimulatorGridDrawing.isPointInRect(pos, pendingGridState.startPos, w, h)) {
+                // マーキー選択を防止
+                e.preventDefault();
+                e.stopPropagation();
                 State.set('isGridMoving', true);
                 State.set('dragOffset', { x: pos.x - pendingGridState.startPos.x, y: pos.y - pendingGridState.startPos.y });
                 return;
@@ -237,7 +234,7 @@ window.SimulatorEventHandlers = (function() {
         }
 
         // グリッド調整中でないとき、既存グリッドをクリックしたか判定
-        if (currentMode === 'grid') {
+        if (currentMode === 'grid' || currentMode === 'sampleGrid') {
             const currentPageNum = State.get('currentPageNum');
             const hitIdx = window.SimulatorGridDrawing.hitTestGrids(currentPageNum, pos);
 
@@ -252,7 +249,7 @@ window.SimulatorEventHandlers = (function() {
         State.set('startPos', { ...pos });
         State.set('currentPos', { ...pos });
 
-        if (currentMode === 'grid') {
+        if (currentMode === 'grid' || currentMode === 'sampleGrid') {
             const gridLinesInput = DOM.get('gridLinesInput');
             const gridCharsInput = DOM.get('gridCharsInput');
             const fontSizeInput = DOM.get('fontSizeInput');
@@ -261,31 +258,38 @@ window.SimulatorEventHandlers = (function() {
             const pt = parseFloat(fontSizeInput.value) || 16;
             const text = gridTextInput.value;
 
-            // テキストから行数・文字数を自動計算
             let lines = 1;
             let chars = 1;
-            if (text && text.trim().length > 0) {
-                const halfWidthSymbols = ['!', '?', '？', '！'];
-                const textLines = text.split(/\r\n|\n/);
-                lines = textLines.length;
-                for (let l = 0; l < textLines.length; l++) {
-                    const line = textLines[l];
-                    let tokenCount = 0;
-                    let i = 0;
-                    while (i < line.length) {
-                        const char = line[i];
-                        const nextChar = line[i + 1];
-                        if (halfWidthSymbols.includes(char) && nextChar && halfWidthSymbols.includes(nextChar)) {
-                            tokenCount++;
-                            i += 2;
-                        } else {
-                            tokenCount++;
-                            i++;
+            let showText = false;
+
+            if (currentMode === 'sampleGrid') {
+                // セリフ見本モード: テキストから行数・文字数を自動計算
+                showText = true;
+                if (text && text.trim().length > 0) {
+                    const halfWidthSymbols = ['!', '?', '？', '！'];
+                    const textLines = text.split(/\r\n|\n/);
+                    lines = textLines.length;
+                    for (let l = 0; l < textLines.length; l++) {
+                        const line = textLines[l];
+                        let tokenCount = 0;
+                        let i = 0;
+                        while (i < line.length) {
+                            const char = line[i];
+                            const nextChar = line[i + 1];
+                            if (halfWidthSymbols.includes(char) && nextChar && halfWidthSymbols.includes(nextChar)) {
+                                tokenCount++;
+                                i += 2;
+                            } else {
+                                tokenCount++;
+                                i++;
+                            }
                         }
+                        if (tokenCount > chars) chars = tokenCount;
                     }
-                    if (tokenCount > chars) chars = tokenCount;
                 }
             }
+            // 一文字グリッドモード: lines=1, chars=1 固定、showText=false（デフォルト値のまま）
+
             gridLinesInput.value = lines;
             gridCharsInput.value = chars;
 
@@ -303,7 +307,8 @@ window.SimulatorEventHandlers = (function() {
                 constraint: null,
                 isDrag: false,
                 writingMode: writingMode,
-                isLocked: false
+                isLocked: false,
+                showText: showText
             };
             State.set('pendingGridState', newPendingGridState);
             if (window.SimulatorUI) window.SimulatorUI.updateWritingModeIcon();
@@ -314,9 +319,9 @@ window.SimulatorEventHandlers = (function() {
 
     // 描画中
     function moveDraw(e) {
-        // 統合モード: currentModeがcalibrationまたはgridの場合のみ動作
+        // 統合モード: currentModeがcalibration, grid, sampleGridの場合のみ動作
         const currentMode = State.get('currentMode');
-        if (currentMode !== 'calibration' && currentMode !== 'grid') return;
+        if (currentMode !== 'calibration' && currentMode !== 'grid' && currentMode !== 'sampleGrid') return;
 
         const canvas = DOM.getCanvas();
         const ctx = DOM.getCtx();
@@ -365,82 +370,11 @@ window.SimulatorEventHandlers = (function() {
             const snapshot = State.get('snapshot');
             const pixelsPerMm = State.get('pixelsPerMm');
 
-            if (State.get('isResizing')) {
-                if (pendingGridState.isLocked) return;
-
-                const activeHandle = State.get('activeHandle');
-                const oldCellSize = pendingGridState.ptSize * State.MM_PER_PT * pixelsPerMm;
-                const isHorizontal = pendingGridState.writingMode === 'horizontal';
-                const gridW = (isHorizontal ? pendingGridState.chars : pendingGridState.lines) * oldCellSize;
-                const gridH = (isHorizontal ? pendingGridState.lines : pendingGridState.chars) * oldCellSize;
-
-                let currentL = pendingGridState.startPos.x;
-                let currentR = pendingGridState.startPos.x + gridW;
-                let currentT = pendingGridState.startPos.y;
-                let currentB = pendingGridState.startPos.y + gridH;
-
-                if (activeHandle.includes('l')) currentL = Math.min(pos.x, currentR - 10);
-                if (activeHandle.includes('r')) currentR = Math.max(pos.x, currentL + 10);
-                if (activeHandle.includes('t')) currentT = Math.min(pos.y, currentB - 10);
-                if (activeHandle.includes('b')) currentB = Math.max(pos.y, currentT + 10);
-
-                const newW = currentR - currentL;
-                const newH = currentB - currentT;
-
-                // 新しいセルサイズを計算（行数/列数は維持）
-                const lines = pendingGridState.lines;
-                const chars = pendingGridState.chars;
-                const newCellSizeW = isHorizontal ? newW / chars : newW / lines;
-                const newCellSizeH = isHorizontal ? newH / lines : newH / chars;
-                const newCellSize = Math.min(newCellSizeW, newCellSizeH);
-
-                // 新しいポイントサイズを計算
-                const newPt = newCellSize / pixelsPerMm / State.MM_PER_PT;
-                pendingGridState.ptSize = Math.round(newPt * 10) / 10;
-
-                // 新しいグリッドサイズを計算
-                const finalW = (isHorizontal ? chars : lines) * newCellSize;
-                const finalH = (isHorizontal ? lines : chars) * newCellSize;
-
-                // startPosを更新（ドラッグした辺/角を基準に）
-                if (activeHandle.includes('l')) {
-                    pendingGridState.startPos.x = currentR - finalW;
-                } else {
-                    pendingGridState.startPos.x = currentL;
-                }
-                if (activeHandle.includes('t')) {
-                    pendingGridState.startPos.y = currentB - finalH;
-                } else {
-                    pendingGridState.startPos.y = currentT;
-                }
-
-                // centerPosを更新
-                pendingGridState.centerPos = {
-                    x: pendingGridState.startPos.x + finalW / 2,
-                    y: pendingGridState.startPos.y + finalH / 2
-                };
-
-                // constraintも更新
-                if (!pendingGridState.constraint) {
-                    pendingGridState.constraint = { w: finalW, h: finalH, rawW: finalW, rawH: finalH };
-                } else {
-                    pendingGridState.constraint.rawW = finalW;
-                    pendingGridState.constraint.rawH = finalH;
-                }
-
-                State.set('pendingGridState', pendingGridState);
-
-                // 直接再描画（recalculateGridは使わない）
-                const fontSizeInput = DOM.get('fontSizeInput');
-                fontSizeInput.value = pendingGridState.ptSize;
-                ctx.putImageData(snapshot, 0, 0);
-                window.SimulatorGridDrawing.drawFixedGrid(pendingGridState, true);
-
-                if (window.SimulatorUI) {
-                    window.SimulatorUI.updateDashboardValues();
-                }
-                return;
-            } else if (State.get('isGridMoving')) {
+            // ハンドルリサイズは削除（マウスホイールでサイズ変更）
+            if (State.get('isGridMoving')) {
+                // マーキー選択を防止
+                e.preventDefault();
+                e.stopPropagation();
                 canvas.style.cursor = 'move';
                 const dragOffset = State.get('dragOffset');
                 const newStartX = pos.x - dragOffset.x;
@@ -461,22 +395,15 @@ window.SimulatorEventHandlers = (function() {
             }
 
             // ハンドルカーソル
-            const handle = window.SimulatorGridDrawing.checkHandleHit(pos, pendingGridState);
-            if (handle) {
-                if (handle === 'tl' || handle === 'br') canvas.style.cursor = 'nwse-resize';
-                else if (handle === 'tr' || handle === 'bl') canvas.style.cursor = 'nesw-resize';
-                else if (handle === 'tm' || handle === 'bm') canvas.style.cursor = 'ns-resize';
-                else if (handle === 'ml' || handle === 'mr') canvas.style.cursor = 'ew-resize';
+            // グリッド上ならmoveカーソル、それ以外はデフォルト
+            const cellSize = pendingGridState.ptSize * State.MM_PER_PT * pixelsPerMm;
+            const isHorizontal = pendingGridState.writingMode === 'horizontal';
+            const w = (isHorizontal ? pendingGridState.chars : pendingGridState.lines) * cellSize;
+            const h = (isHorizontal ? pendingGridState.lines : pendingGridState.chars) * cellSize;
+            if (window.SimulatorGridDrawing.isPointInRect(pos, pendingGridState.startPos, w, h)) {
+                canvas.style.cursor = 'move';
             } else {
-                const cellSize = pendingGridState.ptSize * State.MM_PER_PT * pixelsPerMm;
-                const isHorizontal = pendingGridState.writingMode === 'horizontal';
-                const w = (isHorizontal ? pendingGridState.chars : pendingGridState.lines) * cellSize;
-                const h = (isHorizontal ? pendingGridState.lines : pendingGridState.chars) * cellSize;
-                if (window.SimulatorGridDrawing.isPointInRect(pos, pendingGridState.startPos, w, h)) {
-                    canvas.style.cursor = 'move';
-                } else {
-                    canvas.style.cursor = currentMode === 'calibration' ? 'crosshair' : 'default';
-                }
+                canvas.style.cursor = currentMode === 'calibration' ? 'crosshair' : 'default';
             }
             return;
         }
@@ -519,7 +446,7 @@ window.SimulatorEventHandlers = (function() {
             if (isShiftPressed) {
                 State.set('currentPos', { x: endX, y: endY });
             }
-        } else if (currentMode === 'grid') {
+        } else if (currentMode === 'grid' || currentMode === 'sampleGrid') {
             ctx.putImageData(snapshot, 0, 0);
             const w = pos.x - startPos.x;
             const h = pos.y - startPos.y;
@@ -550,7 +477,7 @@ window.SimulatorEventHandlers = (function() {
             if (isSpacePressed || isShiftPressed) {
                 canvas.style.cursor = 'grab';
             } else {
-                canvas.style.cursor = ((currentMode === 'grid' || currentMode === 'calibration') && !isGridAdjusting) ? 'crosshair' : 'default';
+                canvas.style.cursor = ((currentMode === 'grid' || currentMode === 'sampleGrid' || currentMode === 'calibration') && !isGridAdjusting) ? 'crosshair' : 'default';
             }
             return;
         }
@@ -571,6 +498,9 @@ window.SimulatorEventHandlers = (function() {
 
         // 移動終了
         if (State.get('isGridMoving')) {
+            // マーキー選択を防止
+            e.preventDefault();
+            e.stopPropagation();
             State.set('isGridMoving', false);
             if (pendingGridState) {
                 ctx.putImageData(snapshot, 0, 0);
@@ -651,7 +581,7 @@ window.SimulatorEventHandlers = (function() {
         }
 
         // グリッド作成完了処理
-        if (currentMode === 'grid') {
+        if (currentMode === 'grid' || currentMode === 'sampleGrid') {
             const isCalibrated = State.get('isCalibrated');
             if (!isCalibrated) return;
 
@@ -709,7 +639,11 @@ window.SimulatorEventHandlers = (function() {
                 const text = gridTextInput ? gridTextInput.value : '';
                 let lines = 1;
                 let chars = 1;
-                if (text && text.trim().length > 0) {
+                let showText = false;
+
+                // セリフ見本モードの場合のみテキストから計算
+                if (currentMode === 'sampleGrid' && text && text.trim().length > 0) {
+                    showText = true;
                     const halfWidthSymbols = ['!', '?', '？', '！'];
                     const textLines = text.split(/\r\n|\n/);
                     lines = textLines.length;
@@ -731,6 +665,7 @@ window.SimulatorEventHandlers = (function() {
                         if (tokenCount > chars) chars = tokenCount;
                     }
                 }
+                // 一文字グリッドモードの場合は lines=1, chars=1, showText=false（デフォルト値のまま）
 
                 gridLinesInput.value = lines;
                 gridCharsInput.value = chars;
@@ -755,7 +690,8 @@ window.SimulatorEventHandlers = (function() {
                     constraint: { w: safeW, h: safeH, rawW: rectW, rawH: rectH },
                     isDrag: true,
                     writingMode: dragWritingMode,
-                    isLocked: false
+                    isLocked: false,
+                    showText: showText
                 };
                 State.set('pendingGridState', newPendingGridState);
 
@@ -789,14 +725,67 @@ window.SimulatorEventHandlers = (function() {
 
     // ホイール操作
     function handleWheel(e) {
-        // 統合モード: currentModeがcalibrationまたはgridの場合のみ動作
+        // 統合モード: currentModeがgridまたはsampleGridの場合のみ動作
         const currentMode = State.get('currentMode');
-        if (currentMode !== 'calibration' && currentMode !== 'grid') return;
+        if (currentMode !== 'grid' && currentMode !== 'sampleGrid') return;
         if (e.target.closest('.sidebar') || e.target.closest('.bottom-nav-bar')) return;
 
         const isGridAdjusting = State.get('isGridAdjusting');
+        if (!isGridAdjusting) return;
 
-        // ホイールによるpt変更は無効化
+        const pendingGridState = State.get('pendingGridState');
+        if (!pendingGridState) return;
+
+        // マウス位置を取得してグリッド上にいるかチェック（getPos を使用して座標変換を正しく処理）
+        const pos = getPos(e);
+
+        const pixelsPerMm = State.get('pixelsPerMm');
+        const cellSize = pendingGridState.ptSize * State.MM_PER_PT * pixelsPerMm;
+        const isHorizontal = pendingGridState.writingMode === 'horizontal';
+        const w = (isHorizontal ? pendingGridState.chars : pendingGridState.lines) * cellSize;
+        const h = (isHorizontal ? pendingGridState.lines : pendingGridState.chars) * cellSize;
+
+        // グリッド上にいない場合は何もしない（ページスクロールを許可）
+        if (!window.SimulatorGridDrawing.isPointInRect(pos, pendingGridState.startPos, w, h)) {
+            return;
+        }
+
+        // グリッド上でのスクロールはページ移動を防止
+        e.preventDefault();
+        e.stopPropagation();
+
+        // ホイール方向に応じてptサイズを変更（小数点第一位で四捨五入）
+        const delta = e.deltaY > 0 ? -0.5 : 0.5;
+        const rawPt = pendingGridState.ptSize + delta;
+        const newPt = Math.round(Math.max(1, Math.min(200, rawPt)) * 10) / 10;
+
+        if (newPt !== pendingGridState.ptSize) {
+            pendingGridState.ptSize = newPt;
+
+            // セルサイズから再計算（recalculateGridはptSizeをリセットするので使わない）
+            const newCellSize = newPt * State.MM_PER_PT * pixelsPerMm;
+            const newW = (isHorizontal ? pendingGridState.chars : pendingGridState.lines) * newCellSize;
+            const newH = (isHorizontal ? pendingGridState.lines : pendingGridState.chars) * newCellSize;
+            pendingGridState.startPos.x = pendingGridState.centerPos.x - newW / 2;
+            pendingGridState.startPos.y = pendingGridState.centerPos.y - newH / 2;
+
+            // 制約を解除（ホイールで手動サイズ変更したため）
+            pendingGridState.constraint = null;
+
+            State.set('pendingGridState', pendingGridState);
+
+            // フォントサイズ入力欄も更新
+            const fontSizeInput = DOM.get('fontSizeInput');
+            if (fontSizeInput) fontSizeInput.value = newPt;
+
+            const ctx = DOM.getCtx();
+            const snapshot = State.get('snapshot');
+            if (snapshot) ctx.putImageData(snapshot, 0, 0);
+            window.SimulatorGridDrawing.drawFixedGrid(pendingGridState, true);
+
+            // ダッシュボード値を更新
+            if (window.SimulatorUI) window.SimulatorUI.updateDashboardValues();
+        }
     }
 
     function init() {

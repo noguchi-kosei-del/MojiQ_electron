@@ -66,11 +66,11 @@ function enterProofreadingMode() {
         ProofreadingPanel.updatePageBarButtonState();
     }
 
-    // 現在のJSONデータでパネルをレンダリング
+    // 現在のJSONデータでパネルをレンダリング（モード切替時はチェック状態を保持）
     if (window.MojiQStore && window.ProofreadingPanel) {
         const data = MojiQStore.get('proofreadingMode.currentData');
         if (data) {
-            ProofreadingPanel.renderCheckData(data);
+            ProofreadingPanel.renderCheckData(data, { preserveChecked: true });
         }
     }
 
@@ -424,11 +424,17 @@ function initWindowControlsAndMenuBar() {
                     const clearBtn = document.getElementById('clearBtn');
                     if (clearBtn && !clearBtn.disabled) clearBtn.click();
                     break;
+                case 'copy':
+                    window.dispatchEvent(new CustomEvent('mojiq:copy', { detail: {} }));
+                    break;
                 case 'cut':
                     window.dispatchEvent(new CustomEvent('mojiq:cut', { detail: {} }));
                     break;
                 case 'paste':
                     window.dispatchEvent(new CustomEvent('mojiq:paste', { detail: {} }));
+                    break;
+                case 'pasteInPlace':
+                    window.dispatchEvent(new CustomEvent('mojiq:paste', { detail: { inPlace: true } }));
                     break;
                 case 'zoom-in':
                     const zoomInBtn = document.getElementById('zoomInBtn');
@@ -675,25 +681,58 @@ function initWindowControlsAndMenuBar() {
         });
     }
 
+    // --- 終了確認カスタムモーダルの表示（main processからの要求） ---
+    if (window.electronAPI && window.electronAPI.onShowCloseConfirm) {
+        window.electronAPI.onShowCloseConfirm(async () => {
+            // カスタムモーダルで終了確認を表示
+            if (window.MojiQModal && window.MojiQModal.showCloseConfirm) {
+                const result = await window.MojiQModal.showCloseConfirm();
+                window.electronAPI.sendCloseAction(
+                    result === 'save' ? 'save-and-quit' :
+                    result === 'quit' ? 'quit-without-saving' :
+                    'cancel'
+                );
+            } else {
+                // フォールバック: ネイティブconfirm
+                const save = confirm('描画内容が保存されていません。保存しますか？');
+                window.electronAPI.sendCloseAction(save ? 'save-and-quit' : 'quit-without-saving');
+            }
+        });
+    }
+
+    // --- アップデート通知カスタムモーダルの表示（main processからの要求） ---
+    if (window.electronAPI && window.electronAPI.onShowUpdateAvailable) {
+        window.electronAPI.onShowUpdateAvailable(async (data) => {
+            const currentVersion = (data && data.currentVersion) || '';
+            const latestVersion = (data && data.latestVersion) || '';
+            if (window.MojiQModal && window.MojiQModal.showUpdateAvailable) {
+                const result = await window.MojiQModal.showUpdateAvailable(currentVersion, latestVersion);
+                window.electronAPI.sendUpdateAction(result === 'update' ? 'update' : 'later');
+            } else {
+                const doUpdate = confirm(`新しいバージョン v${latestVersion} が見つかりました。アップデートを開始しますか？`);
+                window.electronAPI.sendUpdateAction(doUpdate ? 'update' : 'later');
+            }
+        });
+    }
+
     // --- 「保存する」選択時：保存後に終了 ---
     if (window.electronAPI && window.electronAPI.onSaveAndQuit) {
         window.electronAPI.onSaveAndQuit(async () => {
-            // PDF保存処理を実行
+            // PDF保存処理を実行（タイムアウト付き: 3分）
             if (window.MojiQPdfManager && typeof window.MojiQPdfManager.savePdf === 'function') {
                 try {
-                    await window.MojiQPdfManager.savePdf();
+                    const SAVE_QUIT_TIMEOUT = 180000; // 3分
+                    const savePromise = window.MojiQPdfManager.savePdf();
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('保存処理がタイムアウトしました（3分）')), SAVE_QUIT_TIMEOUT)
+                    );
+                    await Promise.race([savePromise, timeoutPromise]);
                     // 保存完了後にアプリを終了
                     window.electronAPI.saveCompletedQuit();
                 } catch (error) {
                     console.error('保存中にエラーが発生しました:', error);
                     // エラー時はユーザーに通知（終了しない）
-                    if (window.electronAPI && window.electronAPI.showMessageDialog) {
-                        await window.electronAPI.showMessageDialog({
-                            type: 'error',
-                            title: '保存エラー',
-                            message: '保存中にエラーが発生しました。\n' + (error.message || error)
-                        });
-                    } else if (window.MojiQModal && window.MojiQModal.showAlert) {
+                    if (window.MojiQModal && window.MojiQModal.showAlert) {
                         window.MojiQModal.showAlert('保存中にエラーが発生しました。\n' + (error.message || error), '保存エラー');
                     }
                 }
@@ -772,8 +811,8 @@ window.addEventListener('load', () => {
         bracketBtn: document.getElementById('bracketBtn'),
         lineBtn: document.getElementById('lineBtn'),
         lineAnnotatedBtn: document.getElementById('lineAnnotatedBtn'),
-        arrowBtn: document.getElementById('arrowBtn'),
-        doubleArrowBtn: document.getElementById('doubleArrowBtn'),
+        arrowBtn: document.getElementById('arrowBtnSidebar'),
+        doubleArrowBtn: document.getElementById('doubleArrowBtnSidebar'),
         doubleArrowAnnotatedBtn: document.getElementById('doubleArrowAnnotatedBtn'),
         polylineBtn: document.getElementById('polylineBtn'),
         textBtn: document.getElementById('textBtn'),
@@ -782,6 +821,7 @@ window.addEventListener('load', () => {
         eraserBtn: document.getElementById('eraserBtn'),
         doneStampBtn: document.getElementById('doneStampBtn'),
         rubyStampBtn: document.getElementById('rubyStampBtn'),
+        questionStampBtn: document.getElementById('questionStampBtn'),
         toruStampBtn: document.getElementById('toruStampBtn'),
         torutsumeStampBtn: document.getElementById('torutsumeStampBtn'),
         torumamaStampBtn: document.getElementById('torumamaStampBtn'),
@@ -1113,6 +1153,7 @@ window.addEventListener('load', () => {
         eraserBtn: elements.eraserBtn,
         doneStampBtn: elements.doneStampBtn,
         rubyStampBtn: elements.rubyStampBtn,
+        questionStampBtn: elements.questionStampBtn,
         toruStampBtn: elements.toruStampBtn,
         torutsumeStampBtn: elements.torutsumeStampBtn,
         torumamaStampBtn: elements.torumamaStampBtn,
@@ -1501,6 +1542,17 @@ window.addEventListener('load', () => {
                         window._savePdfDropdownClose();
                     }
                     updateSelectionState();
+
+                    // 横長の画像（見開き）の場合は右綴じ・左綴じをグレーアウト
+                    const isLandscape = MojiQPdfManager.isLandscapeImage && MojiQPdfManager.isLandscapeImage();
+                    if (bindingRightBtn) {
+                        bindingRightBtn.disabled = isLandscape;
+                        bindingRightBtn.classList.toggle('disabled', isLandscape);
+                    }
+                    if (bindingLeftBtn) {
+                        bindingLeftBtn.disabled = isLandscape;
+                        bindingLeftBtn.classList.toggle('disabled', isLandscape);
+                    }
                 }
             });
         });

@@ -204,6 +204,11 @@ window.MojiQDrawingObjects = (function() {
                 MojiQPdfManager.markAsChanged();
             }
 
+            // オブジェクト変更イベントを発火（コメントタブ更新用）
+            window.dispatchEvent(new CustomEvent('mojiq:objects-changed', {
+                detail: { action: 'add', pageNum, objectType: obj.type }
+            }));
+
             return obj.id;
         },
 
@@ -233,6 +238,11 @@ window.MojiQDrawingObjects = (function() {
                 if (window.MojiQPdfManager && MojiQPdfManager.markAsChanged) {
                     MojiQPdfManager.markAsChanged();
                 }
+
+                // オブジェクト変更イベントを発火（コメントタブ更新用）
+                window.dispatchEvent(new CustomEvent('mojiq:objects-changed', {
+                    detail: { action: 'update', pageNum, objectType: objects[index].type }
+                }));
 
                 return true;
             }
@@ -308,6 +318,11 @@ window.MojiQDrawingObjects = (function() {
                 if (window.MojiQPdfManager && MojiQPdfManager.markAsChanged) {
                     MojiQPdfManager.markAsChanged();
                 }
+
+                // オブジェクト変更イベントを発火（コメントタブ更新用）
+                window.dispatchEvent(new CustomEvent('mojiq:objects-changed', {
+                    detail: { action: 'remove', pageNum, objectType: removed.type }
+                }));
 
                 return removed;
             }
@@ -652,6 +667,14 @@ window.MojiQDrawingObjects = (function() {
             // Redoスタックをクリア
             state.redoStacks[pageNum] = [];
 
+            // 描画キャッシュを無効化
+            // drawing-select.js等の直接ミューテーションで updateObject を経由しない
+            // コミット（移動・リサイズ・回転・引出線編集・アノテーション移動等）でも、
+            // ここでバージョンを上げてキャッシュを無効化する。
+            // updateObject 等からの呼び出しでは既にインクリメント済みだが、
+            // 二重インクリメントは害がない。
+            incrementPageVersion(pageNum);
+
             // ヒストリーパネルへ通知
             const objectType = data.type || (data.object && data.object.type) || action;
             window.dispatchEvent(new CustomEvent('mojiq:history-add', {
@@ -731,6 +754,9 @@ window.MojiQDrawingObjects = (function() {
 
                 // idIndexを再構築（undo操作後のインデックス整合性を保証）
                 rebuildPageIndex(pageNum);
+
+                // 描画キャッシュを無効化（undo後の描画を確実に反映）
+                incrementPageVersion(pageNum);
 
                 // ページキャッシュを無効化（描画オブジェクトが変更されたため）
                 if (window.MojiQPdfManager && MojiQPdfManager.invalidatePageCache) {
@@ -819,6 +845,9 @@ window.MojiQDrawingObjects = (function() {
 
                 // idIndexを再構築（redo操作後のインデックス整合性を保証）
                 rebuildPageIndex(pageNum);
+
+                // 描画キャッシュを無効化（redo後の描画を確実に反映）
+                incrementPageVersion(pageNum);
 
                 // ページキャッシュを無効化（描画オブジェクトが変更されたため）
                 if (window.MojiQPdfManager && MojiQPdfManager.invalidatePageCache) {
@@ -1069,6 +1098,10 @@ window.MojiQDrawingObjects = (function() {
                             console.warn('画像の復元がタイムアウト:', clonedObj.id);
                             clonedObj._imageLoadFailed = true;
                             clonedObj._imageLoadTimeout = true;
+                            // タイムアウト時はimageDataUrlを削除（再シリアライズ時のサイズ肥大化防止）
+                            delete clonedObj.imageDataUrl;
+                            // 読み込み中止
+                            if (img) img.src = '';
                             resolve(clonedObj);
                         }
                     }, 5000);

@@ -204,6 +204,16 @@ const CalibrationPanel = (() => {
       }
 
       currentPath = dirPath;
+
+      // 「校正チェックデータ」フォルダの自動スキップ
+      // サブフォルダが「校正チェックデータ」のみの場合に自動遷移
+      const subFolders = result.items.filter(i => i.isDirectory);
+      if (subFolders.length === 1 && subFolders[0].name === '校正チェックデータ') {
+        navigationStack.push(currentPath);
+        await loadFolder(subFolders[0].path);
+        return;
+      }
+
       renderFolderList(result.items);
       updateBreadcrumb();
     } catch (error) {

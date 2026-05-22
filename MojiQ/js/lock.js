@@ -156,7 +156,10 @@ const AppLock = {
 // DOM読み込み完了時にロックを実行
 document.addEventListener('DOMContentLoaded', AppLock.init);
 
-// グローバルスコープに解除関数を公開（script.jsから呼べるようにする）
+// MojiQ名前空間に登録
+window.MojiQAppLock = AppLock;
+
+// グローバルスコープに解除関数を公開（script.jsから呼べるようにする - 後方互換性）
 window.unlockApp = AppLock.unlock;
 window.showAppSidebars = AppLock.showSidebars;
 window.resetToInitial = AppLock.resetToInitial;

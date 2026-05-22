@@ -13,9 +13,9 @@ window.SimulatorKeyboard = (function() {
         window.addEventListener('mojiq:space', (e) => {
             State.set('isSpacePressed', e.detail.down);
 
-            // 統合モード: calibrationまたはgridモード時のカーソル変更
+            // 統合モード: calibration, grid, sampleGridモード時のカーソル変更
             const currentMode = State.get('currentMode');
-            if (currentMode === 'calibration' || currentMode === 'grid') {
+            if (currentMode === 'calibration' || currentMode === 'grid' || currentMode === 'sampleGrid') {
                 const canvas = DOM.getCanvas();
                 if (canvas) {
                     const isSimPanning = State.get('isSimPanning');
@@ -25,7 +25,7 @@ window.SimulatorKeyboard = (function() {
                         const isShiftPressed = State.get('isShiftPressed');
                         if (!isSimPanning && !isShiftPressed) {
                             const isGridAdjusting = State.get('isGridAdjusting');
-                            canvas.style.cursor = ((currentMode === 'grid' || currentMode === 'calibration') && !isGridAdjusting) ? 'crosshair' : 'default';
+                            canvas.style.cursor = ((currentMode === 'grid' || currentMode === 'sampleGrid' || currentMode === 'calibration') && !isGridAdjusting) ? 'crosshair' : 'default';
                         }
                     }
                 }
@@ -36,9 +36,9 @@ window.SimulatorKeyboard = (function() {
         window.addEventListener('mojiq:shift', (e) => {
             State.set('isShiftPressed', e.detail.down);
 
-            // 統合モード: calibrationまたはgridモード時のカーソル変更
+            // 統合モード: calibration, grid, sampleGridモード時のカーソル変更
             const currentMode = State.get('currentMode');
-            if (currentMode === 'calibration' || currentMode === 'grid') {
+            if (currentMode === 'calibration' || currentMode === 'grid' || currentMode === 'sampleGrid') {
                 const canvas = DOM.getCanvas();
                 if (canvas) {
                     const isSimPanning = State.get('isSimPanning');
@@ -54,7 +54,7 @@ window.SimulatorKeyboard = (function() {
                         const isSpacePressed = State.get('isSpacePressed');
                         if (!isSimPanning && !isSpacePressed) {
                             const isGridAdjusting = State.get('isGridAdjusting');
-                            canvas.style.cursor = ((currentMode === 'grid' || currentMode === 'calibration') && !isGridAdjusting) ? 'crosshair' : 'default';
+                            canvas.style.cursor = ((currentMode === 'grid' || currentMode === 'sampleGrid' || currentMode === 'calibration') && !isGridAdjusting) ? 'crosshair' : 'default';
                         }
                     }
                 }

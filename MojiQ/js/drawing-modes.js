@@ -949,7 +949,12 @@ window.MojiQDrawingModes = (function() {
             return shapeEndPos;
         }
 
-        if (mode === 'line' || mode === 'arrow' || mode === 'doubleArrow' || mode === 'doubleArrowAnnotated') {
+        if (mode === 'doubleArrowAnnotated') {
+            // 字間指示ツールは Y字線の終端から引出線を伸ばす
+            return { x: shapeEndPos.x, y: shapeEndPos.y };
+        }
+
+        if (mode === 'line' || mode === 'arrow' || mode === 'doubleArrow') {
             return {
                 x: (startPos.x + shapeEndPos.x) / 2,
                 y: (startPos.y + shapeEndPos.y) / 2

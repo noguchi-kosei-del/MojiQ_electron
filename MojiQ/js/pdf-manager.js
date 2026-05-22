@@ -28,6 +28,12 @@ window.MojiQPdfManager = (function() {
     let imagePageData = {};
     // 画像ページのImageBitmapキャッシュ（高速描画用）
     let imageBitmapCache = {};
+    // 読み込んだPDFから復元した確認済みコメント情報
+    let loadedCheckedComments = null;
+    // MojiQで保存済みのPDFかどうか（PDF注釈は既にラスタライズ済み）
+    let isMojiQSavedPdf = false;
+    // 読み込んだPDFから復元したMojiQテキスト情報
+    let loadedMojiQTexts = null;
 
     // 初回レンダリング時のコンテナサイズを固定（リサイズ時に変更しないため）
     let fixedContainerWidth = null;
@@ -157,6 +163,7 @@ window.MojiQPdfManager = (function() {
 
     // uint8ArrayToBase64 は _MojiQPdfUtils.uint8ArrayToBase64 を使用
     const uint8ArrayToBase64 = window._MojiQPdfUtils.uint8ArrayToBase64;
+    const uint8ArrayToBase64Async = window._MojiQPdfUtils.uint8ArrayToBase64Async;
 
     /**
      * 保存結果の警告を表示
@@ -190,6 +197,10 @@ window.MojiQPdfManager = (function() {
             // SubjectフィールドからMojiQメタデータを読み込む
             const subject = pdfDoc.getSubject();
 
+            // MojiQで保存済みのPDFかどうかを判定
+            // MojiQ:で始まるメタデータがあれば、PDF注釈は既にラスタライズ済み
+            isMojiQSavedPdf = !!(subject && subject.includes('MojiQ:'));
+
             if (subject && subject.includes('MojiQ:commentTextHidden=true')) {
                 // コメントテキスト非表示状態を復元
                 if (window.MojiQTextLayerManager && window.MojiQTextLayerManager.setIsHidden) {
@@ -199,6 +210,48 @@ window.MojiQPdfManager = (function() {
                 // 明示的に表示状態に設定（他のPDFから状態が引き継がれるのを防止）
                 if (window.MojiQTextLayerManager && window.MojiQTextLayerManager.setIsHidden) {
                     window.MojiQTextLayerManager.setIsHidden(false);
+                }
+            }
+
+            // 確認済みコメント情報を復元
+            loadedCheckedComments = null;
+            if (subject) {
+                const checkedMatch = subject.match(/MojiQChecked:([A-Za-z0-9+/=]+)/);
+                if (checkedMatch && checkedMatch[1]) {
+                    try {
+                        const jsonStr = decodeURIComponent(escape(atob(checkedMatch[1])));
+                        const compactData = JSON.parse(jsonStr);
+                        loadedCheckedComments = compactData.map(item => ({
+                            pdfPage: item.p,
+                            contents: item.c,
+                            canvasRect: (item.x !== null && item.y !== null) ? { x: item.x, y: item.y } : null
+                        }));
+                    } catch (e) {
+                        console.warn('[MojiQ] 確認済みコメント情報の復元に失敗:', e);
+                    }
+                }
+            }
+
+            // MojiQテキスト情報を復元
+            loadedMojiQTexts = null;
+            if (subject) {
+                const textMatch = subject.match(/MojiQText:([A-Za-z0-9+/=]+)/);
+                if (textMatch && textMatch[1]) {
+                    try {
+                        const jsonStr = decodeURIComponent(escape(atob(textMatch[1])));
+                        const textData = JSON.parse(jsonStr);
+                        if (Array.isArray(textData)) {
+                            loadedMojiQTexts = textData.map(item => ({
+                                pdfPage: item.p,
+                                contents: item.t,
+                                canvasRect: { x: item.x, y: item.y },
+                                displayWidth: item.w,
+                                displayHeight: item.h
+                            }));
+                        }
+                    } catch (e) {
+                        console.warn('[MojiQ] MojiQテキスト情報の復元に失敗:', e);
+                    }
                 }
             }
         } catch (e) {
@@ -1695,13 +1748,14 @@ window.MojiQPdfManager = (function() {
                 updateLoadingProgress(current, total, 'ページ');
             });
 
-            // PDF注釈を読み込み
+            // MojiQメタデータ（コメントテキスト非表示状態、確認済みコメント情報など）を読み込み
+            // 元のPDFファイルデータからメタデータを読み込む（最適化前のデータを使用）
+            // 注: PDF注釈読み込み前に実行することで、確認済みコメントをスキップ可能にする
+            await loadMojiQMetadata(typedarray);
+
+            // PDF注釈を読み込み（確認済みコメントはスキップ）
             updateProgressOverlayText('注釈を読み込み中...');
             await window.MojiQPdfAnnotationLoader.loadPdfAnnotationsForAllPages(pdf, fixedContainerWidth, fixedContainerHeight);
-
-            // MojiQメタデータ（コメントテキスト非表示状態など）を読み込み
-            // 元のPDFファイルデータからメタデータを読み込む（最適化前のデータを使用）
-            await loadMojiQMetadata(typedarray);
 
             // プログレスオーバーレイを非表示
             isProcessing = false;
@@ -1726,10 +1780,17 @@ window.MojiQPdfManager = (function() {
 
         } catch (err) {
             console.error(err);
+            // 状態を安全にリセット（部分的に初期化された状態を放置しない）
             isProcessing = false;
             showLoadingOverlay(false);
             window._pendingDrawingImport = false;
-            MojiQModal.showAlert('PDF読み込み失敗', 'エラー');
+            // 部分的に設定されたPDFデータをクリア
+            if (state) {
+                state.pdfDocs = [];
+                state.pageMapping = [];
+                state.totalPages = 0;
+            }
+            MojiQModal.showAlert('PDF読み込み失敗: ' + (err.message || err), 'エラー');
         }
     }
 
@@ -1799,11 +1860,110 @@ window.MojiQPdfManager = (function() {
         saveOperation.lockTime = null;
     }
 
+    /**
+     * 保存処理の状態（isProcessing / saveOperation.isLocked）が残留していないか検査し、
+     * 残留していれば強制リセット。saveOperation.lockTime を基準とする。
+     * Promise.race タイムアウトが効いていれば到達しない想定だが、二次防御として用意。
+     */
+    function recoverStaleSaveProcessing() {
+        if (!saveOperation.isLocked || !saveOperation.lockTime) return;
+        const stuckMs = Date.now() - saveOperation.lockTime;
+        const limit = calculateSaveTimeout() + 30000; // 保存タイムアウト + 30秒バッファ
+        if (stuckMs <= limit) return;
+        console.warn(`[MojiQ] 保存処理が ${Math.round(stuckMs / 1000)}秒残留。状態を強制リセットします。`);
+        isProcessing = false;
+        saveOperation.isLocked = false;
+        saveOperation.lockTime = null;
+        try { lockMenu(false); } catch (e) { /* noop */ }
+        try { hideProgressOverlay(); } catch (e) { /* noop */ }
+    }
+
+    /**
+     * Promiseにタイムアウトを付与（保存処理のハング対策）
+     * @param {Promise} promise - 対象のPromise
+     * @param {string} label - タイムアウト時のエラーメッセージ用ラベル
+     * @param {number} [ms] - タイムアウトms（省略時は calculateSaveTimeout()）
+     * @returns {Promise} タイムアウト付きPromise
+     */
+    function withSaveTimeout(promise, label, ms) {
+        const timeoutMs = ms || calculateSaveTimeout();
+        let timeoutId = null;
+        const timeoutPromise = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => {
+                reject(new Error(`${label}がタイムアウトしました（${Math.round(timeoutMs / 1000)}秒）`));
+            }, timeoutMs);
+        });
+        return Promise.race([promise, timeoutPromise]).finally(() => {
+            if (timeoutId) clearTimeout(timeoutId);
+        });
+    }
+
+    // IPC ハング対策: ファイル書き込み系の Electron IPC にタイムアウトを付与
+    const IPC_SAVE_TIMEOUT_MS = 120000;       // PDF本体書き込み: 2分
+    const IPC_JSON_TIMEOUT_MS = 60000;        // JSON書き込み: 1分
+
+    function saveFileWithTimeout(filePath, base64Data) {
+        return withSaveTimeout(
+            window.MojiQElectron.saveFile(filePath, base64Data),
+            'PDFファイル書き込み',
+            IPC_SAVE_TIMEOUT_MS
+        );
+    }
+
+    function exportDrawingWithTimeout(filePath) {
+        return withSaveTimeout(
+            window.DrawingExportImport.exportToPath(filePath),
+            '描画JSON書き込み',
+            IPC_JSON_TIMEOUT_MS
+        ).catch((e) => {
+            console.warn('[MojiQ] 描画JSON保存失敗:', e);
+            return false; // exportToPath の戻り値仕様に合わせる
+        });
+    }
+
+    function exportCommentsWithTimeout(filePath) {
+        return withSaveTimeout(
+            window.DrawingExportImport.exportCommentsToPath(filePath),
+            'コメントJSON書き込み',
+            IPC_JSON_TIMEOUT_MS
+        ).catch((e) => {
+            console.warn('[MojiQ] コメントJSON保存失敗:', e);
+            return false;
+        });
+    }
+
+    /**
+     * 保存完了時のユーザー通知メッセージを組み立てる。
+     * 実際に成功した項目のみを含めることで「嘘の成功メッセージ」を回避する。
+     * @param {boolean} exportDrawingEnabled - 描画/コメント同時保存が有効か
+     * @param {boolean} drawingSuccess - 描画JSONの保存成否（true=保存成功）
+     * @param {boolean} commentSuccess - コメントJSONの保存成否
+     * @returns {string} 表示メッセージ
+     */
+    function buildSaveCompletionMessage(exportDrawingEnabled, drawingSuccess, commentSuccess) {
+        if (!exportDrawingEnabled) return 'PDF保存が完了しました。';
+        if (drawingSuccess && commentSuccess) return 'PDFと描画＋コメントデータの保存が完了しました。';
+        if (drawingSuccess) return 'PDFと描画データの保存が完了しました。';
+        if (commentSuccess) return 'PDFとコメントデータの保存が完了しました。';
+        // 両方 false: 保存対象がなかった場合と失敗した場合の両方を含む（区別不能）。
+        // PDFは成功しているためベースメッセージのみ表示。個別失敗は console.warn に出力済み。
+        return 'PDF保存が完了しました。';
+    }
+
     async function savePdf() {
         if (state.pdfDocs.length === 0) return;
 
+        // 二次防御: 保存状態の残留を検知したら強制リセット
+        recoverStaleSaveProcessing();
+
         // 処理中の場合は保存をスキップ（ロード中に保存されるのを防止）
         if (isProcessing) return;
+
+        // 背景透過モードがオンの場合は透過PDF保存を実行（ロック取得は委譲先で行う）
+        if (isBgTransparentMode) {
+            await saveTransparentPdfDirect();
+            return;
+        }
 
         // 保存ロック取得（QA対策 #42, #52, #54）
         if (!acquireSaveLock()) {
@@ -1812,57 +1972,54 @@ window.MojiQPdfManager = (function() {
             return;
         }
 
-        // 背景透過モードがオンの場合は透過PDF保存を実行
-        if (isBgTransparentMode) {
-            try {
-                await saveTransparentPdfDirect();
-            } finally {
-                releaseSaveLock();
-            }
-            return;
-        }
-
-        // 処理中フラグを立てる（ファイルオープン防止）
-        isProcessing = true;
-
-        // メニューをロック（誤操作防止）
-        lockMenu(true);
-
-        // 保存中の表示（titleを変更）
+        // finallyで参照する状態フラグを try 外で宣言（いずれも throw しない）
         const originalTitle = savePdfBtn ? savePdfBtn.title : '';
-        if (savePdfBtn) {
-            savePdfBtn.title = "保存中...";
-            savePdfBtn.disabled = true;
-        }
-
-        // 描画中のストロークがあれば強制的に確定させる（選択解除より先に実行）
-        if (window.MojiQDrawing && window.MojiQDrawing.finalizeCurrentStroke) {
-            window.MojiQDrawing.finalizeCurrentStroke();
-        }
-
-        // 選択状態を解除（選択枠がPDFに残らないようにする）
-        const DrawingObjects = window.MojiQDrawingObjects;
-        if (DrawingObjects) {
-            DrawingObjects.deselectObject(state.currentPageNum);
-            // キャンバスを再描画して選択枠を消す
-            if (window.MojiQDrawing) {
-                window.MojiQDrawing.redrawCanvas();
-            }
-        }
-
-        // 現在の描画を保存
-        MojiQPageManager.saveCurrentCanvasToHistory();
-
-        // ファイル名取得
-        const fileName = getSaveFileName();
-
-        // ページ数が多い場合はプログレスオーバーレイを表示
-        const showProgress = state.totalPages >= 3;
-        if (showProgress) {
-            showProgressOverlay('PDFを保存しています...');
-        }
+        let showProgress = false;
+        let menuLocked = false;
+        let btnDisabled = false;
+        let fileName = '';
 
         try {
+            // 処理中フラグを立てる（ファイルオープン防止）
+            isProcessing = true;
+
+            // メニューをロック（誤操作防止）
+            lockMenu(true);
+            menuLocked = true;
+
+            // 保存中の表示（titleを変更）
+            if (savePdfBtn) {
+                savePdfBtn.title = "保存中...";
+                savePdfBtn.disabled = true;
+                btnDisabled = true;
+            }
+
+            // 描画系前処理は失敗しても保存本体は続行
+            try {
+                if (window.MojiQDrawing && window.MojiQDrawing.finalizeCurrentStroke) {
+                    window.MojiQDrawing.finalizeCurrentStroke();
+                }
+                const DrawingObjects = window.MojiQDrawingObjects;
+                if (DrawingObjects) {
+                    DrawingObjects.deselectObject(state.currentPageNum);
+                    if (window.MojiQDrawing) {
+                        window.MojiQDrawing.redrawCanvas();
+                    }
+                }
+                MojiQPageManager.saveCurrentCanvasToHistory();
+            } catch (preErr) {
+                console.warn('[MojiQ] 保存前処理で例外（続行）:', preErr);
+            }
+
+            // ファイル名取得
+            fileName = getSaveFileName();
+
+            // ページ数が多い場合はプログレスオーバーレイを表示
+            if (state.totalPages >= 3) {
+                showProgress = true;
+                showProgressOverlay('PDFを保存しています...');
+            }
+
             // pdf-libを使用した非破壊保存
             const PdfLibSaver = window.MojiQPdfLibSaver;
             if (!PdfLibSaver) {
@@ -1872,8 +2029,11 @@ window.MojiQPdfManager = (function() {
             // 見開きモード時は見開きマッピングを渡す
             const saveOptions = {
                 onProgress: (percent) => {
-                    if (showProgress) {
+                    if (!showProgress) return;
+                    try {
                         updateLoadingProgress(percent, 100, '%');
+                    } catch (e) {
+                        console.warn('[MojiQ] 進捗表示で例外（無視）:', e);
                     }
                 },
                 compressMode: window.isCompressSaveEnabled && window.isCompressSaveEnabled()
@@ -1888,10 +2048,14 @@ window.MojiQPdfManager = (function() {
                 saveOptions.spreadCssPageHeight = spreadBasePageSize.height * SpreadState.getSpreadBaseScale();
             }
 
-            const result = await PdfLibSaver.saveNonDestructive(state, fileName, saveOptions);
+            const result = await withSaveTimeout(
+                PdfLibSaver.saveNonDestructive(state, fileName, saveOptions),
+                'PDF保存処理'
+            );
 
-            if (!result.success) {
-                throw new Error(result.error || 'PDF保存に失敗しました');
+            // BUG修正: resultがnull/undefinedの場合のnull参照エラーを防止
+            if (!result || !result.success) {
+                throw new Error((result && result.error) || 'PDF保存に失敗しました');
             }
 
             // 圧縮警告がある場合は表示
@@ -1906,23 +2070,25 @@ window.MojiQPdfManager = (function() {
                 // 上書き保存用のパスが設定されている場合はダイアログを表示せずに保存
                 if (currentSaveFilePath) {
                     // Uint8ArrayをBase64に変換（大きなファイル対応）
-                    const pdfBase64 = uint8ArrayToBase64(pdfBytes);
-                    const saveResult = await window.MojiQElectron.saveFile(currentSaveFilePath, pdfBase64);
+                    const pdfBase64 = await uint8ArrayToBase64Async(pdfBytes);
+                    const saveResult = await saveFileWithTimeout(currentSaveFilePath, pdfBase64);
                     if (!saveResult.success) {
                         throw new Error(saveResult.error || '保存に失敗しました');
                     }
-                    // 保存成功: 変更フラグをリセット
-                    hasUnsavedChanges = false;
                     // 描画データも保存チェックがオンの場合、描画データも保存
                     const exportDrawingEnabled = window.isExportDrawingEnabled && window.isExportDrawingEnabled();
                     let drawingExportSuccess = false;
+                    let commentExportSuccess = false;
                     if (exportDrawingEnabled && window.DrawingExportImport) {
-                        drawingExportSuccess = await window.DrawingExportImport.exportToPath(currentSaveFilePath);
+                        drawingExportSuccess = await exportDrawingWithTimeout(currentSaveFilePath);
+                        commentExportSuccess = await exportCommentsWithTimeout(currentSaveFilePath);
                     }
+                    // 保存成功: 変更フラグをリセット（描画エクスポート完了後）
+                    hasUnsavedChanges = false;
                     // 上書き保存完了のポップアップを表示（描画データの保存結果を反映）
-                    const saveMessage = (exportDrawingEnabled && drawingExportSuccess)
-                        ? 'PDFと描画データの保存が完了しました。'
-                        : 'PDF保存が完了しました。';
+                    const saveMessage = buildSaveCompletionMessage(
+                        exportDrawingEnabled, drawingExportSuccess, commentExportSuccess
+                    );
                     MojiQModal.showAlert(saveMessage, '保存完了');
                     // 警告があれば表示
                     showSaveWarnings(result);
@@ -1931,13 +2097,11 @@ window.MojiQPdfManager = (function() {
                     const dialogResult = await window.MojiQElectron.showSavePdfDialog(fileName + '.pdf');
                     if (!dialogResult.canceled && dialogResult.filePath) {
                         // Uint8ArrayをBase64に変換（大きなファイル対応）
-                        const pdfBase64 = uint8ArrayToBase64(pdfBytes);
-                        const saveResult = await window.MojiQElectron.saveFile(dialogResult.filePath, pdfBase64);
+                        const pdfBase64 = await uint8ArrayToBase64Async(pdfBytes);
+                        const saveResult = await saveFileWithTimeout(dialogResult.filePath, pdfBase64);
                         if (!saveResult.success) {
                             throw new Error(saveResult.error || '保存に失敗しました');
                         }
-                        // 保存成功: 変更フラグをリセット
-                        hasUnsavedChanges = false;
                         // 上書き保存用: ファイルパスを記憶
                         currentSaveFilePath = dialogResult.filePath;
                         // ヘッダーのファイル名も更新
@@ -1946,13 +2110,17 @@ window.MojiQPdfManager = (function() {
                         // 描画データも保存チェックがオンの場合、描画データも保存
                         const exportDrawingEnabledNew = window.isExportDrawingEnabled && window.isExportDrawingEnabled();
                         let drawingExportSuccessNew = false;
+                        let commentExportSuccessNew = false;
                         if (exportDrawingEnabledNew && window.DrawingExportImport) {
-                            drawingExportSuccessNew = await window.DrawingExportImport.exportToPath(dialogResult.filePath);
+                            drawingExportSuccessNew = await exportDrawingWithTimeout(dialogResult.filePath);
+                            commentExportSuccessNew = await exportCommentsWithTimeout(dialogResult.filePath);
                         }
+                        // 保存成功: 変更フラグをリセット（描画エクスポート完了後）
+                        hasUnsavedChanges = false;
                         // 保存完了のポップアップを表示（描画データの保存結果を反映）
-                        const saveMessageNew = (exportDrawingEnabledNew && drawingExportSuccessNew)
-                            ? 'PDFと描画データの保存が完了しました。'
-                            : 'PDF保存が完了しました。';
+                        const saveMessageNew = buildSaveCompletionMessage(
+                            exportDrawingEnabledNew, drawingExportSuccessNew, commentExportSuccessNew
+                        );
                         MojiQModal.showAlert(saveMessageNew, '保存完了');
                         // 警告があれば表示
                         showSaveWarnings(result);
@@ -1982,14 +2150,15 @@ window.MojiQPdfManager = (function() {
             if (showProgress) {
                 hideProgressOverlay();
             }
-            isProcessing = false;
-            // メニューをアンロック（showProgressがfalseの場合、またはshowLoadingOverlay後の安全策）
-            lockMenu(false);
-            releaseSaveLock(); // QA対策 #42, #52, #54
-            if (savePdfBtn) {
+            if (btnDisabled && savePdfBtn) {
                 savePdfBtn.title = originalTitle;
                 savePdfBtn.disabled = false;
             }
+            if (menuLocked) {
+                lockMenu(false);
+            }
+            isProcessing = false;
+            releaseSaveLock(); // QA対策 #42, #52, #54
         }
     }
 
@@ -2000,8 +2169,17 @@ window.MojiQPdfManager = (function() {
     async function saveAsNew() {
         if (state.pdfDocs.length === 0) return;
 
+        // 二次防御: 保存状態の残留を検知したら強制リセット
+        recoverStaleSaveProcessing();
+
         // 処理中の場合は保存をスキップ（ロード中に保存されるのを防止）
         if (isProcessing) return;
+
+        // 背景透過モードがオンの場合は透過PDF保存を実行（ロック取得は委譲先で行う）
+        if (isBgTransparentMode) {
+            await saveTransparentPdfDirect();
+            return;
+        }
 
         // 保存ロック取得（QA対策 #42, #52, #54）
         if (!acquireSaveLock()) {
@@ -2010,57 +2188,54 @@ window.MojiQPdfManager = (function() {
             return;
         }
 
-        // 背景透過モードがオンの場合は透過PDF保存を実行
-        if (isBgTransparentMode) {
-            try {
-                await saveTransparentPdfDirect();
-            } finally {
-                releaseSaveLock();
-            }
-            return;
-        }
-
-        // 処理中フラグを立てる（ファイルオープン防止）
-        isProcessing = true;
-
-        // メニューをロック（誤操作防止）
-        lockMenu(true);
-
-        // 保存中の表示（titleを変更）
+        // finallyで参照する状態フラグを try 外で宣言（いずれも throw しない）
         const originalTitle = savePdfBtn ? savePdfBtn.title : '';
-        if (savePdfBtn) {
-            savePdfBtn.title = "保存中...";
-            savePdfBtn.disabled = true;
-        }
-
-        // 描画中のストロークがあれば強制的に確定させる（選択解除より先に実行）
-        if (window.MojiQDrawing && window.MojiQDrawing.finalizeCurrentStroke) {
-            window.MojiQDrawing.finalizeCurrentStroke();
-        }
-
-        // 選択状態を解除（選択枠がPDFに残らないようにする）
-        const DrawingObjects = window.MojiQDrawingObjects;
-        if (DrawingObjects) {
-            DrawingObjects.deselectObject(state.currentPageNum);
-            // キャンバスを再描画して選択枠を消す
-            if (window.MojiQDrawing) {
-                window.MojiQDrawing.redrawCanvas();
-            }
-        }
-
-        // 現在の描画を保存
-        MojiQPageManager.saveCurrentCanvasToHistory();
-
-        // ファイル名取得
-        const fileName = getSaveFileName();
-
-        // ページ数が多い場合はプログレスオーバーレイを表示
-        const showProgress = state.totalPages >= 3;
-        if (showProgress) {
-            showProgressOverlay('PDFを保存しています...');
-        }
+        let showProgress = false;
+        let menuLocked = false;
+        let btnDisabled = false;
+        let fileName = '';
 
         try {
+            // 処理中フラグを立てる（ファイルオープン防止）
+            isProcessing = true;
+
+            // メニューをロック（誤操作防止）
+            lockMenu(true);
+            menuLocked = true;
+
+            // 保存中の表示（titleを変更）
+            if (savePdfBtn) {
+                savePdfBtn.title = "保存中...";
+                savePdfBtn.disabled = true;
+                btnDisabled = true;
+            }
+
+            // 描画系前処理は失敗しても保存本体は続行
+            try {
+                if (window.MojiQDrawing && window.MojiQDrawing.finalizeCurrentStroke) {
+                    window.MojiQDrawing.finalizeCurrentStroke();
+                }
+                const DrawingObjects = window.MojiQDrawingObjects;
+                if (DrawingObjects) {
+                    DrawingObjects.deselectObject(state.currentPageNum);
+                    if (window.MojiQDrawing) {
+                        window.MojiQDrawing.redrawCanvas();
+                    }
+                }
+                MojiQPageManager.saveCurrentCanvasToHistory();
+            } catch (preErr) {
+                console.warn('[MojiQ] 保存前処理で例外（続行）:', preErr);
+            }
+
+            // ファイル名取得
+            fileName = getSaveFileName();
+
+            // ページ数が多い場合はプログレスオーバーレイを表示
+            if (state.totalPages >= 3) {
+                showProgress = true;
+                showProgressOverlay('PDFを保存しています...');
+            }
+
             // pdf-libを使用した非破壊保存
             const PdfLibSaver = window.MojiQPdfLibSaver;
             if (!PdfLibSaver) {
@@ -2070,8 +2245,11 @@ window.MojiQPdfManager = (function() {
             // 見開きモード時は見開きマッピングを渡す
             const saveOptions = {
                 onProgress: (percent) => {
-                    if (showProgress) {
+                    if (!showProgress) return;
+                    try {
                         updateLoadingProgress(percent, 100, '%');
+                    } catch (e) {
+                        console.warn('[MojiQ] 進捗表示で例外（無視）:', e);
                     }
                 },
                 compressMode: window.isCompressSaveEnabled && window.isCompressSaveEnabled()
@@ -2086,10 +2264,14 @@ window.MojiQPdfManager = (function() {
                 saveOptions.spreadCssPageHeight = spreadBasePageSize.height * SpreadState.getSpreadBaseScale();
             }
 
-            const result = await PdfLibSaver.saveNonDestructive(state, fileName, saveOptions);
+            const result = await withSaveTimeout(
+                PdfLibSaver.saveNonDestructive(state, fileName, saveOptions),
+                'PDF保存処理'
+            );
 
-            if (!result.success) {
-                throw new Error(result.error || 'PDF保存に失敗しました');
+            // BUG修正: resultがnull/undefinedの場合のnull参照エラーを防止
+            if (!result || !result.success) {
+                throw new Error((result && result.error) || 'PDF保存に失敗しました');
             }
 
             // 圧縮警告がある場合は表示
@@ -2105,8 +2287,8 @@ window.MojiQPdfManager = (function() {
                 const dialogResult = await window.MojiQElectron.showSavePdfDialog(fileName + '.pdf');
                 if (!dialogResult.canceled && dialogResult.filePath) {
                     // Uint8ArrayをBase64に変換（大きなファイル対応）
-                    const pdfBase64 = uint8ArrayToBase64(pdfBytes);
-                    const saveResult = await window.MojiQElectron.saveFile(dialogResult.filePath, pdfBase64);
+                    const pdfBase64 = await uint8ArrayToBase64Async(pdfBytes);
+                    const saveResult = await saveFileWithTimeout(dialogResult.filePath, pdfBase64);
                     if (!saveResult.success) {
                         throw new Error(saveResult.error || '保存に失敗しました');
                     }
@@ -2120,13 +2302,15 @@ window.MojiQPdfManager = (function() {
                     // 描画データも保存チェックがオンの場合、描画データも保存
                     const exportDrawingEnabledSaveAs = window.isExportDrawingEnabled && window.isExportDrawingEnabled();
                     let drawingExportSuccessSaveAs = false;
+                    let commentExportSuccessSaveAs = false;
                     if (exportDrawingEnabledSaveAs && window.DrawingExportImport) {
-                        drawingExportSuccessSaveAs = await window.DrawingExportImport.exportToPath(dialogResult.filePath);
+                        drawingExportSuccessSaveAs = await exportDrawingWithTimeout(dialogResult.filePath);
+                        commentExportSuccessSaveAs = await exportCommentsWithTimeout(dialogResult.filePath);
                     }
                     // 保存完了のポップアップを表示（描画データの保存結果を反映）
-                    const saveMessageSaveAs = (exportDrawingEnabledSaveAs && drawingExportSuccessSaveAs)
-                        ? 'PDFと描画データの保存が完了しました。'
-                        : 'PDF保存が完了しました。';
+                    const saveMessageSaveAs = buildSaveCompletionMessage(
+                        exportDrawingEnabledSaveAs, drawingExportSuccessSaveAs, commentExportSuccessSaveAs
+                    );
                     MojiQModal.showAlert(saveMessageSaveAs, '保存完了');
                     // 警告があれば表示
                     showSaveWarnings(result);
@@ -2155,14 +2339,15 @@ window.MojiQPdfManager = (function() {
             if (showProgress) {
                 hideProgressOverlay();
             }
-            isProcessing = false;
-            // メニューをアンロック（showProgressがfalseの場合、またはshowLoadingOverlay後の安全策）
-            lockMenu(false);
-            releaseSaveLock(); // QA対策 #42, #52, #54
-            if (savePdfBtn) {
+            if (btnDisabled && savePdfBtn) {
                 savePdfBtn.title = originalTitle;
                 savePdfBtn.disabled = false;
             }
+            if (menuLocked) {
+                lockMenu(false);
+            }
+            isProcessing = false;
+            releaseSaveLock(); // QA対策 #42, #52, #54
         }
     }
 
@@ -2173,6 +2358,10 @@ window.MojiQPdfManager = (function() {
      */
     async function exportPdfToPath(filePath) {
         if (state.pdfDocs.length === 0) return;
+
+        // 二次防御: 保存状態の残留を検知したら強制リセット
+        recoverStaleSaveProcessing();
+
         if (isProcessing) return;
 
         // BUG修正: 保存ロックを取得（他の保存処理との競合防止）
@@ -2181,45 +2370,52 @@ window.MojiQPdfManager = (function() {
             return;
         }
 
-        // 処理中フラグを立てる（ファイルオープン防止）
-        isProcessing = true;
-
-        // メニューをロック（誤操作防止）
-        lockMenu(true);
-
-        // 保存中の表示
+        // finallyで参照する状態フラグを try 外で宣言（いずれも throw しない）
         const originalTitle = savePdfBtn ? savePdfBtn.title : '';
-        if (savePdfBtn) {
-            savePdfBtn.title = "保存中...";
-            savePdfBtn.disabled = true;
-        }
-
-        // 描画中のストロークがあれば強制的に確定させる（選択解除より先に実行）
-        if (window.MojiQDrawing && window.MojiQDrawing.finalizeCurrentStroke) {
-            window.MojiQDrawing.finalizeCurrentStroke();
-        }
-
-        // 選択状態を解除
-        const DrawingObjects = window.MojiQDrawingObjects;
-        if (DrawingObjects) {
-            DrawingObjects.deselectObject(state.currentPageNum);
-            if (window.MojiQDrawing) {
-                window.MojiQDrawing.redrawCanvas();
-            }
-        }
-
-        MojiQPageManager.saveCurrentCanvasToHistory();
-
-        // ファイル名をパスから抽出
+        let showProgress = false;
+        let menuLocked = false;
+        let btnDisabled = false;
+        // ファイル名をパスから抽出（純粋な文字列操作なので throw しない）
         const fileName = filePath.split(/[/\\]/).pop().replace(/\.pdf$/i, '') || 'download';
 
-        // ページ数が多い場合はプログレスオーバーレイを表示
-        const showProgress = state.totalPages >= 3;
-        if (showProgress) {
-            showProgressOverlay('PDFを保存しています...');
-        }
-
         try {
+            // 処理中フラグを立てる（ファイルオープン防止）
+            isProcessing = true;
+
+            // メニューをロック（誤操作防止）
+            lockMenu(true);
+            menuLocked = true;
+
+            // 保存中の表示
+            if (savePdfBtn) {
+                savePdfBtn.title = "保存中...";
+                savePdfBtn.disabled = true;
+                btnDisabled = true;
+            }
+
+            // 描画系前処理は失敗しても保存本体は続行
+            try {
+                if (window.MojiQDrawing && window.MojiQDrawing.finalizeCurrentStroke) {
+                    window.MojiQDrawing.finalizeCurrentStroke();
+                }
+                const DrawingObjects = window.MojiQDrawingObjects;
+                if (DrawingObjects) {
+                    DrawingObjects.deselectObject(state.currentPageNum);
+                    if (window.MojiQDrawing) {
+                        window.MojiQDrawing.redrawCanvas();
+                    }
+                }
+                MojiQPageManager.saveCurrentCanvasToHistory();
+            } catch (preErr) {
+                console.warn('[MojiQ] 保存前処理で例外（続行）:', preErr);
+            }
+
+            // ページ数が多い場合はプログレスオーバーレイを表示
+            if (state.totalPages >= 3) {
+                showProgress = true;
+                showProgressOverlay('PDFを保存しています...');
+            }
+
             // pdf-libを使用した非破壊保存
             const PdfLibSaver = window.MojiQPdfLibSaver;
             if (!PdfLibSaver) {
@@ -2229,10 +2425,14 @@ window.MojiQPdfManager = (function() {
             // 見開きモード時は見開きマッピングを渡す
             const saveOptions = {
                 onProgress: (percent) => {
-                    if (showProgress) {
+                    if (!showProgress) return;
+                    try {
                         updateLoadingProgress(percent, 100, '%');
+                    } catch (e) {
+                        console.warn('[MojiQ] 進捗表示で例外（無視）:', e);
                     }
-                }
+                },
+                compressMode: window.isCompressSaveEnabled && window.isCompressSaveEnabled()
             };
 
             // 見開きモード時は見開き状態で保存
@@ -2244,18 +2444,27 @@ window.MojiQPdfManager = (function() {
                 saveOptions.spreadCssPageHeight = spreadBasePageSize.height * SpreadState.getSpreadBaseScale();
             }
 
-            const result = await PdfLibSaver.saveNonDestructive(state, fileName, saveOptions);
+            const result = await withSaveTimeout(
+                PdfLibSaver.saveNonDestructive(state, fileName, saveOptions),
+                'PDF保存処理'
+            );
 
-            if (!result.success) {
-                throw new Error(result.error || 'PDF保存に失敗しました');
+            // BUG修正: resultがnull/undefinedの場合のnull参照エラーを防止
+            if (!result || !result.success) {
+                throw new Error((result && result.error) || 'PDF保存に失敗しました');
             }
 
-            // Uint8ArrayをBase64に変換（大きなファイル対応）
+            // 圧縮警告がある場合は表示
+            if (result.compressWarning) {
+                MojiQModal.showAlert(result.compressWarning, '圧縮結果');
+            }
+
+            // Uint8ArrayをBase64に変換（大きなファイル対応、UIブロック防止のため非同期版）
             const pdfBytes = result.data;
-            const pdfBase64 = uint8ArrayToBase64(pdfBytes);
+            const pdfBase64 = await uint8ArrayToBase64Async(pdfBytes);
 
             // 指定パスに保存
-            const saveResult = await window.MojiQElectron.saveFile(filePath, pdfBase64);
+            const saveResult = await saveFileWithTimeout(filePath, pdfBase64);
             if (!saveResult.success) {
                 throw new Error(saveResult.error || '保存に失敗しました');
             }
@@ -2272,14 +2481,16 @@ window.MojiQPdfManager = (function() {
             // 描画データも保存チェックがオンの場合、描画データも保存
             const exportDrawingEnabledPath = window.isExportDrawingEnabled && window.isExportDrawingEnabled();
             let drawingExportSuccessPath = false;
+            let commentExportSuccessPath = false;
             if (exportDrawingEnabledPath && window.DrawingExportImport) {
-                drawingExportSuccessPath = await window.DrawingExportImport.exportToPath(filePath);
+                drawingExportSuccessPath = await exportDrawingWithTimeout(filePath);
+                commentExportSuccessPath = await exportCommentsWithTimeout(filePath);
             }
 
             // 保存完了のポップアップを表示（描画データの保存結果を反映）
-            const saveMessagePath = (exportDrawingEnabledPath && drawingExportSuccessPath)
-                ? 'PDFと描画データの保存が完了しました。'
-                : 'PDF保存が完了しました。';
+            const saveMessagePath = buildSaveCompletionMessage(
+                exportDrawingEnabledPath, drawingExportSuccessPath, commentExportSuccessPath
+            );
             MojiQModal.showAlert(saveMessagePath, '保存完了');
 
             // 警告があれば表示
@@ -2292,15 +2503,16 @@ window.MojiQPdfManager = (function() {
             if (showProgress) {
                 hideProgressOverlay();
             }
-            isProcessing = false;
-            // BUG修正: 保存ロックを解放
-            releaseSaveLock();
-            // メニューをアンロック
-            lockMenu(false);
-            if (savePdfBtn) {
+            if (btnDisabled && savePdfBtn) {
                 savePdfBtn.title = originalTitle;
                 savePdfBtn.disabled = false;
             }
+            if (menuLocked) {
+                lockMenu(false);
+            }
+            isProcessing = false;
+            // BUG修正: 保存ロックを解放
+            releaseSaveLock();
         }
     }
 
@@ -2352,8 +2564,9 @@ window.MojiQPdfManager = (function() {
 
             const result = await PdfLibSaver.saveNonDestructive(state, 'print-temp', saveOptions);
 
-            if (!result.success) {
-                return { success: false, error: result.error || 'PDF生成に失敗しました' };
+            // BUG修正: resultがnull/undefinedの場合のnull参照エラーを防止
+            if (!result || !result.success) {
+                return { success: false, error: (result && result.error) || 'PDF生成に失敗しました' };
             }
 
             return { success: true, data: result.data };
@@ -3237,8 +3450,8 @@ window.MojiQPdfManager = (function() {
             // ヘッダーにPDFファイル名を表示
             updatePdfFileNameDisplay(fileName);
 
-            // 上書き保存用: ファイルパスを記憶
-            currentSaveFilePath = filePath;
+            // 上書き保存用: 初回読込時はパスをリセット（保存後に設定される）
+            currentSaveFilePath = null;
 
             // 変更フラグをリセット（新規読み込み時は変更なし）
             hasUnsavedChanges = false;
@@ -3250,13 +3463,14 @@ window.MojiQPdfManager = (function() {
                 updateLoadingProgress(current, total, 'ページ');
             });
 
-            // PDF注釈を読み込み
+            // MojiQメタデータ（コメントテキスト非表示状態、確認済みコメント情報など）を読み込み
+            // 元のPDFデータからメタデータを読み込む（最適化/圧縮前のデータを使用）
+            // 注: PDF注釈読み込み前に実行することで、確認済みコメントをスキップ可能にする
+            await loadMojiQMetadata(typedarray);
+
+            // PDF注釈を読み込み（確認済みコメントはスキップ）
             updateProgressOverlayText('注釈を読み込み中...');
             await window.MojiQPdfAnnotationLoader.loadPdfAnnotationsForAllPages(pdf, fixedContainerWidth, fixedContainerHeight);
-
-            // MojiQメタデータ（コメントテキスト非表示状態など）を読み込み
-            // 元のPDFデータからメタデータを読み込む（最適化/圧縮前のデータを使用）
-            await loadMojiQMetadata(typedarray);
 
             hideProgressOverlay();
             // 検版ビューワー連携: 指定された初期ページを表示
@@ -3402,13 +3616,14 @@ window.MojiQPdfManager = (function() {
                 updateProgressOverlay(current, total);
             });
 
-            // PDF注釈を読み込み
+            // MojiQメタデータ（コメントテキスト非表示状態、確認済みコメント情報など）を読み込み
+            // 元のPDFデータからメタデータを読み込む
+            // 注: PDF注釈読み込み前に実行することで、確認済みコメントをスキップ可能にする
+            await loadMojiQMetadata(bytes);
+
+            // PDF注釈を読み込み（確認済みコメントはスキップ）
             showProgressOverlay('注釈を読み込み中...');
             await window.MojiQPdfAnnotationLoader.loadPdfAnnotationsForAllPages(pdf, fixedContainerWidth, fixedContainerHeight);
-
-            // MojiQメタデータ（コメントテキスト非表示状態など）を読み込み
-            // 元のPDFデータからメタデータを読み込む
-            await loadMojiQMetadata(bytes);
 
             hideProgressOverlay();
 
@@ -3504,6 +3719,10 @@ window.MojiQPdfManager = (function() {
      */
     async function saveTransparentPdf() {
         if (state.pdfDocs.length === 0) return;
+
+        // 二次防御: 保存状態の残留を検知したら強制リセット
+        recoverStaleSaveProcessing();
+
         // BUG修正: 処理中チェックを追加
         if (isProcessing) return;
 
@@ -3517,41 +3736,48 @@ window.MojiQPdfManager = (function() {
             return;
         }
 
-        // BUG修正: 処理中フラグを立てる
-        isProcessing = true;
-
-        // メニューをロック（誤操作防止）
-        lockMenu(true);
-
-        // 保存中の表示
+        // finallyで参照する状態フラグを try 外で宣言（いずれも throw しない）
         const saveTransparentBtn = document.getElementById('saveTransparentPdfBtn');
         const originalTitle = saveTransparentBtn ? saveTransparentBtn.title : '';
-        if (saveTransparentBtn) {
-            saveTransparentBtn.title = "保存中...";
-            saveTransparentBtn.disabled = true;
-        }
-
-        // 描画中のストロークがあれば強制的に確定させる（選択解除より先に実行）
-        if (window.MojiQDrawing && window.MojiQDrawing.finalizeCurrentStroke) {
-            window.MojiQDrawing.finalizeCurrentStroke();
-        }
-
-        // 選択状態を解除（選択枠がPDFに残らないようにする）
-        const DrawingObjects = window.MojiQDrawingObjects;
-        if (DrawingObjects) {
-            DrawingObjects.deselectObject(state.currentPageNum);
-            if (window.MojiQDrawing) {
-                window.MojiQDrawing.redrawCanvas();
-            }
-        }
-
-        // 現在の描画を保存
-        MojiQPageManager.saveCurrentCanvasToHistory();
-
-        // ファイル名取得
-        const fileName = getSaveFileName('_transparent');
+        let menuLocked = false;
+        let btnDisabled = false;
+        let fileName = '';
 
         try {
+            // BUG修正: 処理中フラグを立てる
+            isProcessing = true;
+
+            // メニューをロック（誤操作防止）
+            lockMenu(true);
+            menuLocked = true;
+
+            // 保存中の表示
+            if (saveTransparentBtn) {
+                saveTransparentBtn.title = "保存中...";
+                saveTransparentBtn.disabled = true;
+                btnDisabled = true;
+            }
+
+            // 描画系前処理は失敗しても保存本体は続行
+            try {
+                if (window.MojiQDrawing && window.MojiQDrawing.finalizeCurrentStroke) {
+                    window.MojiQDrawing.finalizeCurrentStroke();
+                }
+                const DrawingObjects = window.MojiQDrawingObjects;
+                if (DrawingObjects) {
+                    DrawingObjects.deselectObject(state.currentPageNum);
+                    if (window.MojiQDrawing) {
+                        window.MojiQDrawing.redrawCanvas();
+                    }
+                }
+                MojiQPageManager.saveCurrentCanvasToHistory();
+            } catch (preErr) {
+                console.warn('[MojiQ] 透過保存前処理で例外（続行）:', preErr);
+            }
+
+            // ファイル名取得
+            fileName = getSaveFileName('_transparent');
+
             // pdf-libを使用した透過保存
             const PdfLibSaver = window.MojiQPdfLibSaver;
             if (!PdfLibSaver) {
@@ -3572,7 +3798,10 @@ window.MojiQPdfManager = (function() {
                 saveOptions.spreadCssPageHeight = spreadBasePageSize.height * SpreadState.getSpreadBaseScale();
             }
 
-            const result = await PdfLibSaver.saveTransparent(state, fileName, saveOptions);
+            const result = await withSaveTimeout(
+                PdfLibSaver.saveTransparent(state, fileName, saveOptions),
+                '透過PDF保存処理'
+            );
 
             if (!result.success) {
                 throw new Error(result.error || '透過PDF保存に失敗しました');
@@ -3585,8 +3814,8 @@ window.MojiQPdfManager = (function() {
                 // Electronネイティブ保存ダイアログを使用
                 const dialogResult = await window.MojiQElectron.showSavePdfDialog(fileName + '_transparent.pdf');
                 if (!dialogResult.canceled && dialogResult.filePath) {
-                    const pdfBase64 = uint8ArrayToBase64(pdfBytes);
-                    const saveResult = await window.MojiQElectron.saveFile(dialogResult.filePath, pdfBase64);
+                    const pdfBase64 = await uint8ArrayToBase64Async(pdfBytes);
+                    const saveResult = await saveFileWithTimeout(dialogResult.filePath, pdfBase64);
                     if (!saveResult.success) {
                         throw new Error(saveResult.error || '保存に失敗しました');
                     }
@@ -3610,16 +3839,15 @@ window.MojiQPdfManager = (function() {
             console.error('透過PDF保存エラー:', e);
             MojiQModal.showAlert('保存エラー: ' + e.message, 'エラー');
         } finally {
-            // BUG修正: 処理中フラグをクリア
-            isProcessing = false;
-            // BUG修正: 保存ロックを解放
-            releaseSaveLock();
-            // メニューをアンロック
-            lockMenu(false);
-            if (saveTransparentBtn) {
+            if (btnDisabled && saveTransparentBtn) {
                 saveTransparentBtn.title = originalTitle;
                 saveTransparentBtn.disabled = false;
             }
+            if (menuLocked) {
+                lockMenu(false);
+            }
+            isProcessing = false;
+            releaseSaveLock();
         }
     }
 
@@ -3629,6 +3857,10 @@ window.MojiQPdfManager = (function() {
      */
     async function saveTransparentPdfDirect() {
         if (state.pdfDocs.length === 0) return;
+
+        // 二次防御: 保存状態の残留を検知したら強制リセット
+        recoverStaleSaveProcessing();
+
         // BUG修正: 処理中チェックを追加
         if (isProcessing) return;
 
@@ -3638,46 +3870,54 @@ window.MojiQPdfManager = (function() {
             return;
         }
 
-        // 処理中フラグを立てる（ファイルオープン防止）
-        isProcessing = true;
-
-        // メニューをロック（誤操作防止）
-        lockMenu(true);
-
-        // 保存中の表示
+        // finallyで参照する状態フラグを try 外で宣言（いずれも throw しない）
         const originalTitle = savePdfBtn ? savePdfBtn.title : '';
-        if (savePdfBtn) {
-            savePdfBtn.title = "保存中...";
-            savePdfBtn.disabled = true;
-        }
-
-        // 描画中のストロークがあれば強制的に確定させる（選択解除より先に実行）
-        if (window.MojiQDrawing && window.MojiQDrawing.finalizeCurrentStroke) {
-            window.MojiQDrawing.finalizeCurrentStroke();
-        }
-
-        // 選択状態を解除（選択枠がPDFに残らないようにする）
-        const DrawingObjects = window.MojiQDrawingObjects;
-        if (DrawingObjects) {
-            DrawingObjects.deselectObject(state.currentPageNum);
-            if (window.MojiQDrawing) {
-                window.MojiQDrawing.redrawCanvas();
-            }
-        }
-
-        // 現在の描画を保存
-        MojiQPageManager.saveCurrentCanvasToHistory();
-
-        // ファイル名取得
-        const fileName = getSaveFileName();
-
-        // ページ数が多い場合はプログレスオーバーレイを表示
-        const showProgress = state.totalPages >= 3;
-        if (showProgress) {
-            showProgressOverlay('透過PDFを保存しています...');
-        }
+        let showProgress = false;
+        let menuLocked = false;
+        let btnDisabled = false;
+        let fileName = '';
 
         try {
+            // 処理中フラグを立てる（ファイルオープン防止）
+            isProcessing = true;
+
+            // メニューをロック（誤操作防止）
+            lockMenu(true);
+            menuLocked = true;
+
+            // 保存中の表示
+            if (savePdfBtn) {
+                savePdfBtn.title = "保存中...";
+                savePdfBtn.disabled = true;
+                btnDisabled = true;
+            }
+
+            // 描画系前処理は失敗しても保存本体は続行
+            try {
+                if (window.MojiQDrawing && window.MojiQDrawing.finalizeCurrentStroke) {
+                    window.MojiQDrawing.finalizeCurrentStroke();
+                }
+                const DrawingObjects = window.MojiQDrawingObjects;
+                if (DrawingObjects) {
+                    DrawingObjects.deselectObject(state.currentPageNum);
+                    if (window.MojiQDrawing) {
+                        window.MojiQDrawing.redrawCanvas();
+                    }
+                }
+                MojiQPageManager.saveCurrentCanvasToHistory();
+            } catch (preErr) {
+                console.warn('[MojiQ] 透過保存前処理で例外（続行）:', preErr);
+            }
+
+            // ファイル名取得
+            fileName = getSaveFileName();
+
+            // ページ数が多い場合はプログレスオーバーレイを表示
+            if (state.totalPages >= 3) {
+                showProgress = true;
+                showProgressOverlay('透過PDFを保存しています...');
+            }
+
             // pdf-libを使用した透過保存（スライダーで設定した透明度）
             const PdfLibSaver = window.MojiQPdfLibSaver;
             if (!PdfLibSaver) {
@@ -3688,8 +3928,11 @@ window.MojiQPdfManager = (function() {
             const saveOptions = {
                 bgOpacity: bgOpacityValue,  // スライダーで設定した透明度
                 onProgress: (percent) => {
-                    if (showProgress) {
+                    if (!showProgress) return;
+                    try {
                         updateLoadingProgress(percent, 100, '%');
+                    } catch (e) {
+                        console.warn('[MojiQ] 進捗表示で例外（無視）:', e);
                     }
                 }
             };
@@ -3703,7 +3946,10 @@ window.MojiQPdfManager = (function() {
                 saveOptions.spreadCssPageHeight = spreadBasePageSize.height * SpreadState.getSpreadBaseScale();
             }
 
-            const result = await PdfLibSaver.saveTransparent(state, fileName, saveOptions);
+            const result = await withSaveTimeout(
+                PdfLibSaver.saveTransparent(state, fileName, saveOptions),
+                '透過PDF保存処理'
+            );
 
             if (!result.success) {
                 throw new Error(result.error || '透過PDF保存に失敗しました');
@@ -3716,8 +3962,8 @@ window.MojiQPdfManager = (function() {
                 // Electronネイティブ保存ダイアログを使用
                 const dialogResult = await window.MojiQElectron.showSavePdfDialog(fileName + '.pdf');
                 if (!dialogResult.canceled && dialogResult.filePath) {
-                    const pdfBase64 = uint8ArrayToBase64(pdfBytes);
-                    const saveResult = await window.MojiQElectron.saveFile(dialogResult.filePath, pdfBase64);
+                    const pdfBase64 = await uint8ArrayToBase64Async(pdfBytes);
+                    const saveResult = await saveFileWithTimeout(dialogResult.filePath, pdfBase64);
                     if (!saveResult.success) {
                         throw new Error(saveResult.error || '保存に失敗しました');
                     }
@@ -3744,15 +3990,16 @@ window.MojiQPdfManager = (function() {
             if (showProgress) {
                 hideProgressOverlay();
             }
-            isProcessing = false;
-            // BUG修正: 保存ロックを解放
-            releaseSaveLock();
-            // メニューをアンロック
-            lockMenu(false);
-            if (savePdfBtn) {
+            if (btnDisabled && savePdfBtn) {
                 savePdfBtn.title = originalTitle;
                 savePdfBtn.disabled = false;
             }
+            if (menuLocked) {
+                lockMenu(false);
+            }
+            isProcessing = false;
+            // BUG修正: 保存ロックを解放
+            releaseSaveLock();
         }
     }
 
@@ -5878,6 +6125,48 @@ window.MojiQPdfManager = (function() {
         splitObjectsFromSpreadPages();
     }
 
+    /**
+     * 横長のページが含まれているかどうかを判定
+     * いずれかのページで幅が高さより大きい場合は横長と判定
+     * @returns {boolean}
+     */
+    function isLandscapeImage() {
+        if (!state || !state.pageMapping || state.pageMapping.length === 0) {
+            return false;
+        }
+
+        // 全ページをチェックし、いずれかが横長ならtrueを返す
+        for (let i = 0; i < state.pageMapping.length; i++) {
+            const mapItem = state.pageMapping[i];
+            if (!mapItem) continue;
+
+            let width = 0, height = 0;
+
+            // displayWidth/Heightで判定（レンダリング後に設定される）
+            if (mapItem.displayWidth && mapItem.displayHeight) {
+                width = mapItem.displayWidth;
+                height = mapItem.displayHeight;
+            }
+            // width/heightで判定（画像ページ・白紙ページ用）
+            else if (mapItem.width && mapItem.height) {
+                width = mapItem.width;
+                height = mapItem.height;
+            }
+            // 画像ページの場合、imagePageDataからも判定
+            else if (mapItem.docIndex === -2 && imagePageData[mapItem.imageIndex]) {
+                const imgData = imagePageData[mapItem.imageIndex];
+                width = imgData.width;
+                height = imgData.height;
+            }
+
+            if (width > 0 && height > 0 && width > height) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     return {
         init,
         cleanup,  // メモリリーク対策: イベントリスナー解除
@@ -5950,6 +6239,16 @@ window.MojiQPdfManager = (function() {
         // プログレス表示（画像配置等で使用）
         showProgress: showProgressOverlay,
         hideProgress: hideProgressOverlay,
-        updateProgress: updateLoadingProgress
+        updateProgress: updateLoadingProgress,
+        // 確認済みコメント情報（PDF注釈の再読み込みスキップ用）
+        getLoadedCheckedComments: () => loadedCheckedComments,
+        clearLoadedCheckedComments: () => { loadedCheckedComments = null; },
+        // MojiQ保存済みPDFかどうか（PDF注釈は既にラスタライズ済み）
+        isMojiQSavedPdf: () => isMojiQSavedPdf,
+        // MojiQテキスト情報（メタデータから復元）
+        getLoadedMojiQTexts: () => loadedMojiQTexts,
+        clearLoadedMojiQTexts: () => { loadedMojiQTexts = null; },
+        // 横長の画像（見開き）かどうかを判定
+        isLandscapeImage
     };
 })();
