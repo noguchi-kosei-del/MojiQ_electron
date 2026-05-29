@@ -1,9 +1,55 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+function detectPackagedRuntime() {
+  if (process.argv.includes('--mojiq-packaged=1')) return true;
+  if (process.argv.includes('--mojiq-packaged=0')) return false;
+
+  try {
+    const info = ipcRenderer.sendSync('get-runtime-security-info-sync');
+    return info && info.isPackagedRuntime === true;
+  } catch (error) {
+    return true;
+  }
+}
+
+const isPackagedRuntime = detectPackagedRuntime();
+const isCspDebugEnabled = !isPackagedRuntime && process.argv.includes('--mojiq-csp-debug=1');
+const cspViolations = [];
+
+if (isCspDebugEnabled) {
+  window.addEventListener('securitypolicyviolation', (event) => {
+    const violation = {
+      directive: event.violatedDirective,
+      blockedURI: event.blockedURI,
+      effectiveDirective: event.effectiveDirective,
+      originalPolicy: event.originalPolicy,
+      timestamp: Date.now()
+    };
+
+    cspViolations.push(violation);
+    if (cspViolations.length > 50) cspViolations.shift();
+    console.warn('[MojiQ Security] CSP violation blocked', violation);
+  }, true);
+}
+
+function registerDroppedFiles(event) {
+  const files = Array.from(event.dataTransfer?.files || []);
+  const filePaths = files
+    .map((file) => file.path)
+    .filter((filePath) => typeof filePath === 'string' && filePath.length > 0);
+
+  if (filePaths.length > 0) {
+    ipcRenderer.invoke('register-dropped-files', filePaths).catch(() => {});
+  }
+}
+
+window.addEventListener('drop', registerDroppedFiles, true);
+
 // レンダラープロセスに安全にAPIを公開
 contextBridge.exposeInMainWorld('electronAPI', {
   // Electron環境かどうか
   isElectron: true,
+  ...(isCspDebugEnabled ? { getCspViolations: () => cspViolations.slice() } : {}),
 
   // ファイル選択ダイアログ
   showOpenDialog: (options) => ipcRenderer.invoke('show-open-dialog', options),

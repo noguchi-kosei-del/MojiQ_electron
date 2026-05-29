@@ -124,6 +124,7 @@ window.MojiQPdfManager = (function() {
     // イベントリスナー参照（cleanup用）
     let boundHandlers = {
         pdfUploadChange: null,
+        pdfUploadClick: null,
         insertPdfUploadChange: null,
         openPdfHandler: null,
         savePdfHandler: null,
@@ -1463,7 +1464,9 @@ window.MojiQPdfManager = (function() {
             updatePdfFileNameDisplay(displayName);
 
             // 上書き保存用: ブラウザ経由でファイルを開いた場合はパスが不明なのでリセット
-            currentSaveFilePath = null;
+            currentSaveFilePath = (window.MojiQElectron && window.MojiQElectron.isElectron && typeof file.path === 'string')
+                ? file.path
+                : null;
 
             // 変更フラグをリセット（新規読み込み時は変更なし）
             hasUnsavedChanges = false;
@@ -2593,6 +2596,16 @@ window.MojiQPdfManager = (function() {
         // 回転ボタン
         // PDF/画像アップロード
         if (pdfUpload) {
+            boundHandlers.pdfUploadClick = (e) => {
+                if (window.MojiQElectron && window.MojiQElectron.isElectron) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    if (boundHandlers.openPdfHandler) {
+                        boundHandlers.openPdfHandler();
+                    }
+                }
+            };
+
             boundHandlers.pdfUploadChange = (e) => {
                 // 処理中はファイルオープンを無視
                 if (isProcessing) {
@@ -2602,6 +2615,7 @@ window.MojiQPdfManager = (function() {
                 loadFilesFromInput(e.target.files);
                 e.target.value = '';
             };
+            pdfUpload.addEventListener('click', boundHandlers.pdfUploadClick, true);
             pdfUpload.addEventListener('change', boundHandlers.pdfUploadChange);
         }
 
@@ -2826,8 +2840,17 @@ window.MojiQPdfManager = (function() {
         }
 
         // ショートカットからのPDFオープン
-        boundHandlers.openPdfHandler = () => {
+        boundHandlers.openPdfHandler = async () => {
             if (isProcessing) return;
+            if (window.MojiQElectron && window.MojiQElectron.isElectron && window.MojiQElectron.showOpenPdfDialog) {
+                const result = await window.MojiQElectron.showOpenPdfDialog();
+                if (!result.canceled && result.filePaths && result.filePaths[0]) {
+                    const filePath = result.filePaths[0];
+                    const fileName = filePath.split(/[\\/]/).pop();
+                    await loadPdfFromPath(filePath, fileName);
+                }
+                return;
+            }
             if (pdfUpload) {
                 pdfUpload.click();
             }
@@ -3132,6 +3155,7 @@ window.MojiQPdfManager = (function() {
      * イベントリスナーをクリーンアップ
      */
     function cleanup() {
+        if (pdfUpload) pdfUpload.removeEventListener('click', boundHandlers.pdfUploadClick, true);
         if (pdfUpload) pdfUpload.removeEventListener('change', boundHandlers.pdfUploadChange);
         if (insertPdfUpload) insertPdfUpload.removeEventListener('change', boundHandlers.insertPdfUploadChange);
         if (savePdfBtn) savePdfBtn.removeEventListener('click', boundHandlers.savePdfBtnClick);

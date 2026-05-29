@@ -1,11 +1,12 @@
 {
   "name": "mojiq",
-  "version": "2.3.5",
+  "version": "2.3.6",
   "description": "MojiQ",
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --enable-logging",
+    "dev": "electron . --enable-logging --mojiq-csp-debug=1",
+    "check:security": "node scripts/check-security-regression.mjs",
     "build": "electron-builder",
     "build:win": "electron-builder --win --dir && node scripts/set-icon.js && electron-builder --win --prepackaged dist/win-unpacked",
     "build:mac": "electron-builder --mac",

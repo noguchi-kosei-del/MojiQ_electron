@@ -103,6 +103,60 @@ if (!V.isValidPageNumber(pageNum, maxPages)) return;
 
 ## 最近の主要な変更 (2026-03〜05)
 
+### v2.3.6 セキュリティ強化（CSP・ファイルアクセス許可リスト・OOM対策） (2026-05-29)
+
+機能追加・変更はなく、**セキュリティ強化のみ**のリリース。2026-05-29 のセキュリティ監査（Tauri 版で問題視された「WebView から PC 全ファイルへアクセス可能」「CSP 無効」の 2 項目を Electron 版で確認）の結果を反映。
+
+#### 1. CSP（Content-Security-Policy）の確実な適用 — 最重要
+
+**問題**: CSP が `electron/main.js` の `session.defaultSession.webRequest.onHeadersReceived`（HTTP ヘッダー注入）のみで設定されていたが、本アプリは `loadFile()` で `file://` として HTML を読み込むため、ヘッダー注入だけでは CSP が確実に適用されない。HTML 側に `<meta>` タグが無かった。
+
+**修正内容**: `index.html` / `calibration-viewer.html` / `electron/splash.html` の 3 ファイルの `<head>` に、`main.js` の `appCsp` と**完全同一**の `<meta http-equiv="Content-Security-Policy">` を追加（meta タグ ＋ ヘッダー注入の二重 = 多層防御）。
+- ディレクティブ: `default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'`
+- `'unsafe-inline'`（script/style）はアプリ内テンプレート由来の `onclick`・インラインスタイル互換のため残置。**外部スクリプトのロードはブロック**（最大の XSS 入口を封鎖）
+- 検証方法: `npm run dev`（`--mojiq-csp-debug=1` 付き）で起動し、DevTools Console で外部スクリプト注入を試すと `Refused to load the script ... violates ... script-src` が出れば適用済み。`window.electronAPI.getCspViolations()` で違反ログ取得（debug ビルドのみ公開）
+
+#### 2. ファイルアクセス制御（allowlist 方式）— 最重要
+
+**目的**: WebView（レンダラー）層から任意の PC ファイルへアクセスさせない。
+
+**実装** (`electron/main.js`):
+- `isReadFileAllowed()` / `isWriteFileAllowed()` による許可リスト検証。許可されるのは ①ユーザーがダイアログで明示選択したパス（`allowReadFile`/`allowWriteFile` 登録） ②JSON フォルダ配下（`isPathInJsonFolder`） ③校正テキストフォルダ配下（`isPathInTxtFolder`）のみ
+- 全ファイル IPC（`read-file` / `read-file-binary` / `save-file` / `get-file-size` / `check-disk-space` / `file-exists`）が冒頭で検証し、外れたら `forbiddenPathResponse()`（`FORBIDDEN_PATH`）を返す
+- `isPathSafe()`：`..` トラバーサル・`\0`・Windows デバイスパス/予約名/禁止文字を拒否。`fs.realpathSync.native` でシンボリックリンク解決後に基準フォルダ照合（`isRealPathUnderBase`）
+- **PDF オープンの経路をダイアログ経由に変更**: ブラウザの `<input type=file>`（`pdfUpload.click()`）から、許可リスト登録を伴うネイティブダイアログ `showOpenPdfDialog()` 経由に切替（`js/script.js` の `openPdfWithAllowedDialog()`、`js/pdf-manager.js` の `openPdfHandler`）。Electron 環境では `file.path` を `currentSaveFilePath` に保持して上書き保存を可能化
+- **D&D ファイルの許可登録**: `electron/preload.js` の `registerDroppedFiles()` が drop されたファイルパスを `register-dropped-files` IPC で許可リストに登録
+
+#### 3. OOM・プロセス分離・堅牢化
+
+- **読み込みサイズ上限**: `read-file` = 100MB、`read-file-binary` = 500MB（`fs.promises.stat` で事前チェック）
+- **同期 I/O の非同期化**: `read-file`/`save-file` 等を `fs.promises` 化しメインプロセスのブロックを防止
+- **一時ファイルのスコープ化**: `getMojiqTempDir()` で `%TEMP%\MojiQ` 配下に限定（`app.getPath('temp')` は同関数内の 1 箇所のみ）
+- **コマンドインジェクション対策**: ディスク容量取得の `wmic` はドライブレターを `/^[A-Z]$/` で検証後に実行（`execSync` → 非同期 `exec` 化）。印刷（SumatraPDF）は `spawn` 配列引数でシェル非経由
+- **packaged ランタイム判定**: `getSecurityPreloadArgs()`（`--mojiq-packaged=0/1`）で preload に環境を伝達。`get-runtime-security-info-sync` IPC でフォールバック
+
+#### 4. セキュリティ回帰チェックスクリプト
+
+- `scripts/check-security-regression.mjs`（`npm run check:security`）を新設。`contextIsolation:true` / `nodeIntegration:false` / 各ファイル IPC の許可リスト検証 / realpath 照合 / temp スコープ / packaged フラグ / CSP debug API の露出制御 などを静的検査し、退行を CI 的に検出
+
+#### Electron 基本設定（従来から維持）
+- `nodeIntegration: false` / `contextIsolation: true`（全ウィンドウ・子ウィンドウ）、Electron 28 のため `sandbox` デフォルト有効
+- レンダラーへの API 公開は `contextBridge.exposeInMainWorld('electronAPI', ...)` のみ
+
+#### 残存する軽微なハードニング候補（任意・未対応）
+- `setWindowOpenHandler` が全 URL に `action: 'allow'` を返す（想定 URL 以外は `deny`＋`shell.openExternal` が望ましい）
+- `webContents.on('will-navigate', ...)` 未設定
+
+**変更ファイル**:
+- `electron/main.js` — allowlist 検証・CSP ヘッダー注入・サイズ上限・temp スコープ・wmic 非同期化・packaged フラグ・`showOpenPdfDialog`/`register-dropped-files`/`file-exists` ハンドラ
+- `electron/preload.js` — CSP 違反ロガー（debug 限定）・packaged 判定・`registerDroppedFiles`（D&D 許可登録）・`getCspViolations`（debug 限定公開）
+- `index.html` / `calibration-viewer.html` / `electron/splash.html` — CSP `<meta>` タグ追加
+- `js/script.js` / `js/pdf-manager.js` — PDF オープンを許可リスト登録ダイアログ経由に変更
+- `package.json` — `check:security` スクリプト追加、`dev` に `--mojiq-csp-debug=1` 追加、バージョンを `2.3.5` → `2.3.6` に更新
+- `scripts/check-security-regression.mjs` — 新規（セキュリティ回帰チェック）
+
+---
+
 ### v2.3.5 折れ線ツールのEsc確定・Shift直角スナップ (2026-05-22)
 
 #### 1. Escキーで「開いた折れ線」として確定
@@ -1451,31 +1505,88 @@ proofreading-panel:
 
 ## ファイル構成
 
+> 注: 以下は 2026-05-29 時点の実構成に合わせて更新済み。js/ 配下は実在ファイルを網羅。
+
 ```
 MojiQ/
+├── electron/                      # Electron メインプロセス
+│   ├── main.js                    # メインプロセス（CSP・許可リスト・IPC・印刷・更新）
+│   ├── preload.js                 # プリロード（electronAPI 公開・CSP違反ロガー・D&D許可登録）
+│   ├── splash-preload.js          # スプラッシュ用プリロード
+│   └── splash.html                # スプラッシュ画面
+├── index.html                     # メイン HTML
+├── calibration-viewer.html        # 校正チェックビューワー（別ウィンドウ）
+├── css/                           # スタイルシート一式
+├── logo/                          # アイコン・ロゴ（pdf-icons 含む）
+├── scripts/
+│   ├── check-security-regression.mjs # セキュリティ回帰チェック（npm run check:security）
+│   └── set-icon.js                # ビルド時アイコン設定
 ├── js/
-│   ├── core/
-│   │   ├── namespace.js       # 統一名前空間（MojiQ）
-│   │   ├── error-handler.js   # 標準化されたエラーハンドリング
-│   │   ├── validators.js      # 共通バリデーション関数
-│   │   ├── store.js           # 状態管理
-│   │   ├── event-bus.js       # イベントバス
-│   │   ├── dom-cache.js       # DOMキャッシュ
-│   │   ├── clone.js           # オブジェクトクローン
-│   │   ├── render-manager.js  # レンダリング管理
-│   │   ├── legacy-bridge.js   # レガシーブリッジ
-│   │   └── module-registry.js # モジュールレジストリ
-│   ├── pdf-lib-saver.js       # PDF保存（メタデータ書き込み、注釈テキスト非表示保存）
-│   ├── pdf-manager.js         # PDF管理（メタデータ読み込み）
-│   ├── pdf-annotation-loader.js # PDF注釈読み込み（新規注釈のみオブジェクト化）
-│   ├── text-layer-manager.js  # PDF注釈テキスト表示/非表示管理
-│   ├── drawing.js             # 描画機能
-│   ├── drawing-objects.js     # 描画オブジェクト管理
-│   ├── drawing-renderer.js    # 描画レンダリング
-│   ├── drawing-select.js      # 選択ツール
-│   ├── drawing-export-import.js # 描画データのエクスポート/インポート
-│   ├── drawing-modes.js       # 描画モード別処理
-│   └── ui/
-│       └── proofreading-panel.js # 校正パネル（コメントタブ）
-└── CLAUDE.md                  # このファイル
+│   ├── core/                      # コア基盤
+│   │   ├── namespace.js           # 統一名前空間（MojiQ）
+│   │   ├── error-handler.js       # 標準化されたエラーハンドリング
+│   │   ├── validators.js          # 共通バリデーション関数
+│   │   ├── store.js               # 状態管理
+│   │   ├── event-bus.js           # イベントバス
+│   │   ├── dom-cache.js           # DOMキャッシュ
+│   │   ├── clone.js               # オブジェクトクローン
+│   │   ├── render-manager.js      # レンダリング管理
+│   │   ├── legacy-bridge.js       # レガシーブリッジ
+│   │   └── module-registry.js     # モジュールレジストリ
+│   ├── pdf/                       # PDF サブモジュール
+│   │   ├── pdf-utils.js           # PDF ユーティリティ
+│   │   ├── pdf-compress.js        # PDF 圧縮
+│   │   ├── pdf-cache.js           # PDF キャッシュ
+│   │   └── pdf-spread-state.js    # 見開き状態管理
+│   ├── simulator/                 # 写植シミュレーター
+│   │   ├── index.js
+│   │   ├── state.js
+│   │   ├── dom-elements.js
+│   │   ├── grid-drawing.js
+│   │   ├── zoom.js
+│   │   ├── event-handlers.js
+│   │   ├── tools.js
+│   │   ├── undo-redo.js
+│   │   ├── ui-update.js
+│   │   └── keyboard.js
+│   ├── ui/                        # UI サブモジュール
+│   │   ├── proofreading-panel.js  # 校正パネル（コメントタブ）
+│   │   ├── proofreading-ui.js     # 校正ツール UI
+│   │   ├── calibration-panel.js   # 校正チェック JSON 選択パネル
+│   │   ├── history-panel.js       # 作業履歴パネル
+│   │   └── dropdown-positioner.js # ドロップダウン位置計算
+│   ├── vendor/                    # バンドル済みライブラリ
+│   │   ├── pdf.min.js / pdf.worker.min.js # pdf.js
+│   │   ├── pdf-lib.min.js         # pdf-lib
+│   │   └── jspdf.umd.min.js       # jsPDF
+│   ├── script.js                  # メインエントリ
+│   ├── constants.js / types.js / utils.js
+│   ├── electron-bridge.js         # Electron IPC ブリッジ（MojiQElectron）
+│   ├── pdf-manager.js             # PDF 管理（読み込み・表示・保存制御・メタデータ）
+│   ├── pdf-lib-saver.js           # PDF 保存（メタデータ書き込み・注釈非表示保存）
+│   ├── pdf-annotation-loader.js   # PDF 注釈読み込み（新規注釈のみオブジェクト化）
+│   ├── text-layer-manager.js      # PDF 注釈テキスト表示/非表示管理
+│   ├── drawing.js                 # 描画メイン
+│   ├── drawing-objects.js         # 描画オブジェクト管理
+│   ├── drawing-renderer.js        # 描画レンダリング
+│   ├── drawing-select.js          # 選択ツール
+│   ├── drawing-modes.js           # 描画モード別処理
+│   ├── drawing-export-import.js   # 描画データのエクスポート/インポート
+│   ├── drawing-clipboard.js       # コピー/カット/ペースト
+│   ├── stamps.js                  # スタンプ UI 管理
+│   ├── mode-controller.js         # モード制御
+│   ├── page-manager.js            # ページ管理・Undo/Redo
+│   ├── navigation.js              # ナビゲーション
+│   ├── zoom.js                    # ズーム
+│   ├── viewer-mode.js             # 閲覧モード
+│   ├── print-manager.js           # 印刷管理
+│   ├── modal.js                   # モーダルダイアログ
+│   ├── lock.js                    # UI ロック
+│   ├── shortcuts.js               # ショートカット
+│   ├── settings.js / settings-ui.js # 設定・設定 UI
+│   ├── canvas-context.js          # キャンバスコンテキスト
+│   ├── json-folder-browser.js     # JSON フォルダブラウザ（作品仕様読み込み）
+│   └── calibration-viewer.js      # 校正チェックビューワーのロジック
+├── package.json
+└── CLAUDE.md                      # このファイル
 ```

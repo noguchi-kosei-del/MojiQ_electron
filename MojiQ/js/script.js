@@ -391,11 +391,27 @@ function initWindowControlsAndMenuBar() {
             });
         });
 
-        function handleMenuAction(action) {
+        async function openPdfWithAllowedDialog() {
+            if (window.MojiQElectron && window.MojiQElectron.isElectron && window.MojiQElectron.showOpenPdfDialog) {
+                const result = await window.MojiQElectron.showOpenPdfDialog();
+                if (!result.canceled && result.filePaths && result.filePaths[0]) {
+                    const filePath = result.filePaths[0];
+                    const fileName = filePath.split(/[\\/]/).pop();
+                    if (window.MojiQPdfManager && typeof window.MojiQPdfManager.loadPdfFromPath === 'function') {
+                        await window.MojiQPdfManager.loadPdfFromPath(filePath, fileName);
+                    }
+                }
+                return;
+            }
+
+            const pdfUpload = document.getElementById('pdfUpload');
+            if (pdfUpload) pdfUpload.click();
+        }
+
+        async function handleMenuAction(action) {
             switch (action) {
                 case 'open-pdf':
-                    const pdfUpload = document.getElementById('pdfUpload');
-                    if (pdfUpload) pdfUpload.click();
+                    await openPdfWithAllowedDialog();
                     break;
                 case 'save-pdf':
                     const savePdfBtn = document.getElementById('savePdfBtn');
@@ -1758,7 +1774,7 @@ window.addEventListener('load', () => {
     const pdfUpload = document.getElementById('pdfUpload');
 
     if (pdfUploadBtn && pdfUpload) {
-        pdfUploadBtn.addEventListener('click', (e) => {
+        pdfUploadBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             // 他のドロップダウンを閉じる
             if (window._savePdfDropdownClose) {
@@ -1767,7 +1783,18 @@ window.addEventListener('load', () => {
             if (window._spreadBindingDropdownClose) {
                 window._spreadBindingDropdownClose();
             }
-            pdfUpload.click();
+            if (window.MojiQElectron && window.MojiQElectron.isElectron && window.MojiQElectron.showOpenPdfDialog) {
+                const result = await window.MojiQElectron.showOpenPdfDialog();
+                if (!result.canceled && result.filePaths && result.filePaths[0]) {
+                    const filePath = result.filePaths[0];
+                    const fileName = filePath.split(/[\\/]/).pop();
+                    if (window.MojiQPdfManager && typeof window.MojiQPdfManager.loadPdfFromPath === 'function') {
+                        await window.MojiQPdfManager.loadPdfFromPath(filePath, fileName);
+                    }
+                }
+            } else {
+                pdfUpload.click();
+            }
         });
     }
 

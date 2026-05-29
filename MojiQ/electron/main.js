@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, nativeTheme, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, nativeTheme, screen, session } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -12,9 +12,34 @@ function getPrinterModule() {
   return ptp;
 }
 
+const appCsp = "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'";
+
+function isPackagedRuntime() {
+  return app.isPackaged || !process.defaultApp;
+}
+
+function getSecurityPreloadArgs() {
+  return [`--mojiq-packaged=${isPackagedRuntime() ? '1' : '0'}`];
+}
+
+function installContentSecurityPolicy() {
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [appCsp]
+      }
+    });
+  });
+}
+
 let mainWindow;
 let splashWindow;
 let forceQuit = false;
+
+ipcMain.on('get-runtime-security-info-sync', (event) => {
+  event.returnValue = { isPackagedRuntime: isPackagedRuntime() };
+});
 let filesToOpen = []; // 起動時に開くファイルのパス（複数対応）
 let initialPageNumber = null; // 起動時に開くページ番号（検版ビューワー連携用）
 let pendingCalibrationJson = null; // ProGen連携: 起動時に受け取った校正データJSONファイルパス
@@ -79,29 +104,152 @@ function isPathSafe(filePath) {
 
 // JSONフォルダ内のパスかどうかを検証
 function isPathInJsonFolder(filePath) {
-  if (!isPathSafe(filePath)) return false;
-
-  const resolved = path.resolve(filePath);
-  const jsonFolderResolved = path.resolve(JSON_FOLDER_BASE_PATH);
-
-  // JSONフォルダ内のパスかチェック（大文字小文字を区別しない - Windows対応）
-  const normalizedPath = resolved.toLowerCase();
-  const normalizedBase = jsonFolderResolved.toLowerCase();
-
-  return normalizedPath.startsWith(normalizedBase + path.sep) || normalizedPath === normalizedBase;
+  return isRealPathUnderBase(filePath, JSON_FOLDER_BASE_PATH);
 }
 
 // 写植・校正用テキストログフォルダ内のパスかどうかを検証
 function isPathInTxtFolder(filePath) {
+  return isRealPathUnderBase(filePath, TXT_FOLDER_BASE_PATH);
+}
+
+function normalizeCase(filePath) {
+  return process.platform === 'win32' ? filePath.toLowerCase() : filePath;
+}
+
+function normalizeAccessPath(filePath) {
+  if (!isPathSafe(filePath)) return null;
+  return normalizeCase(path.resolve(filePath));
+}
+
+function resolveExistingPath(filePath) {
+  if (!isPathSafe(filePath)) return null;
+  try {
+    return normalizeCase(fs.realpathSync.native(filePath));
+  } catch (error) {
+    return null;
+  }
+}
+
+function isRealPathUnderBase(filePath, basePath) {
+  if (!basePath || !isPathSafe(filePath) || !isPathSafe(basePath)) return false;
+
+  const realPath = resolveExistingPath(filePath);
+  const realBase = resolveExistingPath(basePath);
+  if (!realPath || !realBase) return false;
+
+  return realPath.startsWith(realBase + path.sep) || realPath === realBase;
+}
+
+function isConfiguredPathUnderBase(filePath, basePath) {
+  if (!basePath || !isPathSafe(filePath) || !isPathSafe(basePath)) return false;
+
+  const resolvedPath = normalizeAccessPath(filePath);
+  const resolvedBase = normalizeAccessPath(basePath);
+  if (!resolvedPath || !resolvedBase) return false;
+
+  return resolvedPath.startsWith(resolvedBase + path.sep) || resolvedPath === resolvedBase;
+}
+
+function isTrustedPathUnderBase(filePath, basePath) {
+  const realPath = resolveExistingPath(filePath);
+  const realBase = resolveExistingPath(basePath);
+
+  if (realPath && realBase) {
+    return realPath.startsWith(realBase + path.sep) || realPath === realBase;
+  }
+
+  return isConfiguredPathUnderBase(filePath, basePath);
+}
+
+function getMojiqTempDir() {
+  const tempDir = path.join(app.getPath('temp'), 'MojiQ');
+  fs.mkdirSync(tempDir, { recursive: true });
+  return tempDir;
+}
+
+const allowedReadFiles = new Set();
+const allowedWriteFiles = new Set();
+const allowedReadDirectories = new Set();
+const allowedWriteDirectories = new Set();
+
+function isExistingDirectory(filePath) {
   if (!isPathSafe(filePath)) return false;
 
-  const resolved = path.resolve(filePath);
-  const txtFolderResolved = path.resolve(TXT_FOLDER_BASE_PATH);
+  try {
+    return fs.statSync(filePath).isDirectory();
+  } catch (error) {
+    return false;
+  }
+}
 
-  const normalizedPath = resolved.toLowerCase();
-  const normalizedBase = txtFolderResolved.toLowerCase();
+function resolveWriteTargetPath(filePath) {
+  if (!isPathSafe(filePath)) return null;
 
-  return normalizedPath.startsWith(normalizedBase + path.sep) || normalizedPath === normalizedBase;
+  const existingPath = resolveExistingPath(filePath);
+  if (existingPath) return existingPath;
+
+  const parentDir = path.dirname(filePath);
+  const realParent = resolveExistingPath(parentDir);
+  if (!realParent) return null;
+
+  return normalizeCase(path.join(realParent, path.basename(filePath)));
+}
+
+function isPathUnderAllowedDirectory(filePath, allowedDirectories, resolveForWrite = false) {
+  const normalized = resolveForWrite ? resolveWriteTargetPath(filePath) : resolveExistingPath(filePath);
+  if (!normalized) return false;
+
+  for (const allowedDirectory of allowedDirectories) {
+    if (normalized === allowedDirectory || normalized.startsWith(allowedDirectory + path.sep)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function allowReadFile(filePath) {
+  const normalized = resolveExistingPath(filePath);
+  if (!normalized) return;
+
+  if (isExistingDirectory(filePath)) {
+    allowedReadDirectories.add(normalized);
+  } else {
+    allowedReadFiles.add(normalized);
+  }
+}
+
+function allowWriteFile(filePath) {
+  if (isExistingDirectory(filePath)) {
+    const normalized = resolveExistingPath(filePath);
+    if (normalized) allowedWriteDirectories.add(normalized);
+    return;
+  }
+
+  const normalized = resolveWriteTargetPath(filePath);
+  if (normalized) allowedWriteFiles.add(normalized);
+}
+
+function isReadFileAllowed(filePath) {
+  const normalized = resolveExistingPath(filePath);
+  if (!normalized) return false;
+
+  return allowedReadFiles.has(normalized) ||
+    isPathUnderAllowedDirectory(filePath, allowedReadDirectories) ||
+    isPathInJsonFolder(filePath) ||
+    isPathInTxtFolder(filePath);
+}
+
+function isWriteFileAllowed(filePath) {
+  const normalized = resolveWriteTargetPath(filePath);
+  if (!normalized) return false;
+
+  return allowedWriteFiles.has(normalized) ||
+    isPathUnderAllowedDirectory(filePath, allowedWriteDirectories, true);
+}
+
+function forbiddenPathResponse() {
+  return { success: false, error: 'アクセスが許可されていないパスです', errorCode: 'FORBIDDEN_PATH' };
 }
 
 // ========================================
@@ -328,7 +476,8 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      additionalArguments: getSecurityPreloadArgs()
     },
     icon: path.join(__dirname, '..', 'logo', 'MojiQ_icon.ico')
   });
@@ -356,7 +505,8 @@ function createWindow() {
         webPreferences: {
           preload: path.join(__dirname, 'preload.js'),
           nodeIntegration: false,
-          contextIsolation: true
+          contextIsolation: true,
+          additionalArguments: getSecurityPreloadArgs()
         }
       }
     };
@@ -417,6 +567,8 @@ function createMenuTemplate() {
             });
             if (!result.canceled && result.filePaths.length > 0) {
               const filePath = result.filePaths[0];
+              allowReadFile(filePath);
+              allowWriteFile(filePath);
               // BUG修正: 同期ファイル操作を非同期に変更
               const data = await fs.promises.readFile(filePath);
               const base64 = data.toString('base64');
@@ -439,6 +591,7 @@ function createMenuTemplate() {
               filters: [{ name: 'PDFファイル', extensions: ['pdf'] }]
             });
             if (!result.canceled && result.filePath) {
+              allowWriteFile(result.filePath);
               mainWindow.webContents.send('save-pdf-as', { path: result.filePath });
             }
           }
@@ -500,20 +653,52 @@ function createMenuTemplate() {
 
 // ファイル選択ダイアログ
 ipcMain.handle('show-open-dialog', async (event, options) => {
-  return await dialog.showOpenDialog(mainWindow, options);
+  const result = await dialog.showOpenDialog(mainWindow, options);
+  if (!result.canceled && Array.isArray(result.filePaths)) {
+    result.filePaths.forEach((filePath) => {
+      allowReadFile(filePath);
+      allowWriteFile(filePath);
+    });
+  }
+  return result;
 });
 
 // ファイル保存ダイアログ
+// D&Dされたファイルを許可リストに登録する。
+// このIPCはpreload.js内部からだけ呼び、window.electronAPIには公開しない。
+ipcMain.handle('register-dropped-files', async (event, filePaths) => {
+  if (!mainWindow || event.sender !== mainWindow.webContents) {
+    return { success: false, error: 'invalid sender' };
+  }
+  if (!Array.isArray(filePaths)) {
+    return { success: false, error: 'invalid file list' };
+  }
+
+  let registered = 0;
+  for (const filePath of filePaths) {
+    if (typeof filePath !== 'string' || !isSupportedFile(filePath)) continue;
+    allowReadFile(filePath);
+    allowWriteFile(filePath);
+    registered++;
+  }
+
+  return { success: true, registered };
+});
+
 ipcMain.handle('show-save-dialog', async (event, options) => {
-  return await dialog.showSaveDialog(mainWindow, options);
+  const result = await dialog.showSaveDialog(mainWindow, options);
+  if (!result.canceled && result.filePath) {
+    allowWriteFile(result.filePath);
+  }
+  return result;
 });
 
 // ファイル読み込み
 // BUG修正: readFileSyncをfs.promises.readFileに変更（メインプロセスブロック防止）
 ipcMain.handle('read-file', async (event, filePath) => {
   try {
-    if (!isPathSafe(filePath)) {
-      return { success: false, error: '不正なファイルパスです' };
+    if (!isReadFileAllowed(filePath)) {
+      return forbiddenPathResponse();
     }
     // ファイルサイズチェック（OOM防止: IPC経由のBase64変換は100MBまで）
     const stats = await fs.promises.stat(filePath);
@@ -540,6 +725,9 @@ ipcMain.handle('read-file', async (event, filePath) => {
 ipcMain.handle('save-file', async (event, filePath, base64Data) => {
   if (!isPathSafe(filePath)) {
     return { success: false, error: '不正なファイルパスです', errorCode: 'INVALID_PATH' };
+  }
+  if (!isWriteFileAllowed(filePath)) {
+    return forbiddenPathResponse();
   }
 
   // ファイルが読み取り専用属性かどうかをチェック（Windows）
@@ -677,6 +865,9 @@ ipcMain.handle('save-file', async (event, filePath, base64Data) => {
 // BUG修正: execSyncをexecに変更（メインプロセスブロック防止）
 ipcMain.handle('check-disk-space', async (event, filePath, requiredBytes) => {
   try {
+    if (!isWriteFileAllowed(filePath)) {
+      return forbiddenPathResponse();
+    }
     if (process.platform === 'win32') {
       const drive = path.parse(filePath).root.charAt(0).toUpperCase();
       // BUG-004修正: コマンドインジェクション対策 - ドライブレターの検証
@@ -724,7 +915,7 @@ ipcMain.handle('check-disk-space', async (event, filePath, requiredBytes) => {
 ipcMain.handle('print-pdf', async (event, pdfBase64Data) => {
   try {
     const { shell } = require('electron');
-    const tempDir = app.getPath('temp');
+    const tempDir = getMojiqTempDir();
     const tempFilePath = path.join(tempDir, `mojiq-print-${Date.now()}.pdf`);
 
     const buffer = Buffer.from(pdfBase64Data, 'base64');
@@ -766,7 +957,7 @@ ipcMain.handle('get-printers', async () => {
 // BUG修正: 同期ファイル操作を非同期に変更
 ipcMain.handle('print-pdf-direct', async (event, options) => {
   const { pdfBase64Data, printerName, copies, pageRanges } = options;
-  const tempDir = app.getPath('temp');
+  const tempDir = getMojiqTempDir();
   const tempFilePath = path.join(tempDir, `mojiq-print-${Date.now()}.pdf`);
 
   try {
@@ -859,7 +1050,7 @@ ipcMain.handle('print-pdf-direct', async (event, options) => {
 // システム印刷ダイアログで印刷（spawn版：ダイアログ終了まで待機）
 // BUG修正: 同期ファイル操作を非同期に変更
 ipcMain.handle('print-pdf-with-dialog', async (event, pdfBase64Data) => {
-  const tempDir = app.getPath('temp');
+  const tempDir = getMojiqTempDir();
   const tempFilePath = path.join(tempDir, `mojiq-print-${Date.now()}.pdf`);
 
   try {
@@ -984,6 +1175,9 @@ ipcMain.handle('list-directory', async (event, dirPath) => {
 // BUG修正: 同期ファイル操作を非同期に変更
 ipcMain.handle('get-file-size', async (event, filePath) => {
   try {
+    if (!isReadFileAllowed(filePath)) {
+      return forbiddenPathResponse();
+    }
     const stats = await fs.promises.stat(filePath);
     return { success: true, size: stats.size };
   } catch (error) {
@@ -995,6 +1189,9 @@ ipcMain.handle('get-file-size', async (event, filePath) => {
 // BUG修正: 同期ファイル操作を非同期に変更
 ipcMain.handle('file-exists', async (event, filePath) => {
   try {
+    if (!isReadFileAllowed(filePath) && !isWriteFileAllowed(filePath)) {
+      return forbiddenPathResponse();
+    }
     await fs.promises.access(filePath, fs.constants.F_OK);
     return { success: true, exists: true };
   } catch (error) {
@@ -1010,9 +1207,8 @@ ipcMain.handle('file-exists', async (event, filePath) => {
 // BUG修正: 同期ファイル操作を非同期に変更
 ipcMain.handle('read-file-binary', async (event, filePath) => {
   try {
-    // BUG-011修正: パストラバーサル対策 - パスの安全性チェック
-    if (!isPathSafe(filePath)) {
-      return { success: false, error: '不正なファイルパスです' };
+    if (!isReadFileAllowed(filePath)) {
+      return forbiddenPathResponse();
     }
     // ファイルサイズチェック（OOM防止）
     const stats = await fs.promises.stat(filePath);
@@ -1274,10 +1470,16 @@ function openFilesInApp(filePaths, pageNum = null) {
       if (pdfFiles.length > 0 && imageFiles.length === 0) {
         // PDFのみの場合は最初の1つを開く
         const filePath = pdfFiles[0];
+        allowReadFile(filePath);
+        allowWriteFile(filePath);
         const fileName = path.basename(filePath);
         mainWindow.webContents.send('file-opened-path', { path: filePath, name: fileName, initialPage: pageNum });
       } else if (imageFiles.length > 0) {
         // 画像ファイルがある場合は複数まとめて送信
+        imageFiles.forEach((filePath) => {
+          allowReadFile(filePath);
+          allowWriteFile(filePath);
+        });
         const imageData = imageFiles.map(filePath => ({
           path: filePath,
           name: path.basename(filePath)
@@ -1302,6 +1504,8 @@ pendingCalibrationJson = argsResult.calibrationJson;
 
 // アプリの準備ができたらウィンドウを作成
 app.whenReady().then(async () => {
+  installContentSecurityPolicy();
+
   // スプラッシュウィンドウを先に表示（更新チェックは後でバックグラウンド実行）
   createSplashWindow();
 
